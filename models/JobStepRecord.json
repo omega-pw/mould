@@ -1,0 +1,200 @@
+{
+    "entity_name": "job_step_record",
+    "description": "任务步骤记录",
+    "pri_key": "id",
+    "enums": [
+        {
+            "enum_name": "step_type",
+            "description": "步骤类型",
+            "options": [
+                {
+                    "key": "Auto",
+                    "value": 1,
+                    "label": "自动"
+                },
+                {
+                    "key": "Manual",
+                    "value": 2,
+                    "label": "手动"
+                }
+            ]
+        },
+        {
+            "enum_name": "status",
+            "description": "状态",
+            "options": [
+                {
+                    "key": "Pending",
+                    "value": 1,
+                    "label": "未开始"
+                },
+                {
+                    "key": "Running",
+                    "value": 2,
+                    "label": "进行中"
+                },
+                {
+                    "key": "Success",
+                    "value": 3,
+                    "label": "成功"
+                },
+                {
+                    "key": "Failure",
+                    "value": 4,
+                    "label": "失败"
+                }
+            ]
+        }
+    ],
+    "properties": [
+        {
+            "property_name": "id",
+            "type": "Id",
+            "priKey": true,
+            "required": true,
+            "unique": true,
+            "description": "步骤记录id"
+        },
+        {
+            "property_name": "org_id",
+            "type": "Id",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "组织id"
+        },
+        {
+            "property_name": "job_id",
+            "type": "Id",
+            "priKey": false,
+            "required": true,
+            "unique": true,
+            "description": "任务id"
+        },
+        {
+            "property_name": "environment_id",
+            "type": "Id",
+            "priKey": false,
+            "required": true,
+            "unique": true,
+            "description": "环境id"
+        },
+        {
+            "property_name": "record_id",
+            "type": "Id",
+            "priKey": false,
+            "required": true,
+            "unique": true,
+            "description": "记录id"
+        },
+        {
+            "property_name": "job_step_id",
+            "type": "Id",
+            "priKey": false,
+            "required": true,
+            "unique": true,
+            "description": "任务步骤id"
+        },
+        {
+            "property_name": "step_name",
+            "type": "String",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "步骤名称",
+            "maxLength": 128
+        },
+        {
+            "property_name": "step_type",
+            "type": "Enum",
+            "enum_name": "step_type",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "步骤类型"
+        },
+        {
+            "property_name": "step_remark",
+            "type": "String",
+            "priKey": false,
+            "required": false,
+            "unique": false,
+            "description": "步骤备注"
+        },
+        {
+            "property_name": "extension_id",
+            "type": "String",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "扩展id",
+            "maxLength": 512
+        },
+        {
+            "property_name": "operation_id",
+            "type": "String",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "操作id"
+        },
+        {
+            "property_name": "operation_name",
+            "type": "String",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "操作名称",
+            "maxLength": 512
+        },
+        {
+            "property_name": "operation_parameter",
+            "type": "String",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "操作参数"
+        },
+        {
+            "property_name": "attachments",
+            "type": "String",
+            "priKey": false,
+            "required": false,
+            "unique": false,
+            "description": "附件"
+        },
+        {
+            "property_name": "job_step_seq",
+            "type": "Integer",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "任务步骤顺序"
+        },
+        {
+            "property_name": "status",
+            "type": "Enum",
+            "enum_name": "status",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "执行状态"
+        },
+        {
+            "property_name": "created_time",
+            "type": "DateTime",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "创建时间"
+        },
+        {
+            "property_name": "last_modified_time",
+            "type": "DateTime",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "更新时间"
+        }
+    ]
+}

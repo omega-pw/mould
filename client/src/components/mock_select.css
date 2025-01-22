@@ -1,0 +1,32 @@
+.e-mock-select {
+    display: inline-block;
+    width: 16em;
+}
+
+.e-mock-select-box {
+    border-color: #CCCCCC;
+}
+
+.e-mock-select-box.s-empty {
+    color: rgb(117, 117, 117);
+}
+
+.e-mock-option-panel {
+    border-color: #CCCCCC;
+    background-color: #FFFFFF;
+}
+
+.e-mock-option:hover {
+    background-color: #F8F8F8;
+}
+
+.e-mock-search-input {
+    border-width: 1px;
+    border-style: solid;
+    outline-style: none;
+    border-color: #CCCCCC;
+}
+
+.e-mock-search-input:focus {
+    border-color: #6699FF;
+}

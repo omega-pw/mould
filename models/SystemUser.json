@@ -1,0 +1,58 @@
+{
+    "entity_name": "system_user",
+    "description": "系统用户",
+    "pri_key": "id",
+    "properties": [
+        {
+            "property_name": "id",
+            "type": "Id",
+            "priKey": true,
+            "required": true,
+            "unique": true,
+            "description": "用户id"
+        },
+        {
+            "property_name": "email",
+            "type": "String",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "邮箱",
+            "maxLength": 256
+        },
+        {
+            "property_name": "user_random_value",
+            "type": "String",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "随机数",
+            "length": 128
+        },
+        {
+            "property_name": "hashed_auth_key",
+            "type": "String",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "授权秘钥摘要",
+            "maxLength": 128
+        },
+        {
+            "property_name": "created_time",
+            "type": "DateTime",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "创建时间"
+        },
+        {
+            "property_name": "last_modified_time",
+            "type": "DateTime",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "更新时间"
+        }
+    ]
+}

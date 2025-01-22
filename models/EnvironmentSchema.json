@@ -1,0 +1,49 @@
+{
+    "entity_name": "environment_schema",
+    "description": "环境规格",
+    "pri_key": "id",
+    "enums": [],
+    "properties": [
+        {
+            "property_name": "id",
+            "type": "Id",
+            "priKey": true,
+            "required": true,
+            "unique": true,
+            "description": "id"
+        },
+        {
+            "property_name": "org_id",
+            "type": "Id",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "组织id"
+        },
+        {
+            "property_name": "name",
+            "type": "String",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "环境规格名称",
+            "maxLength": 128
+        },
+        {
+            "property_name": "created_time",
+            "type": "DateTime",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "创建时间"
+        },
+        {
+            "property_name": "last_modified_time",
+            "type": "DateTime",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "更新时间"
+        }
+    ]
+}

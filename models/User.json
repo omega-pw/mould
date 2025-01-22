@@ -1,0 +1,83 @@
+{
+    "entity_name": "user",
+    "description": "用户",
+    "pri_key": "id",
+    "enums": [
+        {
+            "enum_name": "user_source",
+            "description": "用户来源",
+            "options": [
+                {
+                    "key": "System",
+                    "value": 1,
+                    "label": "系统用户"
+                },
+                {
+                    "key": "External",
+                    "value": 2,
+                    "label": "外部用户"
+                }
+            ]
+        }
+    ],
+    "properties": [
+        {
+            "property_name": "id",
+            "type": "Id",
+            "priKey": true,
+            "required": true,
+            "unique": true,
+            "description": "id"
+        },
+        {
+            "property_name": "org_id",
+            "type": "Id",
+            "priKey": false,
+            "required": false,
+            "unique": true,
+            "description": "组织id"
+        },
+        {
+            "property_name": "user_source",
+            "type": "Enum",
+            "enum_name": "user_source",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "用户来源"
+        },
+        {
+            "property_name": "name",
+            "type": "String",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "名称",
+            "maxLength": 128
+        },
+        {
+            "property_name": "avatar_url",
+            "type": "String",
+            "priKey": false,
+            "required": false,
+            "unique": false,
+            "description": "头像"
+        },
+        {
+            "property_name": "created_time",
+            "type": "DateTime",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "创建时间"
+        },
+        {
+            "property_name": "last_modified_time",
+            "type": "DateTime",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "更新时间"
+        }
+    ]
+}

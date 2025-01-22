@@ -1,0 +1,16 @@
+[Unit]
+Description=Mould Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/mould
+ExecStart=/opt/mould/mould /opt/mould/config.json5
+KillMode=process
+Restart=always
+RestartSec=3s
+
+[Install]
+WantedBy=multi-user.target

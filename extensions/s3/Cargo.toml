@@ -1,0 +1,20 @@
+[package]
+name = "s3-extension"
+version = "0.1.0"
+authors = ["omega"]
+edition = "2018"
+
+[lib]
+name = "s3"
+crate-type = ["cdylib"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+http = "1"
+aws-types = "1"
+aws-smithy-async = { version = "1", features = ["rt-tokio"] }
+aws-smithy-http = { version = "0.60", features = ["rt-tokio"] }
+aws-sdk-s3 = "1"
+futures = "0.3"
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "fs"] }
+mould-extension-sdk = { path="../../extension-sdk" }

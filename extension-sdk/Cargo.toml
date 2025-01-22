@@ -1,0 +1,15 @@
+[package]
+name = "mould-extension-sdk"
+version = "0.1.0"
+authors = ["omega <398914521@qq.com>"]
+edition = "2018"
+license = "Apache-2.0"
+description = "Mould extension sdk."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-trait = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+libloading = "0.8"

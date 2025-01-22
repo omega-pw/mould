@@ -1,0 +1,41 @@
+@-webkit-keyframes rotateLoading {
+    0% {
+        -webkit-transform: rotate(0deg);
+    }
+    100% {
+        -webkit-transform: rotate(360deg);
+    }
+}
+@keyframes rotateLoading {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+.loading {
+    box-sizing: border-box;
+    border: 0.5em solid #409eff;
+    border-top-color: #FFF;
+    border-radius: 50%;
+    width: 3em;
+    height: 3em;
+    display: inline-block;
+    -webkit-animation-name: rotateLoading;
+    animation-name: rotateLoading;
+    -webkit-animation-duration: 1s;
+    animation-duration: 1s;
+    -webkit-animation-timing-function: linear;
+    animation-timing-function: linear;
+    -webkit-animation-delay: 0.00001ms;
+    animation-delay: 0.00001ms;
+    -webkit-animation-iteration-count: infinite;
+    animation-iteration-count: infinite;
+    -webkit-animation-direction: normal;
+    animation-direction: normal;
+    -webkit-animation-fill-mode: none;
+    animation-fill-mode: none;
+    -webkit-animation-play-state: running;
+    animation-play-state: running;
+}

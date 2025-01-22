@@ -1,0 +1,124 @@
+.date-time-picker .year-month-area {
+  overflow: auto;
+  line-height: 3em;
+  border-top: 1px solid;
+  border-left: 1px solid;
+  border-right: 1px solid;
+}
+
+.date-time-picker .year-area, .date-time-picker .month-area {
+  display: inline-block;
+  width: 50%;
+  overflow: hidden;
+}
+
+.date-time-picker .year-area {
+  float: left;
+}
+
+.date-time-picker .month-area {
+  float: right;
+}
+
+.date-time-picker .year-wrapper, .date-time-picker .month-wrapper {
+  display: inline-block;
+  box-sizing: border-box;
+  margin-left: -6em;
+  padding-left: 6em;
+  width: 100%;
+  float: left;
+}
+
+.date-time-picker .icon-prev {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 3em;
+  float: left;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+}
+
+.date-time-picker .icon-next {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 3em;
+  float: right;
+  cursor: pointer;
+}
+
+.date-time-picker .head-cell {
+  width: 0;
+  border: 1px solid #000;
+  text-align: center;
+  vertical-align: middle;
+  padding: 0.5em 1.5em;
+}
+
+.date-time-picker .cell {
+  width: 0;
+  border: 1px solid #000;
+  text-align: center;
+  vertical-align: middle;
+  padding: 0.5em 1em;
+}
+
+.date-time-picker .icon-prev:hover, .date-time-picker .icon-next:hover, .date-time-picker .cell:hover {
+  background-color: #ddd;
+}
+
+.date-time-picker .date-decorator {
+  font-size: smaller;
+}
+
+.date-time-picker .footer-area {
+  border-bottom: 1px solid;
+  border-left: 1px solid;
+  border-right: 1px solid;
+  padding: 0.5em;
+}
+
+.date-time-picker .time-label {
+  line-height: 2em;
+  height: 2em;
+  margin-right: 1em;
+  display: inline-block;
+}
+
+.date-time-picker .time-spliter {
+  box-sizing: border-box;
+  float: left;
+  display: inline-block;
+  height: 2em;
+  border-top: 1px solid;
+  border-bottom: 1px solid;
+  border-left: none;
+  border-right: none;
+}
+
+.date-time-picker .text-box {
+  box-sizing: border-box;
+  float: left;
+  width: 2.4em;
+  height: 2em;
+  font-size: inherit;
+  text-align: center;
+  padding: 0.5em;
+  border: 1px solid;
+}
+.date-time-picker .text-box:focus {
+  outline: none;
+}
+
+.date-time-picker .action-area {
+  line-height: 2em;
+}
+
+.date-time-picker .btn-clear, .date-time-picker .btn-save {
+  font-size: inherit;
+  vertical-align: middle;
+}
+
+.date-time-picker .btn-save[disabled] {
+  cursor: not-allowed;
+}

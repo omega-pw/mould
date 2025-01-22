@@ -1,0 +1,83 @@
+{
+    "entity_name": "external_user",
+    "description": "外部用户",
+    "pri_key": "id",
+    "enums": [
+        {
+            "enum_name": "provider_type",
+            "description": "提供者类型",
+            "options": [
+                {
+                    "key": "Openid",
+                    "value": 1,
+                    "label": "Open Id"
+                },
+                {
+                    "key": "Oauth2",
+                    "value": 2,
+                    "label": "Oauth2"
+                }
+            ]
+        }
+    ],
+    "properties": [
+        {
+            "property_name": "id",
+            "type": "Id",
+            "priKey": true,
+            "required": true,
+            "unique": true,
+            "description": "用户id"
+        },
+        {
+            "property_name": "provider_type",
+            "type": "Enum",
+            "enum_name": "provider_type",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "提供者类型"
+        },
+        {
+            "property_name": "provider",
+            "type": "String",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "提供者",
+            "maxLength": 128
+        },
+        {
+            "property_name": "openid",
+            "type": "String",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "开放id"
+        },
+        {
+            "property_name": "detail",
+            "type": "String",
+            "priKey": false,
+            "required": false,
+            "unique": false,
+            "description": "详细信息"
+        },
+        {
+            "property_name": "created_time",
+            "type": "DateTime",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "创建时间"
+        },
+        {
+            "property_name": "last_modified_time",
+            "type": "DateTime",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "更新时间"
+        }
+    ]
+}

@@ -1,0 +1,41 @@
+{
+    "entity_name": "organization",
+    "description": "组织",
+    "pri_key": "id",
+    "enums": [],
+    "properties": [
+        {
+            "property_name": "id",
+            "type": "Id",
+            "priKey": true,
+            "required": true,
+            "unique": true,
+            "description": "id"
+        },
+        {
+            "property_name": "name",
+            "type": "String",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "组织名称",
+            "maxLength": 128
+        },
+        {
+            "property_name": "created_time",
+            "type": "DateTime",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "创建时间"
+        },
+        {
+            "property_name": "last_modified_time",
+            "type": "DateTime",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "更新时间"
+        }
+    ]
+}

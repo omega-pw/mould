@@ -1,0 +1,87 @@
+{
+    "entity_name": "job_record",
+    "description": "任务记录",
+    "pri_key": "id",
+    "enums": [
+        {
+            "enum_name": "status",
+            "description": "状态",
+            "options": [
+                {
+                    "key": "Running",
+                    "value": 1,
+                    "label": "进行中"
+                },
+                {
+                    "key": "Success",
+                    "value": 2,
+                    "label": "成功"
+                },
+                {
+                    "key": "Failure",
+                    "value": 3,
+                    "label": "失败"
+                }
+            ]
+        }
+    ],
+    "properties": [
+        {
+            "property_name": "id",
+            "type": "Id",
+            "priKey": true,
+            "required": true,
+            "unique": true,
+            "description": "记录id"
+        },
+        {
+            "property_name": "org_id",
+            "type": "Id",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "组织id"
+        },
+        {
+            "property_name": "job_id",
+            "type": "Id",
+            "priKey": false,
+            "required": true,
+            "unique": true,
+            "description": "任务id"
+        },
+        {
+            "property_name": "environment_id",
+            "type": "Id",
+            "priKey": false,
+            "required": true,
+            "unique": true,
+            "description": "环境id"
+        },
+        {
+            "property_name": "status",
+            "type": "Enum",
+            "enum_name": "status",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "执行状态"
+        },
+        {
+            "property_name": "created_time",
+            "type": "DateTime",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "创建时间"
+        },
+        {
+            "property_name": "last_modified_time",
+            "type": "DateTime",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "更新时间"
+        }
+    ]
+}

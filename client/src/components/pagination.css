@@ -1,0 +1,41 @@
+.pagination button {
+  border-radius: 3px;
+  background-color: #FFF;
+  border: 1px solid;
+  line-height: 2em;
+  min-width: 2em;
+  cursor: pointer;
+  margin-left: 0.25em;
+}
+.pagination button:first-child {
+  margin-left: 0;
+}
+.pagination button.active {
+  color: #FFF;
+  background-color: #00A25E;
+  border: 1px solid #00A25E;
+}
+.pagination button.point-left span {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  vertical-align: middle;
+  margin-bottom: 0.1em;
+  border-right: 0.4em dashed;
+  border-top: 0.4em solid transparent;
+  border-bottom: 0.4em solid transparent;
+}
+.pagination button.point-right span {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  vertical-align: middle;
+  margin-bottom: 0.1em;
+  border-left: 0.4em dashed;
+  border-top: 0.4em solid transparent;
+  border-bottom: 0.4em solid transparent;
+}
+.pagination button.point-left:before,
+.pagination button.point-right:before {
+  content: "";
+}

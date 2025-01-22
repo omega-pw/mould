@@ -1,0 +1,80 @@
+.dock-right-page {
+    position:absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    overflow-y: auto;
+    background-color: white;
+    z-index: 1;
+    border-left: 1px solid #ebeef5;
+    width: 80%;
+    @media all and (max-width: 1000px) {
+        width: 800px;
+    }
+    @media all and (max-width: 800px) {
+        width: 100%;
+    }
+    transition-property: transform;
+    transition-duration: 0.25s;
+    transition-timing-function: linear;
+    transform: translateX(100%);
+}
+
+.dock-right-page.active {
+    transform: translateX(0);
+}
+
+.e-btn {
+    padding: 0.25em 0.5em;
+    cursor: pointer;
+    font-size: inherit;
+    line-height: 1em;
+    vertical-align: middle;
+    -moz-user-select:none; /*火狐*/
+    -webkit-user-select:none; /*webkit浏览器*/
+    -ms-user-select:none; /*IE10*/
+    -khtml-user-select:none; /*早期浏览器*/
+    user-select:none;
+}
+
+.e-btn:first-child {
+    margin-left: 0;
+}
+.e-input {
+    font-size: inherit;
+    font-family: inherit;
+    padding: 0.25em;
+    width: 16em;
+    box-sizing: border-box;
+}
+.e-select {
+    font-size: inherit;
+    font-family: inherit;
+    padding-top: 0.25em;
+    padding-bottom: 0.25em;
+    width: 16em;
+    box-sizing: border-box;
+}
+.e-radio-label {
+    margin-left: 1em;
+}
+.e-radio-label:first-child {
+    margin-left: 0;
+}
+.e-table {
+    border-collapse:collapse;
+    table-layout: fixed;
+}
+
+.e-table-hcell {
+    font-weight: bold;
+}
+
+.e-table-cell, .e-table-hcell {
+    padding: 0.25em 0.5em;
+}
+
+.e-mock-select {
+    display: inline-block;
+    width: 16em;
+}

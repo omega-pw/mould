@@ -1,0 +1,18 @@
+[package]
+name = "kubernetes-extension"
+version = "0.1.0"
+authors = ["omega"]
+edition = "2018"
+
+[lib]
+name = "kubernetes"
+crate-type = ["cdylib"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+json5 = "0.4"
+futures = "0.3"
+kube = { version = "0.95", features = ["runtime", "derive", "client"] }
+k8s-openapi = { version = "0.23", features = ["latest"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
+mould-extension-sdk = { path="../../extension-sdk" }

@@ -1,0 +1,12 @@
+.e-checkbox-group>label {
+    margin-left: 0.5em;
+    margin-right: 0.5em;
+}
+
+.e-checkbox-group>label:first-child {
+    margin-left: 0;
+}
+
+.e-checkbox-group>label:last-child {
+    margin-right: 0;
+}

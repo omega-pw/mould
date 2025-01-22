@@ -1,0 +1,28 @@
+.msg-success,
+.msg-warning,
+.msg-error {
+  min-width: 20em;
+  max-width: 32em;
+  padding: 0.75em 1em;
+  border-radius: 0.25em;
+  border-width: 1px;
+  border-style: solid;
+}
+
+.msg-success {
+  color: #67c23a;
+  background-color: #f0f9eb;
+  border-color: #e1f3d8;
+}
+
+.msg-warning {
+  color: #e6a23c;
+  background-color: #fdf6ec;
+  border-color: #faecd8;
+}
+
+.msg-error {
+  color: #f56c6c;
+  background-color: #fef0f0;
+  border-color: #fde2e2;
+}

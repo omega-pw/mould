@@ -1,0 +1,216 @@
+
+/* 显示角色 */
+.block {
+    display: block;
+}
+.inline-block {
+    display: inline-block;
+}
+.flex {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: -moz-box;
+    display: -ms-flexbox;
+    display: flex;
+}
+
+/* 左右结构浮动布局 */
+.float-wrapper {
+    overflow: auto;
+}
+.float-left {
+    float: left;
+}
+.float-right {
+    float: right;
+}
+
+/* 定位 */
+.fixed {
+    position: fixed;
+}
+.absolute {
+    position: absolute;
+}
+.relative {
+    position: relative;
+}
+
+/* 盒子模型 */
+.border-box {
+    box-sizing: border-box;
+}
+.content-box {
+    box-sizing: content-box;
+}
+
+/* 内联水平居中 */
+.align-center {
+    text-align: center;
+}
+.align-left {
+    text-align: left;
+}
+.align-right {
+    text-align: right;
+}
+
+/* 固定宽度元素或者替换元素水平居中 */
+.margin-center {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* 内联垂直居中 */
+.middle {
+    vertical-align: middle;
+}
+
+/* 字体加粗 */
+.bold {
+    font-weight: bold;
+}
+
+.lighter {
+    font-weight: lighter;
+}
+
+/* 用更小的字 */
+.smaller {
+	font-size: smaller;
+}
+/* 更大的字体 */
+.larger {
+	font-size: larger;
+}
+.size-xxs {
+	font-size: xx-small;
+}
+.size-xs {
+	font-size: x-small;
+}
+.size-s {
+	font-size: small;
+}
+.size-m {
+	font-size: medium;
+}
+.size-l {
+	font-size: large;
+}
+.size-xl {
+	font-size: x-large;
+}
+.size-xxl {
+	font-size: xx-large;
+}
+.width-div2 {
+    box-sizing: border-box;
+    display: inline-block;
+    float: left;
+    width: 50%;
+}
+.width-div3 {
+    box-sizing: border-box;
+    display: inline-block;
+    float: left;
+    width: 33.3333333%;
+}
+.width-div4 {
+    box-sizing: border-box;
+    display: inline-block;
+    float: left;
+    width: 25%;
+}
+.width-div5 {
+    box-sizing: border-box;
+    display: inline-block;
+    float: left;
+    width: 20%;
+}
+.width-fill {
+    width: 100%;
+}
+.height-fill {
+    height: 100%;
+}
+
+/* 边框 */
+.border {
+    border-width: 1px;
+    border-style: solid;
+}
+.border-none {
+    border-style: none;
+}
+
+/* 图标背景 */
+.bg-contain {
+    background-position: center center;
+    background-size: contain;
+    background-repeat: no-repeat;
+}
+
+/* 头像背景 */
+.bg-cover {
+    background-position: center center;
+    background-size: cover;
+    background-repeat: no-repeat;
+}
+
+/* 铺满背景 */
+.bg-fill {
+    background-position: center center;
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+}
+
+/* 圆形 */
+.circle {
+    border-radius: 50%;
+}
+
+.pointer {
+    cursor: pointer;
+}
+
+.clear-ul {
+    margin: 0;
+    padding: 0;
+    list-style-type: none;
+}
+
+.clear-p {
+    margin: 0;
+}
+
+.dock-fill {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+.dock-top {
+    top: 0;
+    left: 0;
+    right: 0;
+}
+
+.dock-bottom {
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+.dock-left {
+    left: 0;
+    top: 0;
+    bottom: 0;
+}
+
+.dock-right {
+    right: 0;
+    top: 0;
+    bottom: 0;
+}

@@ -1,0 +1,24 @@
+.e-table {
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.e-table-hcell {
+    font-weight: bold;
+}
+
+.e-table-cell,
+.e-table-hcell {
+    padding: 0.25em 0.5em;
+}
+
+.e-table-row:hover {
+    background-color: #F8F8F8;
+}
+
+.e-table-cell,
+.e-table-hcell {
+    border-width: 1px;
+    border-style: solid;
+    border-color: #EEEEEE;
+}

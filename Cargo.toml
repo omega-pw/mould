@@ -1,0 +1,14 @@
+[workspace]
+members = [
+"server",
+"server-sdk",
+"extension-sdk",
+"extensions/etcd",
+"extensions/postgresql",
+"extensions/mysql",
+"extensions/server",
+"extensions/s3",
+"extensions/nacos",
+"extensions/kubernetes",
+"client",
+]
