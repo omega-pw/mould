@@ -4,53 +4,75 @@ Mould是一个简单的任务编排工具，目标是通过任务和环境的解
 
 
 
+#### 构建步骤
+
+构建mould服务程序（会把客户端和服务端代码构建到一个二进制文件里）
+
+```shell
+cd build
+chmod +x ./build-mould.sh
+./build-mould.sh
+```
+
+构建扩展
+
+```shell
+cd build
+chmod +x ./build-extensions.sh
+./build-extensions.sh
+```
+
+扩展用于管理资源，环境可以认为是一系列资源的集合，目前提供了如下资源的简易扩展（etcd、kubernetes、mysql、nacos、postgresql、s3、server），如果需要自己编写扩展，请参考一个扩展编写一个动态链接库，扩展需要实现trait mould_extension_sdk::Extension，详细请参考：https://docs.rs/mould-extension-sdk/latest/mould_extension_sdk/trait.Extension.html。
+
+
+
 #### 使用方法
 
 准备一个配置文件名字叫config.json5，demo配置如下：
 
 ```json
 {
-    host: "127.0.0.1",
-    port: 8080,
-    log_cfg_path: "./log4rs.yaml",
-    extension_dir: "./extensions",
-    job_log_dir: "./job_logs",
-    sign_secret: "rX46ths0wP64ONdrDzIwAfnwWyBDJnGBkHqy1ri0UDiRwzcHXGT0yY01Rvox4LRKgYuID0Eppp9e6E8FSnuG16mld5Oek1nXvpBYlZtQQf62ACG4E6VrWSvJ4BPrnf522uIQ9OtUgPyiW2QrMnw8TaHidpK5yiHdV2QzxCcRvzlZBI2VVVEPTZ6GfQZyYSZc1idKQp1QMCT6suKJa9rX7iE8JV4Ayg7hlyQEPdElhAT6eqUUjQHGuG4Gt3XIBziE",
-    rsa_pub_key: "./rsa-pub-key.pem",
-    rsa_pri_key: "./rsa-pri-key.pem",
-    server_random_value: "Q5rxHZPowd1Mc4eDczyo185R4XhO9RLPh1FGneWNBjW1",
-    cache_server: {
-        host: "127.0.0.1",
-        port: 6379,
-        user: null,
-        password: null,
-        max_size: 2,
+    "host": "127.0.0.1",
+    "port": 8080,
+    "log_cfg_path": "./log4rs.yaml",
+    "extension_dir": "./extensions",
+    "job_log_dir": "./job_logs",
+    "sign_secret": "rX46ths0wP64ONdrDzIwAfnwWyBDJnGBkHqy1ri0UDiRwzcHXGT0yY01Rvox4LRKgYuID0Eppp9e6E8FSnuG16mld5Oek1nXvpBYlZtQQf62ACG4E6VrWSvJ4BPrnf522uIQ9OtUgPyiW2QrMnw8TaHidpK5yiHdV2QzxCcRvzlZBI2VVVEPTZ6GfQZyYSZc1idKQp1QMCT6suKJa9rX7iE8JV4Ayg7hlyQEPdElhAT6eqUUjQHGuG4Gt3XIBziE",
+    "rsa_pub_key": "./rsa-pub-key.pem",
+    "rsa_pri_key": "./rsa-pri-key.pem",
+    "server_random_value": "Q5rxHZPowd1Mc4eDczyo185R4XhO9RLPh1FGneWNBjW1",
+    "cache_server": {
+        "host": "127.0.0.1",
+        "port": 6379,
+        "user": null,
+        "password": null,
+        "max_size": 2,
     },
-    data_source: {
-        host: "127.0.0.1",
-        port: 5432,
-        dbname: "postgres",
-        user: "postgres",
-        password: "******",
-        max_size: 2,
-        ssl: null
+    "data_source": {
+        "host": "127.0.0.1",
+        "port": 5432,
+        "dbname": "postgres",
+        "user": "postgres",
+        "password": "******",
+        "max_size": 2,
+        "ssl": null
     },
-    public_path: "http://localhost:8080",
-    oauth2_servers: {
-        github: {
-            auth_url: "https://github.com/login/oauth/authorize",
-            token_url: "https://github.com/login/oauth/access_token",
-            client_id: "xxx",
-            client_secret: "xxx"
+    "public_path": "http://localhost:8080",
+    "oauth2_servers": {
+        "github": {
+            "auth_url": "https://github.com/login/oauth/authorize",
+            "token_url": "https://github.com/login/oauth/access_token",
+            "client_id": "xxx",
+            "client_secret": "xxx"
         }
     },
-    openid_servers: {
-        google: {
-            name: "Google",
-            issuer: "https://accounts.google.com",
-            client_id: "xxxx.apps.googleusercontent.com",
-            client_secret: "xxx",
-            scopes: [
+    "openid_servers": {
+        "google": {
+            "name": "Google",
+            "issuer": "https://accounts.google.com",
+            "client_id": "xxxx.apps.googleusercontent.com",
+            "client_secret": "xxx",
+            "scopes": [
               "openid",
               "profile"
             ]
@@ -63,28 +85,34 @@ Mould是一个简单的任务编排工具，目标是通过任务和环境的解
         "region": "us-east-1",
         "bucket": "mould"
     },
-    email_account: {
-        mail_host: "smtp.163.com",
-        mail_port: 25,
-        username: "testuser@163.com",
-        password: "xxx",
-        name: "testuser",
-        address: "testuser@163.com"
+    "email_account": {
+        "mail_host": "smtp.163.com",
+        "mail_port": 25,
+        "username": "testuser@163.com",
+        "password": "xxx",
+        "name": "testuser",
+        "address": "testuser@163.com"
     },
-    email_template: {
-        register_captcha: "./email_template/register_captcha.tmpl",
-        reset_password_captcha: "./email_template/reset_password_captcha.tmpl"
+    "email_template": {
+        "register_captcha": "./email_template/register_captcha.tmpl",
+        "reset_password_captcha": "./email_template/reset_password_captcha.tmpl"
     }
 }
 ```
 准备日志配置文件log4rs.yaml，参考log4rs库https://github.com/estk/log4rs
 准备rsa公私钥对，参考https://travistidwell.com/jsencrypt/demo/index.html
-准备redis服务配置、postgres数据库配置、兼容s3的对象存储配置、邮件账号配置，第三方账户认证系统（oauth2_servers或者openid_servers）配置可选
+准备redis服务配置、postgres数据库配置（目前只支持postgres）、兼容s3的对象存储配置、邮件账号配置，第三方账户认证系统（oauth2_servers或者openid_servers）配置可选
 准备发送邮件的模板，注册邮件./email_template/register_captcha.tmpl，重置密码邮件./email_template/reset_password_captcha.tmpl，语法参考https://github.com/Keats/tera
 
-准备扩展，扩展用于管理资源，环境可以认为是一系列资源的集合，目前提供了如下资源的简易扩展（etcd、kubernetes、mysql、nacos、postgresql、s3、server），请自行构建需要的扩展，把动态链接库放到extensions目录。
+准备扩展，把扩展的动态链接库放到extensions目录。
+
+执行初始化数据库脚本，脚本位置：sql/ddl/init.sql
 
 启动程序：
+```shell
 ./mould ./config.json5
+```
+
+
 
 用浏览器访问 http://localhost:8080
