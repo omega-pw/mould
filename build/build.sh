@@ -16,7 +16,6 @@ IMAGE_NAME=$PROJ_NAME-image-x86_64-$GIT_COMMITID.tar.gz
 LATEST_IMAGE_NAME=$PROJ_NAME-image-x86_64-latest.tar.gz
 CONFIG_FILE=/config/config.json5
 IMAGE_PATH=$REGISTRY$IMAGE_NAMESPACE/$PROJ_NAME
-WEB_CLIENT_ROOT=$WORKSPACE/client
 
 error_exit() {
 	msg=$1
@@ -24,31 +23,17 @@ error_exit() {
 	exit 1
 }
 
-cd $WEB_CLIENT_ROOT
+yum install dos2unix -y
 
-# clear dist first
-rm -rf $WEB_CLIENT_ROOT/dist
-
-echo "Start to install dependencies."
-npm install --registry=https://registry.npmmirror.com || error_exit "Install dependencies failed!"
-echo "Start to build package."
-npm run build || error_exit "Build package failed!"
-
-cd $WEB_CLIENT_ROOT/dist || error_exit "Build code failed!"
-git log -n 1 > $WEB_CLIENT_ROOT/dist/version.txt || error_exit "Add version information failed!"
-cp -rf $WEB_CLIENT_ROOT/dist/* $WORKSPACE/server/static/ || error_exit "Copy client code to static directory failed!"
-
-cd $WORKSPACE/server
-
-echo "Start to build binary."
-cargo build --release || error_exit "Build binary failed!"
+dos2unix $script_path/build-mould.sh
+chmod +x $script_path/build-mould.sh
+$script_path/build-mould.sh || error_exit "Build mould failed!"
 
 echo "Start to upload binary $BIN_NAME."
 curl -X POST -H "project: $PROJ_NAME" -H "artifact: $BIN_NAME" -H "token: $REPO_KEY" -T $WORKSPACE/target/release/$PROJ_NAME $REPO_ADDR/api/oss/upload || error_exit "Upload binary to repository failed!"
 echo "Start to upload binary $LATEST_BIN_NAME."
 curl -X POST -H "project: $PROJ_NAME" -H "artifact: $LATEST_BIN_NAME" -H "token: $REPO_KEY" -T $WORKSPACE/target/release/$PROJ_NAME $REPO_ADDR/api/oss/upload || error_exit "Upload binary to repository failed!"
 
-yum install dos2unix -y
 dos2unix $script_path/build-extensions.sh
 chmod +x $script_path/build-extensions.sh
 $script_path/build-extensions.sh || error_exit "Build extensions failed!"
