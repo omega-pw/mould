@@ -8,6 +8,7 @@ cd $curr_path
 
 source $script_path/build.env
 
+WORKSPACE=$script_path/..
 PROJ_NAME=mould
 GIT_COMMITID=`git rev-parse --short HEAD`
 BIN_NAME=$PROJ_NAME-linux-x86_64-$GIT_COMMITID

@@ -6,6 +6,7 @@ cd `dirname $script_full_name`
 script_path=`pwd`
 cd $curr_path
 
+WORKSPACE=$script_path/..
 WEB_CLIENT_ROOT=$WORKSPACE/client
 
 error_exit() {

@@ -8,6 +8,7 @@ cd $curr_path
 
 source $script_path/build.env
 
+WORKSPACE=$script_path/..
 EXTENSIONS_SRC_DIR=$WORKSPACE/extensions
 EXTENSIONS_DIST_DIR=$script_path/image-root/extensions
 RELEASE_DIR=$WORKSPACE/target/release
