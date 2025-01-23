@@ -8,9 +8,9 @@ use std::time::Instant;
 use tihu::Handler;
 use tihu::Middleware;
 use tihu_native::http::Body;
-use tihu_native::http::HttpDataCache;
+use tihu_native::http::RequestData;
 
-pub type In = (Request<Incoming>, SocketAddr, HttpDataCache);
+pub type In = (Request<Incoming>, SocketAddr, RequestData);
 pub type Out = Result<Response<Body>, anyhow::Error>;
 
 pub struct TimeStatHandler<H, In> {
@@ -24,10 +24,13 @@ where
     H: Handler<In, Out = Out>,
 {
     type Out = H::Out;
-    async fn handle(&self, (request, remote_addr, data_cache): In) -> Self::Out {
+    async fn handle(&self, (request, remote_addr, request_data): In) -> Self::Out {
         let route = request.uri().path().to_string();
         let now = Instant::now();
-        let output = self.inner.handle((request, remote_addr, data_cache)).await;
+        let output = self
+            .inner
+            .handle((request, remote_addr, request_data))
+            .await;
         let cost = now.elapsed().as_millis();
         if cost > 1000 {
             //大于1秒就警告

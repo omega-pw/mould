@@ -32,8 +32,8 @@ use tihu::Id;
 use tihu::LightString;
 use tihu::Middleware;
 use tihu_native::http::Body;
-use tihu_native::http::HttpData;
-use tihu_native::http::HttpDataCache;
+use tihu_native::http::FromRequest;
+use tihu_native::http::RequestData;
 use tihu_native::ErrNo;
 use uuid::Uuid;
 
@@ -244,18 +244,18 @@ pub struct SessionState {
 }
 
 #[async_trait]
-impl HttpData for SessionState {
+impl FromRequest for SessionState {
     async fn try_extract(
         request: &Request<Incoming>,
         remote_addr: SocketAddr,
-        data_cache: &mut HttpDataCache,
+        request_data: &mut RequestData,
     ) -> Result<Self, anyhow::Error> {
-        let signature_result = data_cache
+        let signature_result = request_data
             .try_get::<SignatureResult>(&request, remote_addr)
             .await?;
         let hash = sha256(signature_result.client_id.rsa_pub_key().as_bytes());
         let client_id = encrypt_by_base64(&hash).map_err(ErrNo::CommonError)?;
-        let cookie = data_cache
+        let cookie = request_data
             .try_get::<Option<Cookie>>(&request, remote_addr)
             .await?;
         let session_data = cookie
@@ -301,7 +301,7 @@ impl HttpData for SessionState {
     }
 }
 
-pub type In = (Request<Incoming>, SocketAddr, HttpDataCache);
+pub type In = (Request<Incoming>, SocketAddr, RequestData);
 pub type Out = Result<Response<Body>, anyhow::Error>;
 
 pub struct SessionHandler<E> {
@@ -315,14 +315,14 @@ where
     E: Handler<In, Out = Out>,
 {
     type Out = Out;
-    async fn handle(&self, (request, remote_addr, mut data_cache): In) -> Self::Out {
-        let mut session_state = data_cache
+    async fn handle(&self, (request, remote_addr, mut request_data): In) -> Self::Out {
+        let mut session_state = request_data
             .try_get::<SessionState>(&request, remote_addr)
             .await?
             .clone();
         let mut response = self
             .inner
-            .handle((request, remote_addr, data_cache))
+            .handle((request, remote_addr, request_data))
             .await?;
         if session_state.session.time_to_renew() {
             let curr_time = Utc::now();
@@ -377,11 +377,11 @@ pub struct SignatureResult {
 }
 
 #[async_trait]
-impl HttpData for SignatureResult {
+impl FromRequest for SignatureResult {
     async fn try_extract(
         request: &Request<Incoming>,
         _remote_addr: SocketAddr,
-        _data_cache: &mut HttpDataCache,
+        _request_data: &mut RequestData,
     ) -> Result<Self, anyhow::Error> {
         let client_id_data = get_header(request.headers(), "X-Client-Id").ok_or_else(|| {
             return LightString::from_static("请求没有X-Client-Id请求头！");

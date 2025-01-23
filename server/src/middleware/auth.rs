@@ -24,8 +24,8 @@ use tihu::Id;
 use tihu::LightString;
 use tihu::Middleware;
 use tihu_native::http::Body;
-use tihu_native::http::HttpData;
-use tihu_native::http::HttpDataCache;
+use tihu_native::http::FromRequest;
+use tihu_native::http::RequestData;
 use tihu_native::ErrNo;
 
 pub const SESSION_PREFIX: &'static str = "session-";
@@ -65,11 +65,11 @@ pub enum ApiLevel {
 }
 
 #[async_trait]
-impl HttpData for ApiLevel {
+impl FromRequest for ApiLevel {
     async fn try_extract(
         request: &Request<Incoming>,
         _remote_addr: SocketAddr,
-        _data_cache: &mut HttpDataCache,
+        _request_data: &mut RequestData,
     ) -> Result<Self, anyhow::Error> {
         return Ok(
             if WHITE_LIST_NAMESPACE
@@ -121,13 +121,13 @@ impl AuthLevel {
 }
 
 #[async_trait]
-impl HttpData for AuthLevel {
+impl FromRequest for AuthLevel {
     async fn try_extract(
         request: &Request<Incoming>,
         remote_addr: SocketAddr,
-        data_cache: &mut HttpDataCache,
+        request_data: &mut RequestData,
     ) -> Result<Self, anyhow::Error> {
-        let session_state = data_cache
+        let session_state = request_data
             .try_get::<SessionState>(&request, remote_addr)
             .await?;
         let session_id = session_state.session.id();
@@ -149,13 +149,13 @@ impl HttpData for AuthLevel {
 }
 
 #[async_trait]
-impl HttpData for Guest {
+impl FromRequest for Guest {
     async fn try_extract(
         request: &Request<Incoming>,
         remote_addr: SocketAddr,
-        data_cache: &mut HttpDataCache,
+        request_data: &mut RequestData,
     ) -> Result<Self, anyhow::Error> {
-        let session_state = data_cache
+        let session_state = request_data
             .try_get::<SessionState>(&request, remote_addr)
             .await?;
         let session_id = session_state.session.id();
@@ -166,13 +166,13 @@ impl HttpData for Guest {
 }
 
 #[async_trait]
-impl HttpData for User {
+impl FromRequest for User {
     async fn try_extract(
         request: &Request<Incoming>,
         remote_addr: SocketAddr,
-        data_cache: &mut HttpDataCache,
+        request_data: &mut RequestData,
     ) -> Result<Self, anyhow::Error> {
-        let auth_level = data_cache
+        let auth_level = request_data
             .try_get::<AuthLevel>(&request, remote_addr)
             .await?;
         match auth_level {
@@ -202,7 +202,7 @@ async fn get_session_data(
     }
 }
 
-pub type In = (Request<Incoming>, SocketAddr, HttpDataCache);
+pub type In = (Request<Incoming>, SocketAddr, RequestData);
 pub type Out = Result<Response<Body>, anyhow::Error>;
 
 pub struct AuthHandler<E> {
@@ -217,8 +217,8 @@ where
     E: Handler<In, Out = Out>,
 {
     type Out = E::Out;
-    async fn handle(&self, (request, remote_addr, mut data_cache): In) -> Self::Out {
-        let api_level = data_cache
+    async fn handle(&self, (request, remote_addr, mut request_data): In) -> Self::Out {
+        let api_level = request_data
             .try_get::<ApiLevel>(&request, remote_addr)
             .await?
             .clone();
@@ -227,7 +227,7 @@ where
                 //白名单，放行
             }
             ApiLevel::User => {
-                let auth_level = data_cache
+                let auth_level = request_data
                     .try_get::<AuthLevel>(&request, remote_addr)
                     .await?;
                 match auth_level {
@@ -241,7 +241,9 @@ where
                 }
             }
         }
-        self.inner.handle((request, remote_addr, data_cache)).await
+        self.inner
+            .handle((request, remote_addr, request_data))
+            .await
     }
 }
 

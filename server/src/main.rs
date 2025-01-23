@@ -40,8 +40,8 @@ use tihu::Handler;
 use tihu::LightString;
 use tihu::Middleware;
 use tihu_native::http::Body;
-use tihu_native::http::HttpDataCache;
 use tihu_native::http::HttpHandler;
+use tihu_native::http::RequestData;
 use tihu_native::ErrNo;
 
 pub const VERSION_INFO: &'static str = include_str!("../version.txt");
@@ -129,20 +129,20 @@ fn json_response<T: Into<Body>>(body: T) -> Response<Body> {
 }
 
 async fn dispatch_api(
-    (request, remote_addr, mut data_cache): (Request<Incoming>, SocketAddr, HttpDataCache),
+    (request, remote_addr, mut request_data): (Request<Incoming>, SocketAddr, RequestData),
 ) -> Result<Response<Body>, anyhow::Error> {
-    let signature_result = data_cache
+    let signature_result = request_data
         .try_get::<SignatureResult>(&request, remote_addr)
         .await?;
     let body_hash = signature_result.body_hash.clone();
-    let api_level = data_cache
+    let api_level = request_data
         .try_get::<ApiLevel>(&request, remote_addr)
         .await?
         .clone();
 
     let resp_ret = match api_level {
         ApiLevel::Guest => {
-            let guest: Guest = data_cache
+            let guest: Guest = request_data
                 .try_get::<Guest>(&request, remote_addr)
                 .await?
                 .clone();
@@ -159,7 +159,7 @@ async fn dispatch_api(
             dispatch_guest_api((route.to_string().into(), body, guest)).await
         }
         ApiLevel::User => {
-            let user: User = data_cache
+            let user: User = request_data
                 .try_get::<User>(&request, remote_addr)
                 .await?
                 .clone();
@@ -192,7 +192,7 @@ pub async fn get_handler(
     context: Arc<Context>,
 ) -> Result<
     impl Handler<
-        (Request<Incoming>, SocketAddr, HttpDataCache),
+        (Request<Incoming>, SocketAddr, RequestData),
         Out = Result<Response<Body>, anyhow::Error>,
     >,
     anyhow::Error,
@@ -208,21 +208,23 @@ pub async fn get_handler(
         .chain(SessionMiddleware::new(context.clone()))
         .chain(AuthMiddleware::new(context.clone(), white_list_namespace))
         .transform(
-            move |(request, remote_addr, mut data_cache): (
+            move |(request, remote_addr, mut request_data): (
                 Request<Incoming>,
                 SocketAddr,
-                HttpDataCache,
+                RequestData,
             )| {
                 let oss_handler = oss_handler.clone();
                 let api_handler = api_handler.clone();
                 async move {
                     let result = if match_route(oss_handler.as_ref(), request.uri().path()) {
                         let resp = oss_handler
-                            .handle(request, remote_addr, &mut data_cache, None)
+                            .handle(request, remote_addr, &mut request_data, None)
                             .await;
                         resp.map(|resp| resp.map(Body::from))
                     } else {
-                        api_handler.handle((request, remote_addr, data_cache)).await
+                        api_handler
+                            .handle((request, remote_addr, request_data))
+                            .await
                     };
                     result
                 }
@@ -230,9 +232,9 @@ pub async fn get_handler(
         );
     let handler = Arc::new(handler);
     return Ok(
-        move |(req, remote_addr, data_cache): (Request<Incoming>, SocketAddr, HttpDataCache)| {
+        move |(req, remote_addr, request_data): (Request<Incoming>, SocketAddr, RequestData)| {
             let handler = handler.clone();
-            async move { handler.handle((req, remote_addr, data_cache)).await }
+            async move { handler.handle((req, remote_addr, request_data)).await }
         },
     );
 }

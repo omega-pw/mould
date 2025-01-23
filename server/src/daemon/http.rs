@@ -23,8 +23,8 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tihu::Handler;
 use tihu_native::http::Body;
-use tihu_native::http::HttpDataCache;
 use tihu_native::http::HttpHandler;
+use tihu_native::http::RequestData;
 use tokio::net::TcpListener;
 
 fn json_response<T: Into<Body>>(body: T) -> Response<Body> {
@@ -171,7 +171,7 @@ async fn try_dispatch(
     remote_addr: SocketAddr,
     handler: Arc<
         impl Handler<
-            (Request<Incoming>, SocketAddr, HttpDataCache),
+            (Request<Incoming>, SocketAddr, RequestData),
             Out = Result<Response<Body>, anyhow::Error>,
         >,
     >,
@@ -250,9 +250,9 @@ async fn try_dispatch(
                 }
             }
         } else if match_route(oss_handler.as_ref(), route) {
-            let mut data_cache = HttpDataCache::new();
+            let mut request_data = RequestData::new();
             let resp = oss_handler
-                .handle(req, remote_addr, &mut data_cache, None)
+                .handle(req, remote_addr, &mut request_data, None)
                 .await?;
             return Ok(resp.map(From::from));
         } else {
@@ -263,9 +263,7 @@ async fn try_dispatch(
         if GET_SYSTEM_INFO_API == route {
             return Ok(json_response(result_to_json_resp(get_system_info().await)));
         }
-        return handler
-            .handle((req, remote_addr, HttpDataCache::new()))
-            .await;
+        return handler.handle((req, remote_addr, RequestData::new())).await;
     } else {
         return Ok(response_not_found());
     }
@@ -277,7 +275,7 @@ async fn dispatch(
     remote_addr: SocketAddr,
     handler: Arc<
         impl Handler<
-            (Request<Incoming>, SocketAddr, HttpDataCache),
+            (Request<Incoming>, SocketAddr, RequestData),
             Out = Result<Response<Body>, anyhow::Error>,
         >,
     >,
@@ -299,7 +297,7 @@ pub async fn start_service(
     context: Arc<Context>,
     handler: Arc<
         impl Handler<
-            (Request<Incoming>, SocketAddr, HttpDataCache),
+            (Request<Incoming>, SocketAddr, RequestData),
             Out = Result<Response<Body>, anyhow::Error>,
         >,
     >,
