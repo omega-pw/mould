@@ -42,12 +42,16 @@ pub async fn handle(
 async fn try_handle(
     package: std::fs::File,
     configuration: Config,
-    _append_log: AppendLog,
+    append_log: AppendLog,
 ) -> Result<(), String> {
     let files = parse_package(package)?;
+    append_log(LogLevel::Info, String::from("开始获取上传token"));
     let token = fetch_upload_token(&configuration).await?;
+    append_log(LogLevel::Info, String::from("开始上传文件"));
     upload_files(&token, &files).await?;
+    append_log(LogLevel::Info, String::from("开始更新文件哈希"));
     upsert_hashes(&token, &files).await?;
+    append_log(LogLevel::Info, String::from("开始提交部署"));
     deploy(&configuration, &files).await?;
     return Ok(());
 }
@@ -104,7 +108,7 @@ fn parse_package(package: std::fs::File) -> Result<Vec<FileInfo>, String> {
         file.read_to_end(&mut bytes)
             .map_err(|err| format!("读取zip内部文件失败: {err}"))?;
         let value = BASE64_STANDARD.encode(&bytes);
-        let hash = blake3::hash(format!("{}{}", value, extension).as_bytes())
+        let mut hash = blake3::hash(format!("{}{}", value, extension).as_bytes())
             .to_hex()
             .as_str()
             .to_string();
@@ -136,17 +140,19 @@ async fn fetch_upload_token(configuration: &Config) -> Result<String, String> {
         Authorization::bearer(&configuration.api_token)
             .map_err(|err| format!("构造获取token的请求失败: {err}"))?,
     );
-    let resp = RequestBuilder::from_parts(client, request)
+    let resp_text = RequestBuilder::from_parts(client, request)
         .send()
         .await
         .map_err(|err| format!("获取token失败: {err}"))?
-        .json::<ApiResult<UploadToken>>()
+        .text()
         .await
         .map_err(|err| format!("获取token失败: {err}"))?;
+    let resp: ApiResult<UploadToken> = serde_json::from_str(&resp_text)
+        .map_err(|_err| format!("获取token接口响应格式不正确: {resp_text}"))?;
     if resp.success {
         return Ok(resp.result.jwt);
     } else {
-        return Err(String::from("获取token失败"));
+        return Err(format!("获取token失败, 接口响应：{}", resp_text));
     }
 }
 
@@ -168,18 +174,20 @@ async fn get_missing_hashes(token: &str, files: &[FileInfo]) -> Result<Vec<Strin
     );
     let hashes: Vec<String> = files.iter().map(|file| file.hash.clone()).collect();
     let hashes_form = HashesForm { hashes };
-    let resp = RequestBuilder::from_parts(client, request)
+    let resp_text = RequestBuilder::from_parts(client, request)
         .json(&hashes_form)
         .send()
         .await
         .map_err(|err| format!("检测遗漏hash失败: {err}"))?
-        .json::<ApiResult<Vec<String>>>()
+        .text()
         .await
         .map_err(|err| format!("检测遗漏hash失败: {err}"))?;
+    let resp: ApiResult<Vec<String>> = serde_json::from_str(&resp_text)
+        .map_err(|_err| format!("检测遗漏hash接口响应格式不正确: {resp_text}"))?;
     if resp.success {
         return Ok(resp.result);
     } else {
-        return Err(String::from("检测遗漏hash失败"));
+        return Err(format!("检测遗漏hash失败, 接口响应：{}", resp_text));
     }
 }
 
@@ -210,18 +218,20 @@ async fn upload_files(token: &str, files: &[FileInfo]) -> Result<(), String> {
     request.headers_mut().typed_insert(
         Authorization::bearer(&token).map_err(|err| format!("构造上传请求失败: {err}"))?,
     );
-    let resp = RequestBuilder::from_parts(client, request)
+    let resp_text = RequestBuilder::from_parts(client, request)
         .json(&files)
         .send()
         .await
         .map_err(|err| format!("上传文件失败: {err}"))?
-        .json::<ApiResult<serde_json::Value>>()
+        .text()
         .await
         .map_err(|err| format!("上传文件失败: {err}"))?;
+    let resp: ApiResult<Option<serde_json::Value>> = serde_json::from_str(&resp_text)
+        .map_err(|_err| format!("上传文件响应格式不正确: {resp_text}"))?;
     if resp.success {
         return Ok(());
     } else {
-        return Err(String::from("上传文件失败"));
+        return Err(format!("上传文件失败, 接口响应：{}", resp_text));
     }
 }
 
@@ -238,18 +248,20 @@ async fn upsert_hashes(token: &str, files: &[FileInfo]) -> Result<(), String> {
         .typed_insert(Authorization::bearer(&token).map_err(|err| format!("构造请求失败: {err}"))?);
     let hashes: Vec<String> = files.iter().map(|file| file.hash.clone()).collect();
     let hashes_form = HashesForm { hashes };
-    let resp = RequestBuilder::from_parts(client, request)
+    let resp_text = RequestBuilder::from_parts(client, request)
         .json(&hashes_form)
         .send()
         .await
         .map_err(|err| format!("更新文件哈希失败: {err}"))?
-        .json::<ApiResult<Option<()>>>()
+        .text()
         .await
         .map_err(|err| format!("更新文件哈希失败: {err}"))?;
+    let resp: ApiResult<Option<serde_json::Value>> = serde_json::from_str(&resp_text)
+        .map_err(|_err| format!("更新文件哈希接口响应格式不正确: {resp_text}"))?;
     if resp.success {
         return Ok(());
     } else {
-        return Err(String::from("更新文件哈希失败"));
+        return Err(format!("更新文件哈希失败, 接口响应：{}", resp_text));
     }
 }
 
@@ -275,17 +287,19 @@ async fn deploy(configuration: &Config, files: &[FileInfo]) -> Result<(), String
         Authorization::bearer(&configuration.api_token)
             .map_err(|err| format!("构造部署请求失败: {err}"))?,
     );
-    let resp = RequestBuilder::from_parts(client, request)
+    let resp_text = RequestBuilder::from_parts(client, request)
         .multipart(form)
         .send()
         .await
         .map_err(|err| format!("部署失败: {err}"))?
-        .json::<ApiResult<serde_json::Value>>()
+        .text()
         .await
         .map_err(|err| format!("部署失败: {err}"))?;
+    let resp: ApiResult<Option<serde_json::Value>> = serde_json::from_str(&resp_text)
+        .map_err(|_err| format!("部署接口响应格式不正确: {resp_text}"))?;
     if resp.success {
         return Ok(());
     } else {
-        return Err(String::from("部署失败"));
+        return Err(format!("部署失败, 接口响应：{}", resp_text));
     }
 }
