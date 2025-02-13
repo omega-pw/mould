@@ -10,5 +10,6 @@ members = [
 "extensions/s3",
 "extensions/nacos",
 "extensions/kubernetes",
+"extensions/cloudflare_pages",
 "client",
 ]
