@@ -47,6 +47,10 @@ cd $EXTENSIONS_SRC_DIR/server/
 echo "Start to build server extension."
 cargo build --release || error_exit "Build server extension failed!"
 
+cd $EXTENSIONS_SRC_DIR/cloudflare_pages/
+echo "Start to build cloudflare pages extension."
+cargo build --release || error_exit "Build cloudflare pages extension failed!"
+
 # clear dist first
 rm -rf $EXTENSIONS_DIST_DIR
 mkdir -p $EXTENSIONS_DIST_DIR
@@ -57,3 +61,4 @@ cp $RELEASE_DIR/libnacos.so $EXTENSIONS_DIST_DIR
 cp $RELEASE_DIR/libpostgresql.so $EXTENSIONS_DIST_DIR
 cp $RELEASE_DIR/libs3.so $EXTENSIONS_DIST_DIR
 cp $RELEASE_DIR/libserver.so $EXTENSIONS_DIST_DIR
+cp $RELEASE_DIR/libcloudflare_pages.so $EXTENSIONS_DIST_DIR

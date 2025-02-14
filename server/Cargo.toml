@@ -53,7 +53,7 @@ tihu-native = "0.1"
 lettre = {version = "0.11", default-features = false, features = ["builder", "smtp-transport", "tokio1-rustls-tls"]}
 aws-types = "1"
 aws-smithy-http = "0.60"
-aws-sdk-s3 = "1"
+aws-sdk-s3 = "0.39"
 rust-embed = "8"
 mime_guess = "2"
 form_urlencoded = "1"
