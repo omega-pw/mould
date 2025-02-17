@@ -277,7 +277,7 @@ fn render_steps(
                                                         for files.iter().map(|file| {
                                                             match file {
                                                                 File::Remote { key, name, .. } => {
-                                                                    let url = format!("/blob/{}", key);
+                                                                    let url = format!("/{}", key);
                                                                     html! {
                                                                         <div>
                                                                             <a href={url} target="_blank" download={name.clone()}>{name}</a>

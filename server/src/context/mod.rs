@@ -29,6 +29,7 @@ use mould_extension_sdk::pluginator;
 use mould_extension_sdk::ContextTrait;
 use mould_extension_sdk::Extension;
 use native_common::cache::RedisCache;
+use sdk::storage::UPLOAD_API;
 // use native_common::utils::Snowflake;
 use native_tls::{Certificate, TlsConnector};
 use oauth2::basic::BasicClient;
@@ -72,7 +73,6 @@ mod extension;
 
 mould_extension_sdk::plugin_trait!(Extension);
 
-pub const BLOB_KEY_PREFIX: &'static str = "blob/";
 pub const RPC_TIMEOUT: u64 = 10;
 
 pub struct ExtensionContext {
@@ -138,7 +138,6 @@ impl ContextTrait for ExtensionContext {
         return Ok(new_target);
     }
     async fn download_file(&self, key: &str) -> Result<std::fs::File, String> {
-        let key = format!("{}{}", BLOB_KEY_PREFIX, key);
         let resp = self
             .oss_client
             .get_object()
@@ -250,14 +249,26 @@ impl Context {
         let cache_pool = init_cache_pool(&config.cache_server)?;
         let db_pool = init_db_pool(&config.data_source)?;
         let bucket = config.oss.bucket.clone();
-        let oss_handler = OssHandler::try_init_from_config(
+        let mut oss_handler = OssHandler::try_init_from_config(
             OssConfig {
                 oss: config.oss.clone(),
-                key_prefix: Some(BLOB_KEY_PREFIX.into()),
             },
             adjust_oss_error_code,
         )
         .await?;
+        oss_handler
+            .add_get_mapping(
+                LightString::from_static("/blob/"),
+                LightString::from_static("blob/"),
+            )
+            .add_get_mapping(
+                LightString::from_static("/file/"),
+                LightString::from_static("file/"),
+            )
+            .add_upload_mapping(
+                LightString::from_static(UPLOAD_API),
+                LightString::from_static("blob/"),
+            );
         let oss_client = Arc::new(init_oss_client(&config.oss)?);
         let mut oauth2_clients = HashMap::with_capacity(config.oauth2_servers.len());
         for (provider, oauth2_server) in &config.oauth2_servers {

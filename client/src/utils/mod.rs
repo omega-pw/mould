@@ -309,8 +309,11 @@ pub async fn upload_file(
     .await
     .map_err(|err| LightString::from(err.to_string()))?;
     if 0 == resp.code {
-        return resp.data.ok_or_else(|| {
-            return "没有返回数据！".into();
+        let data = resp.data.ok_or_else(|| {
+            return LightString::from("没有返回数据！");
+        })?;
+        return Ok(UploadResp {
+            key: format!("blob/{}", data.key),
         });
     } else {
         return Err(resp.message.to_string().into());

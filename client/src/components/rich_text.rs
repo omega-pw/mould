@@ -390,7 +390,7 @@ fn build_file_image(file: &File) -> js_sys::Object {
 }
 
 fn package_resource_url(res_key: JsValue) -> String {
-    return format!("/blob/{}", res_key.as_string().unwrap());
+    return format!("/{}", res_key.as_string().unwrap());
 }
 
 fn build_config(

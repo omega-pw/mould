@@ -389,7 +389,8 @@ pub async fn dispatch_guest_api(
 }
 
 pub static WHITE_LIST_NAMESPACE: &[&'static str] = &[
-    object_storage_lib::KEY_PREFIX,
+    "/blob/",
+    "/file/",
     sdk::auth::get_salt::GET_SALT_API,
     sdk::auth::get_rsa_pub_key::GET_RSA_PUB_KEY_API,
     sdk::auth::get_nonce::GET_NONCE_API,

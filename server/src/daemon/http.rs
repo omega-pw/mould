@@ -133,7 +133,7 @@ fn match_route(http_handler: &dyn HttpHandler, route: &str) -> bool {
     return http_handler
         .namespace()
         .iter()
-        .any(|namespace| route.starts_with(namespace));
+        .any(|namespace| route.starts_with(namespace.as_ref()));
 }
 
 fn gen_login_html(

@@ -19,7 +19,7 @@ module.exports = (env, argv) => {
                     changeOrigin: true,
                     bypass: function (req, res, proxyOptions) {
                         if (
-                            ['/api/', '/blob/', '/oauth2/login/', '/oidc/login/'].every((prefix) => {
+                            ['/api/', '/blob/', '/file/', '/oauth2/login/', '/oidc/login/'].every((prefix) => {
                                 return !req.url.startsWith(prefix);
                             })
                         ) {

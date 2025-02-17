@@ -705,7 +705,7 @@ pub fn config_detail_view(attributes: &[(Key, Attribute, AttributeValue)]) -> Ht
                                                 if let Some(file) = file.as_ref() {
                                                     match file {
                                                         File::Remote { key, name, .. } => {
-                                                            let url = format!("/blob/{}", key);
+                                                            let url = format!("/{}", key);
                                                             html! {
                                                                 <a href={url} target="_blank">{name}</a>
                                                             }
@@ -744,7 +744,7 @@ pub fn config_detail_view(attributes: &[(Key, Attribute, AttributeValue)]) -> Ht
                                                     for files.iter().map(|(_key, file, _)| {
                                                         match file {
                                                             File::Remote { key, name, .. } => {
-                                                                let url = format!("/blob/{}", key);
+                                                                let url = format!("/{}", key);
                                                                 html! {
                                                                     <a href={url} target="_blank">{name}</a>
                                                                 }

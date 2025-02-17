@@ -110,7 +110,7 @@ impl FileUpload {
     fn file_view(&self, file: &File) -> Html {
         match file {
             File::Remote { key, name, .. } => {
-                let url = format!("/blob/{}", key);
+                let url = format!("/{}", key);
                 html! {
                     <a href={url} target="_blank">{name}</a>
                 }
