@@ -169,6 +169,7 @@ pub fn BindingInput(props: &BindingProps) -> Html {
             onblur={props.onblur.clone()}
             onkeydown={props.onkeydown.clone()}
             onkeyup={props.onkeyup.clone()}
+            onenter={props.onenter.clone()}
         />
     };
 }
