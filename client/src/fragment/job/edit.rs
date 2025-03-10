@@ -19,7 +19,8 @@ use crate::components::textarea::BindingTextarea;
 use crate::components::uploading_files::upload_files;
 use crate::components::validate_wrapper::ValidateData;
 use crate::components::validate_wrapper::ValidateWrapper;
-use crate::components::File;
+use crate::components::Resource;
+use crate::components::ResourceMetadata;
 use crate::components::SelectOption;
 use crate::sdk;
 use crate::utils;
@@ -111,9 +112,9 @@ pub struct AutoStep {
 pub struct JobStep {
     step_type: Binding<StepType>,
     id: Binding<Option<Id>>,
-    name: ValidateData<LightString>,            //步骤名称
-    remark: Binding<JsValue>,                   //备注
-    attachments: Binding<Vec<(Key, File, ())>>, //附件
+    name: ValidateData<LightString>,                //步骤名称
+    remark: Binding<JsValue>,                       //备注
+    attachments: Binding<Vec<(Key, Resource, ())>>, //附件
     auto_step: AutoStep,
 }
 
@@ -655,7 +656,7 @@ impl JobEditState {
                                             }
                                         },
                                         StepType::Manual => html!{
-                                            attachments.view(move |files: UseStateHandle<Vec<(Key, File, ())>>| {
+                                            attachments.view(move |files: UseStateHandle<Vec<(Key, Resource, ())>>| {
                                                 html! {
                                                     <tr>
                                                         <td class="align-right" style="vertical-align: top;">{"附件："}</td>
@@ -872,12 +873,15 @@ async fn read_job_detail(
                                                                                 value.to_string()
                                                                             })
                                                                             .unwrap_or_default();
-                                                                        let file = File::Remote {
-                                                                            key: key,
-                                                                            name: name,
-                                                                            size: size,
-                                                                            mime_type: mime_type,
-                                                                        };
+                                                                        let file = Resource::Remote(
+                                                                            ResourceMetadata {
+                                                                                key: key,
+                                                                                name: name,
+                                                                                size: size,
+                                                                                mime_type:
+                                                                                    mime_type,
+                                                                            },
+                                                                        );
                                                                         (gen_id().into(), file, ())
                                                                     })
                                                                     .unwrap()
@@ -1023,18 +1027,13 @@ async fn try_upload_files(edit_form: &EditForm) -> Result<(), LightString> {
                         AttributeValue::File(file_value) => {
                             if let Some(file) = file_value.get() {
                                 match file {
-                                    File::Local(hashing_file) => {
+                                    Resource::Local(hashing_file) => {
                                         let handle = file_value.clone();
                                         files.push((
                                             hashing_file.clone(),
                                             Callback::from(move |result| match result {
-                                                Ok(key) => {
-                                                    handle.set(Some(File::Remote {
-                                                        key: key,
-                                                        name: hashing_file.file.name(),
-                                                        size: hashing_file.file.size(),
-                                                        mime_type: hashing_file.file.type_(),
-                                                    }));
+                                                Ok(metadata) => {
+                                                    handle.set(Some(Resource::Remote(metadata)));
                                                 }
                                                 Err(err) => {
                                                     log::error!("上传文件失败: {:?}", err);
@@ -1042,7 +1041,7 @@ async fn try_upload_files(edit_form: &EditForm) -> Result<(), LightString> {
                                             }),
                                         ));
                                     }
-                                    File::Remote { .. } => (),
+                                    Resource::Remote(_metadata) => (),
                                 }
                             }
                         }
@@ -1055,7 +1054,7 @@ async fn try_upload_files(edit_form: &EditForm) -> Result<(), LightString> {
                             {
                                 let lock_data = lock_data.clone();
                                 match file {
-                                    File::Local(hashing_file) => {
+                                    Resource::Local(hashing_file) => {
                                         let file_list = file_list.clone();
                                         files.push((
                                             hashing_file.clone(),
@@ -1065,13 +1064,9 @@ async fn try_upload_files(edit_form: &EditForm) -> Result<(), LightString> {
                                                 lock_data.1 = finished_count;
                                                 let new_files = &mut lock_data.0;
                                                 match result {
-                                                    Ok(key) => {
-                                                        new_files[index].1 = File::Remote {
-                                                            key: key,
-                                                            name: hashing_file.file.name(),
-                                                            size: hashing_file.file.size(),
-                                                            mime_type: hashing_file.file.type_(),
-                                                        };
+                                                    Ok(metadata) => {
+                                                        new_files[index].1 =
+                                                            Resource::Remote(metadata);
                                                     }
                                                     Err(err) => {
                                                         log::error!("上传文件失败: {:?}", err);
@@ -1083,7 +1078,7 @@ async fn try_upload_files(edit_form: &EditForm) -> Result<(), LightString> {
                                             }),
                                         ));
                                     }
-                                    File::Remote { .. } => (),
+                                    Resource::Remote(_metadata) => (),
                                 }
                             }
                         }
@@ -1100,7 +1095,7 @@ async fn try_upload_files(edit_form: &EditForm) -> Result<(), LightString> {
                 {
                     let lock_data = lock_data.clone();
                     match file {
-                        File::Local(hashing_file) => {
+                        Resource::Local(hashing_file) => {
                             let attachments = job_step.attachments.clone();
                             files.push((
                                 hashing_file.clone(),
@@ -1110,13 +1105,8 @@ async fn try_upload_files(edit_form: &EditForm) -> Result<(), LightString> {
                                     lock_data.1 = finished_count;
                                     let new_files = &mut lock_data.0;
                                     match result {
-                                        Ok(key) => {
-                                            new_files[index].1 = File::Remote {
-                                                key: key,
-                                                name: hashing_file.file.name(),
-                                                size: hashing_file.file.size(),
-                                                mime_type: hashing_file.file.type_(),
-                                            };
+                                        Ok(metadata) => {
+                                            new_files[index].1 = Resource::Remote(metadata);
                                         }
                                         Err(err) => {
                                             log::error!("上传文件失败: {:?}", err);
@@ -1128,7 +1118,7 @@ async fn try_upload_files(edit_form: &EditForm) -> Result<(), LightString> {
                                 }),
                             ));
                         }
-                        File::Remote { .. } => (),
+                        Resource::Remote(_metadata) => (),
                     }
                 }
             }
@@ -1180,20 +1170,18 @@ fn collect_job_step_list_list(
                     .get()
                     .into_iter()
                     .map(|(_, file, _)| match file {
-                        File::Remote {
-                            key,
-                            name,
-                            size,
-                            mime_type,
-                        } => {
+                        Resource::Remote(metadata) => {
                             let mut map = serde_json::Map::new();
-                            map.insert(String::from("key"), Value::String(key));
-                            map.insert(String::from("name"), Value::String(name));
-                            map.insert(String::from("size"), Value::from(size));
-                            map.insert(String::from("mime_type"), Value::String(mime_type));
+                            map.insert(String::from("key"), Value::String(metadata.key));
+                            map.insert(String::from("name"), Value::String(metadata.name));
+                            map.insert(String::from("size"), Value::from(metadata.size));
+                            map.insert(
+                                String::from("mime_type"),
+                                Value::String(metadata.mime_type),
+                            );
                             Value::Object(map)
                         }
-                        File::Local(_) => {
+                        Resource::Local(_) => {
                             unreachable!();
                         }
                     })

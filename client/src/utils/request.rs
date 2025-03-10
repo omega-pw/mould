@@ -1,11 +1,19 @@
 use crate::LightString;
+use futures::lock::Mutex;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use tihu::Api;
+
+static SINGLE_CACHE_MAP: LazyLock<Mutex<HashMap<String, serde_json::Value>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+static MULTI_CACHE_MAP: LazyLock<Mutex<HashMap<(String, String), serde_json::Value>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 pub trait Handler<In, Out>: 'static {
     fn handle(&self, input: In) -> Pin<Box<dyn Future<Output = Out>>>;
@@ -27,7 +35,14 @@ pub enum Method {
     Delete,
 }
 
+enum CacheMethod {
+    Url,
+    UrlAndKey(LightString),
+}
+
 pub type HttpRequestor = dyn Handler<(LightString, LightString), Result<LightString, LightString>>;
+//请求校验器
+pub type RequestValidator<T> = dyn Fn(&T) -> Result<(), LightString>;
 //loading展示器
 pub type LoadingHandler = dyn Handler<bool, ()>;
 //锁处理器，lock参数为true表示加锁，lock参数为false表示解锁，返回true表示执行成功，返回false表示执行失败
@@ -44,12 +59,15 @@ pub struct Request<Req, Resp> {
     method: Method,
     http_requestor: Option<Arc<HttpRequestor>>,
     show_loading: bool,
+    request_validator: Option<Arc<RequestValidator<Req>>>,
     loading_handler: Option<Arc<LoadingHandler>>,
     lock_handler: Option<Arc<LockHandler>>,
     data_unwrapper: Option<Arc<DataUnwrapper>>,
+    validate_error_handler: Option<Arc<ErrorHandler>>,
     lock_error_handler: Option<Arc<LockErrorHandler>>,
     req_error_handler: Option<Arc<ErrorHandler>>,
     unwrap_error_handler: Option<Arc<ErrorHandler>>,
+    use_cache: Option<CacheMethod>,
     phantom1: PhantomData<Req>,
     phantom2: PhantomData<Resp>,
 }
@@ -65,12 +83,15 @@ where
             method: Method::Post,
             http_requestor: None,
             show_loading: true,
+            request_validator: None,
             loading_handler: None,
             lock_handler: None,
             data_unwrapper: None,
+            validate_error_handler: None,
             lock_error_handler: None,
             req_error_handler: None,
             unwrap_error_handler: None,
+            use_cache: None,
             phantom1: PhantomData,
             phantom2: PhantomData,
         }
@@ -91,6 +112,13 @@ where
     }
     pub fn lock_handler(&mut self, lock_handler: impl Handler<bool, bool>) -> &mut Self {
         self.lock_handler = Some(Arc::new(lock_handler));
+        return self;
+    }
+    pub fn request_validator(
+        &mut self,
+        request_validator: impl Fn(&Req) -> Result<(), LightString> + 'static,
+    ) -> &mut Self {
+        self.request_validator = Some(Arc::new(request_validator));
         return self;
     }
     pub fn loading_handler(&mut self, loading_handler: impl Handler<bool, ()>) -> &mut Self {
@@ -119,8 +147,48 @@ where
         self.unwrap_error_handler = Some(Arc::new(unwrap_error_handler));
         return self;
     }
-
+    pub fn cache_by_url(&mut self) -> &mut Self {
+        self.use_cache.replace(CacheMethod::Url);
+        return self;
+    }
+    pub fn cache_by_url_and_key(&mut self, key: LightString) -> &mut Self {
+        self.use_cache.replace(CacheMethod::UrlAndKey(key));
+        return self;
+    }
     pub async fn call(&self, req: &Req) -> Result<Resp, LightString> {
+        if let Some(request_validator) = self.request_validator.as_ref() {
+            if let Err(err_msg) = request_validator(req) {
+                if let Some(validate_error_handler) = self
+                    .validate_error_handler
+                    .as_ref()
+                    .or_else(|| unsafe { DEFAULT_VALIDATE_ERROR_HANDLER.as_ref() })
+                {
+                    validate_error_handler.handle(err_msg.clone()).await;
+                }
+                return Err(err_msg);
+            }
+        }
+        if let Some(use_cache) = self.use_cache.as_ref() {
+            let cache = match use_cache {
+                CacheMethod::Url => {
+                    let single_cache_map = LazyLock::force(&SINGLE_CACHE_MAP);
+                    let single_cache_map = single_cache_map.lock().await;
+                    single_cache_map.get(self.url.as_ref()).map(Clone::clone)
+                }
+                CacheMethod::UrlAndKey(key) => {
+                    let multi_cache_map = LazyLock::force(&MULTI_CACHE_MAP);
+                    let multi_cache_map = multi_cache_map.lock().await;
+                    multi_cache_map
+                        .get(&(self.url.to_string(), key.to_string()))
+                        .map(Clone::clone)
+                }
+            };
+            if let Some(cache) = cache {
+                if let Ok(resp) = serde_json::from_value::<Resp>(cache) {
+                    return Ok(resp);
+                }
+            }
+        }
         return self.call_with_lock(req).await;
     }
 
@@ -189,23 +257,42 @@ where
                     .or_else(|| unsafe { DEFAULT_DATA_UNWRAPPER.as_ref() })
                 {
                     match data_unwrapper.handle(full_resp).await {
-                        Ok(resp) => match serde_json::from_value::<Resp>(resp) {
-                            Ok(resp) => {
-                                return Ok(resp);
-                            }
-                            Err(err) => {
-                                let err_msg =
-                                    LightString::from(format!("响应数据格式不正确：{}", err));
-                                if let Some(unwrap_error_handler) = self
-                                    .unwrap_error_handler
-                                    .as_ref()
-                                    .or_else(|| unsafe { DEFAULT_UNWRAP_ERROR_HANDLER.as_ref() })
-                                {
-                                    unwrap_error_handler.handle(err_msg.clone()).await;
+                        Ok(resp) => {
+                            if let Some(use_cache) = self.use_cache.as_ref() {
+                                match use_cache {
+                                    CacheMethod::Url => {
+                                        let single_cache_map = LazyLock::force(&SINGLE_CACHE_MAP);
+                                        let mut single_cache_map = single_cache_map.lock().await;
+                                        single_cache_map.insert(self.url.to_string(), resp.clone());
+                                    }
+                                    CacheMethod::UrlAndKey(key) => {
+                                        let multi_cache_map = LazyLock::force(&MULTI_CACHE_MAP);
+                                        let mut multi_cache_map = multi_cache_map.lock().await;
+                                        multi_cache_map.insert(
+                                            (self.url.to_string(), key.to_string()),
+                                            resp.clone(),
+                                        );
+                                    }
                                 }
-                                return Err(err_msg);
                             }
-                        },
+                            match serde_json::from_value::<Resp>(resp) {
+                                Ok(resp) => {
+                                    return Ok(resp);
+                                }
+                                Err(err) => {
+                                    let err_msg =
+                                        LightString::from(format!("响应数据格式不正确：{}", err));
+                                    if let Some(unwrap_error_handler) =
+                                        self.unwrap_error_handler.as_ref().or_else(|| unsafe {
+                                            DEFAULT_UNWRAP_ERROR_HANDLER.as_ref()
+                                        })
+                                    {
+                                        unwrap_error_handler.handle(err_msg.clone()).await;
+                                    }
+                                    return Err(err_msg);
+                                }
+                            }
+                        }
                         Err(err) => {
                             if let Some(unwrap_error_handler) = self
                                 .unwrap_error_handler
@@ -218,6 +305,23 @@ where
                         }
                     }
                 } else {
+                    if let Some(use_cache) = self.use_cache.as_ref() {
+                        match use_cache {
+                            CacheMethod::Url => {
+                                let single_cache_map = LazyLock::force(&SINGLE_CACHE_MAP);
+                                let mut single_cache_map = single_cache_map.lock().await;
+                                single_cache_map.insert(self.url.to_string(), full_resp.clone());
+                            }
+                            CacheMethod::UrlAndKey(key) => {
+                                let multi_cache_map = LazyLock::force(&MULTI_CACHE_MAP);
+                                let mut multi_cache_map = multi_cache_map.lock().await;
+                                multi_cache_map.insert(
+                                    (self.url.to_string(), key.to_string()),
+                                    full_resp.clone(),
+                                );
+                            }
+                        }
+                    }
                     return serde_json::from_value::<Resp>(full_resp).map_err(
                         |err| -> LightString {
                             log::error!("响应数据格式不正确：{}", err);
@@ -260,6 +364,10 @@ pub trait ApiExt {
         loading_handler: impl Handler<bool, ()>,
     ) -> Request<Self::Input, Self::Output>;
     fn disable_loading(&self) -> Request<Self::Input, Self::Output>;
+    fn validate_error_handler(
+        &self,
+        validate_error_handler: impl Handler<LightString, ()>,
+    ) -> Request<Self::Input, Self::Output>;
     fn lock_error_handler(
         &self,
         lock_error_handler: impl Handler<(), ()>,
@@ -272,6 +380,8 @@ pub trait ApiExt {
         &self,
         unwrap_error_handler: impl Handler<LightString, ()>,
     ) -> Request<Self::Input, Self::Output>;
+    fn cache_by_url(&self) -> Request<Self::Input, Self::Output>;
+    fn cache_by_url_and_key(&self, key: LightString) -> Request<Self::Input, Self::Output>;
     async fn call(&self, req: &Self::Input) -> Result<Self::Output, LightString>;
 }
 
@@ -290,6 +400,9 @@ where
     ) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.http_requestor = Some(Arc::new(http_requestor));
+        request.request_validator(|req: &T::Input| {
+            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+        });
         request
     }
     fn data_unwrapper(
@@ -298,11 +411,17 @@ where
     ) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.data_unwrapper = Some(Arc::new(data_unwrapper));
+        request.request_validator(|req: &T::Input| {
+            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+        });
         request
     }
     fn lock_handler(&self, lock_handler: impl Handler<bool, bool>) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.lock_handler = Some(Arc::new(lock_handler));
+        request.request_validator(|req: &T::Input| {
+            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+        });
         request
     }
     fn loading_handler(
@@ -311,11 +430,28 @@ where
     ) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.loading_handler = Some(Arc::new(loading_handler));
+        request.request_validator(|req: &T::Input| {
+            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+        });
         request
     }
     fn disable_loading(&self) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.show_loading = false;
+        request.request_validator(|req: &T::Input| {
+            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+        });
+        request
+    }
+    fn validate_error_handler(
+        &self,
+        validate_error_handler: impl Handler<LightString, ()>,
+    ) -> Request<T::Input, T::Output> {
+        let mut request = Request::new(Self::namespace().to_string().into());
+        request.validate_error_handler = Some(Arc::new(validate_error_handler));
+        request.request_validator(|req: &T::Input| {
+            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+        });
         request
     }
     fn lock_error_handler(
@@ -324,6 +460,9 @@ where
     ) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.lock_error_handler = Some(Arc::new(lock_error_handler));
+        request.request_validator(|req: &T::Input| {
+            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+        });
         request
     }
     fn req_error_handler(
@@ -332,6 +471,9 @@ where
     ) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.req_error_handler = Some(Arc::new(req_error_handler));
+        request.request_validator(|req: &T::Input| {
+            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+        });
         request
     }
     fn unwrap_error_handler(
@@ -340,10 +482,35 @@ where
     ) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.unwrap_error_handler = Some(Arc::new(unwrap_error_handler));
+        request.request_validator(|req: &T::Input| {
+            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+        });
         request
     }
+
+    fn cache_by_url(&self) -> Request<T::Input, T::Output> {
+        let mut request = Request::new(Self::namespace().to_string().into());
+        request.use_cache.replace(CacheMethod::Url);
+        request.request_validator(|req: &T::Input| {
+            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+        });
+        request
+    }
+
+    fn cache_by_url_and_key(&self, key: LightString) -> Request<T::Input, T::Output> {
+        let mut request = Request::new(Self::namespace().to_string().into());
+        request.use_cache.replace(CacheMethod::UrlAndKey(key));
+        request.request_validator(|req: &T::Input| {
+            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+        });
+        request
+    }
+
     async fn call(&self, req: &Self::Input) -> Result<Self::Output, LightString> {
-        let request = Request::new(Self::namespace().to_string().into());
+        let mut request = Request::new(Self::namespace().to_string().into());
+        request.request_validator(|req: &T::Input| {
+            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+        });
         request.call(req).await
     }
 }
@@ -351,5 +518,6 @@ where
 pub static mut DEFAULT_HTTP_REQUESTOR: Option<Arc<HttpRequestor>> = None;
 pub static mut DEFAULT_LOADING_HANDLER: Option<Arc<LoadingHandler>> = None;
 pub static mut DEFAULT_DATA_UNWRAPPER: Option<Arc<DataUnwrapper>> = None;
+pub static mut DEFAULT_VALIDATE_ERROR_HANDLER: Option<Arc<ErrorHandler>> = None;
 pub static mut DEFAULT_REQ_ERROR_HANDLER: Option<Arc<ErrorHandler>> = None;
 pub static mut DEFAULT_UNWRAP_ERROR_HANDLER: Option<Arc<ErrorHandler>> = None;

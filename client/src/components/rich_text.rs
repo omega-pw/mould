@@ -5,6 +5,7 @@ use super::modal_dialog::ModalDialog;
 use super::uploading_files::upload_files;
 use super::validate_wrapper::ValidateData;
 use super::HashingFile;
+use super::ResourceMetadata;
 use crate::utils::choose_file;
 use crate::utils::validator;
 use crate::utils::validator::Validator;
@@ -589,8 +590,9 @@ fn try_upload(files: JsValue, resolve: Function, reject: Function) -> Result<(),
     .unwrap()
     .dyn_into()
     .unwrap();
-    let result_map: Arc<RwLock<HashMap<usize, Result<String, AttrValue>>>> = Default::default();
-    let files: Vec<(HashingFile, Callback<Result<String, AttrValue>>)> = files
+    let result_map: Arc<RwLock<HashMap<usize, Result<ResourceMetadata, AttrValue>>>> =
+        Default::default();
+    let files: Vec<(HashingFile, Callback<Result<ResourceMetadata, AttrValue>>)> = files
         .to_vec()
         .into_iter()
         .enumerate()
@@ -624,7 +626,7 @@ fn try_upload(files: JsValue, resolve: Function, reject: Function) -> Result<(),
                 results.sort_by_key(|item| item.0);
                 let arguments = js_sys::Array::new();
                 for (_, result) in results {
-                    arguments.push(&JsValue::from_str(&result.unwrap()));
+                    arguments.push(&JsValue::from_str(&result.unwrap().key));
                 }
                 if let Err(err) = resolve.call1(&JsValue::UNDEFINED, &arguments) {
                     log::error!("调用Promise的resolve失败: {:?}", err);

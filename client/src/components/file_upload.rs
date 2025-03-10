@@ -1,7 +1,7 @@
 use super::button::Button;
 use super::hidden_file::HiddenFile;
-use super::File;
 use super::HashingFile;
+use super::Resource;
 use std::ops::Deref;
 use wasm_bindgen::prelude::*;
 use yew::prelude::*;
@@ -14,11 +14,11 @@ pub enum Msg {
 
 #[derive(Clone, PartialEq, Properties)]
 pub struct Props {
-    pub file: Option<File>,
+    pub file: Option<Resource>,
     #[prop_or_default]
     pub readonly: bool,
     #[prop_or_default]
-    pub onchange: Option<Callback<Option<File>>>,
+    pub onchange: Option<Callback<Option<Resource>>>,
 }
 
 pub struct FileUpload {}
@@ -42,7 +42,7 @@ impl Component for FileUpload {
         match msg {
             Msg::ReplaceFile(file) => {
                 if let Some(onchange) = ctx.props().onchange.as_ref() {
-                    let file = File::Local(HashingFile {
+                    let file = Resource::Local(HashingFile {
                         file: file.clone(),
                         sha512: calc_file_sha512_method
                             .call1(&wasm_bindgen::JsValue::UNDEFINED, &file)
@@ -107,15 +107,15 @@ impl Component for FileUpload {
 }
 
 impl FileUpload {
-    fn file_view(&self, file: &File) -> Html {
+    fn file_view(&self, file: &Resource) -> Html {
         match file {
-            File::Remote { key, name, .. } => {
-                let url = format!("/{}", key);
+            Resource::Remote(metadata) => {
+                let url = format!("/{}", metadata.key);
                 html! {
-                    <a href={url} target="_blank">{name}</a>
+                    <a href={url} target="_blank">{metadata.name.clone()}</a>
                 }
             }
-            File::Local(hashing_file) => {
+            Resource::Local(hashing_file) => {
                 html! { hashing_file.file.name() }
             }
         }
@@ -124,18 +124,18 @@ impl FileUpload {
 
 #[derive(Clone, PartialEq, Properties)]
 pub struct BindingProps {
-    pub file: UseStateHandle<Option<File>>,
+    pub file: UseStateHandle<Option<Resource>>,
     #[prop_or_default]
     pub readonly: bool,
     #[prop_or_default]
-    pub onchange: Option<Callback<Option<File>>>,
+    pub onchange: Option<Callback<Option<Resource>>>,
 }
 
 #[function_component]
 pub fn BindingFileUpload(props: &BindingProps) -> Html {
     let file_clone = props.file.clone();
     let onchange = props.onchange.clone();
-    let on_change = Callback::from(move |file: Option<File>| {
+    let on_change = Callback::from(move |file: Option<Resource>| {
         file_clone.set(file.clone());
         if let Some(onchange) = onchange.as_ref() {
             onchange.emit(file);

@@ -3,6 +3,7 @@ use super::dialog::Dialog;
 use super::page::Page;
 use super::uploading_file::UploadingFile;
 use super::HashingFile;
+use super::ResourceMetadata;
 use crate::utils::gen_id;
 use crate::LightString;
 use js_sys::Function;
@@ -19,7 +20,11 @@ use yew::{html, Html};
 
 #[derive(Clone, PartialEq, Properties)]
 pub struct Props {
-    pub files: Vec<(Key, HashingFile, Callback<Result<String, LightString>>)>,
+    pub files: Vec<(
+        Key,
+        HashingFile,
+        Callback<Result<ResourceMetadata, LightString>>,
+    )>,
     #[prop_or(999)]
     pub z_index: u64,
     #[prop_or_default]
@@ -41,7 +46,7 @@ pub fn UploadingFiles(props: &Props) -> Html {
                             let done_count = done_count.clone();
                             let onsingledone = onsingledone.clone();
                             let first_error_result = first_error_result.clone();
-                            let ondone = Callback::from(move |result: Result<String, LightString>| {
+                            let ondone = Callback::from(move |result: Result<ResourceMetadata, LightString>| {
                                 let has_error = first_error_result.is_err();
                                 if let Err(error) = result.as_ref() {
                                     if !has_error {
@@ -69,7 +74,7 @@ pub fn UploadingFiles(props: &Props) -> Html {
 }
 
 pub async fn upload_files(
-    files: Vec<(HashingFile, Callback<Result<String, LightString>>)>,
+    files: Vec<(HashingFile, Callback<Result<ResourceMetadata, LightString>>)>,
 ) -> Result<(), LightString> {
     if files.is_empty() {
         return Ok(());

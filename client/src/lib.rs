@@ -115,6 +115,12 @@ pub struct NotifyCount {
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 fn init_request() {
+    let error_handler = Arc::new(
+        |message: LightString| -> Pin<Box<dyn Future<Output = ()>>> {
+            components::popup_message::error(message);
+            Box::pin(async {})
+        },
+    );
     unsafe {
         utils::request::DEFAULT_HTTP_REQUESTOR =
             Some(Arc::new(
@@ -161,18 +167,9 @@ fn init_request() {
                 })
             },
         ));
-        utils::request::DEFAULT_REQ_ERROR_HANDLER = Some(Arc::new(
-            |message: LightString| -> Pin<Box<dyn Future<Output = ()>>> {
-                components::popup_message::error(message);
-                Box::pin(async {})
-            },
-        ));
-        utils::request::DEFAULT_UNWRAP_ERROR_HANDLER = Some(Arc::new(
-            |message: LightString| -> Pin<Box<dyn Future<Output = ()>>> {
-                components::popup_message::error(message);
-                Box::pin(async {})
-            },
-        ));
+        utils::request::DEFAULT_VALIDATE_ERROR_HANDLER = Some(error_handler.clone());
+        utils::request::DEFAULT_REQ_ERROR_HANDLER = Some(error_handler.clone());
+        utils::request::DEFAULT_UNWRAP_ERROR_HANDLER = Some(error_handler);
     }
 }
 

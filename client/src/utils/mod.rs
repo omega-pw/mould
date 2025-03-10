@@ -3,8 +3,12 @@ pub mod binding;
 pub mod handle;
 pub mod list;
 pub mod request;
+pub mod result;
 pub mod validator;
 use crate::components;
+use crate::components::HashingFile;
+use crate::components::Resource;
+use crate::components::ResourceMetadata;
 use crate::js;
 use crate::sdk;
 use crate::LightString;
@@ -18,6 +22,7 @@ use chrono::Utc;
 pub use components::popup_message::error;
 pub use components::popup_message::success;
 pub use components::popup_message::warning;
+use futures::channel::oneshot;
 use gloo::timers::callback::Timeout;
 use js::is_valid_rsa_key_pair;
 use js::sha512;
@@ -39,13 +44,16 @@ use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::atomic::AtomicI64;
 use std::sync::atomic::Ordering;
+use std::sync::Mutex;
 use tihu::api::Response as CommonResponse;
 use tihu::client_id::ClientId;
+use tihu::Id;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{FormData, Request, RequestInit, Response};
 use yew::prelude::*;
+use yew::virtual_dom::Key;
 
 static TIME_DIFF: AtomicI64 = AtomicI64::new(0);
 
@@ -318,6 +326,82 @@ pub async fn upload_file(
     } else {
         return Err(resp.message.to_string().into());
     }
+}
+
+pub fn add_upload_tasks(
+    tasks: &mut Vec<(HashingFile, Callback<Result<ResourceMetadata, LightString>>)>,
+    handle: &UseStateHandle<Vec<(Key, Resource, Option<Id>)>>,
+) -> Result<
+    Vec<oneshot::Receiver<(Key, Result<ResourceMetadata, LightString>, Option<Id>)>>,
+    LightString,
+> {
+    let mut receivers = Vec::with_capacity(handle.len());
+    for (key, resource, id) in handle.iter() {
+        let (sender, receiver) =
+            oneshot::channel::<(Key, Result<ResourceMetadata, LightString>, Option<Id>)>();
+        match resource {
+            Resource::Local(hashing_file) => {
+                let key = key.clone();
+                let sender = Mutex::new(Some(sender));
+                let id = id.clone();
+                tasks.push((
+                    hashing_file.clone(),
+                    Callback::from(move |result: Result<ResourceMetadata, LightString>| {
+                        if let Err(err) = result.as_ref() {
+                            log::error!("上传资源文件失败: {:?}", err);
+                        }
+                        if let Some(sender) = sender.lock().unwrap().take() {
+                            sender.send((key.clone(), result, id.clone())).unwrap();
+                        }
+                    }),
+                ));
+            }
+            Resource::Remote(metadata) => {
+                sender
+                    .send((key.clone(), Ok(metadata.clone()), id.clone()))
+                    .unwrap();
+            }
+        }
+        receivers.push(receiver);
+    }
+    return Ok(receivers);
+}
+
+pub fn add_upload_task(
+    tasks: &mut Vec<(HashingFile, Callback<Result<ResourceMetadata, LightString>>)>,
+    handle: UseStateHandle<Option<Resource>>,
+) -> Result<oneshot::Receiver<Result<ResourceMetadata, LightString>>, LightString> {
+    let (sender, receiver) = oneshot::channel::<Result<ResourceMetadata, LightString>>();
+    let resource = handle
+        .deref()
+        .as_ref()
+        .ok_or_else(|| LightString::from("没有选择资源文件"))?;
+    match resource {
+        Resource::Local(hashing_file) => {
+            let hashing_file = hashing_file.clone();
+            let sender = Mutex::new(Some(sender));
+            tasks.push((
+                hashing_file,
+                Callback::from(move |result: Result<ResourceMetadata, LightString>| {
+                    match result.as_ref() {
+                        Ok(metadata) => {
+                            handle.set(Some(Resource::Remote(metadata.clone())));
+                        }
+                        Err(err) => {
+                            log::error!("上传资源文件失败: {:?}", err);
+                        }
+                    }
+                    if let Some(sender) = sender.lock().unwrap().take() {
+                        sender.send(result).unwrap();
+                    }
+                }),
+            ));
+        }
+        Resource::Remote(metadata) => {
+            sender.send(Ok(metadata.clone())).unwrap();
+        }
+    }
+    return Ok(receiver);
 }
 
 static mut LAST_DOM: Option<(web_sys::HtmlInputElement, js_sys::Function)> = None;

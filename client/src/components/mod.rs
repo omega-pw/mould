@@ -130,12 +130,15 @@ impl PartialEq for HashingFile {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum File {
-    Remote {
-        key: String,
-        name: String,
-        size: f64,
-        mime_type: String,
-    },
+pub struct ResourceMetadata {
+    pub key: String,
+    pub name: String,
+    pub size: f64,
+    pub mime_type: String,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum Resource {
+    Remote(ResourceMetadata),
     Local(HashingFile),
 }

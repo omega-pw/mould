@@ -13,7 +13,8 @@ use crate::components::required::Required;
 // use crate::components::rich_text::BindingRichText;
 use crate::components::textarea::BindingTextarea;
 use crate::components::validate_wrapper::ValidateData;
-use crate::components::File;
+use crate::components::Resource;
+use crate::components::ResourceMetadata;
 use crate::sdk;
 use crate::utils::binding::Binding;
 use crate::utils::gen_id;
@@ -46,8 +47,8 @@ pub enum AttributeValue {
     Enum(ValidateData<LightString>),
     EnumList(ValidateData<Vec<LightString>>),
     Bool(Binding<bool>),
-    File(ValidateData<Option<File>>),
-    FileList(ValidateData<Vec<(Key, File, ())>>),
+    File(ValidateData<Option<Resource>>),
+    FileList(ValidateData<Vec<(Key, Resource, ())>>),
 }
 
 impl AttributeValue {
@@ -701,16 +702,16 @@ pub fn config_detail_view(attributes: &[(Key, Attribute, AttributeValue)]) -> Ht
                                 {
                                     match value {
                                         AttributeValue::File(file) => {
-                                            file.view(move |file: UseStateHandle<Option<File>>, _validator| {
+                                            file.view(move |file: UseStateHandle<Option<Resource>>, _validator| {
                                                 if let Some(file) = file.as_ref() {
                                                     match file {
-                                                        File::Remote { key, name, .. } => {
-                                                            let url = format!("/{}", key);
+                                                        Resource::Remote(metadata) => {
+                                                            let url = format!("/{}", metadata.key);
                                                             html! {
-                                                                <a href={url} target="_blank">{name}</a>
+                                                                <a href={url} target="_blank">{metadata.name.clone()}</a>
                                                             }
                                                         }
-                                                        File::Local(hashing_file) => {
+                                                        Resource::Local(hashing_file) => {
                                                             html! { hashing_file.file.name() }
                                                         }
                                                     }
@@ -739,17 +740,17 @@ pub fn config_detail_view(attributes: &[(Key, Attribute, AttributeValue)]) -> Ht
                                 {
                                     match value {
                                         AttributeValue::FileList(files) => {
-                                            files.view(move |files: UseStateHandle<Vec<(Key, File, ())>>, _validator| {
+                                            files.view(move |files: UseStateHandle<Vec<(Key, Resource, ())>>, _validator| {
                                                 html! {
                                                     for files.iter().map(|(_key, file, _)| {
                                                         match file {
-                                                            File::Remote { key, name, .. } => {
-                                                                let url = format!("/{}", key);
+                                                            Resource::Remote(metadata) => {
+                                                                let url = format!("/{}", metadata.key);
                                                                 html! {
-                                                                    <a href={url} target="_blank">{name}</a>
+                                                                    <a href={url} target="_blank">{metadata.name.clone()}</a>
                                                                 }
                                                             }
-                                                            File::Local(hashing_file) => {
+                                                            Resource::Local(hashing_file) => {
                                                                 html! { hashing_file.file.name() }
                                                             }
                                                         }
@@ -837,20 +838,18 @@ pub fn serialize_config(attributes: &[(Key, Attribute, AttributeValue)]) -> Stri
                 let file = value.get();
                 if let Some(file) = file {
                     match file {
-                        File::Remote {
-                            key,
-                            name,
-                            size,
-                            mime_type,
-                        } => {
+                        Resource::Remote(metadata) => {
                             let mut map = serde_json::Map::new();
-                            map.insert(String::from("key"), Value::String(key));
-                            map.insert(String::from("name"), Value::String(name));
-                            map.insert(String::from("size"), Value::from(size));
-                            map.insert(String::from("mime_type"), Value::String(mime_type));
+                            map.insert(String::from("key"), Value::String(metadata.key));
+                            map.insert(String::from("name"), Value::String(metadata.name));
+                            map.insert(String::from("size"), Value::from(metadata.size));
+                            map.insert(
+                                String::from("mime_type"),
+                                Value::String(metadata.mime_type),
+                            );
                             Value::Object(map)
                         }
-                        File::Local(_) => {
+                        Resource::Local(_) => {
                             unreachable!();
                         }
                     }
@@ -863,20 +862,18 @@ pub fn serialize_config(attributes: &[(Key, Attribute, AttributeValue)]) -> Stri
                     .get()
                     .into_iter()
                     .map(|(_, file, _)| match file {
-                        File::Remote {
-                            key,
-                            name,
-                            size,
-                            mime_type,
-                        } => {
+                        Resource::Remote(metadata) => {
                             let mut map = serde_json::Map::new();
-                            map.insert(String::from("key"), Value::String(key));
-                            map.insert(String::from("name"), Value::String(name));
-                            map.insert(String::from("size"), Value::from(size));
-                            map.insert(String::from("mime_type"), Value::String(mime_type));
+                            map.insert(String::from("key"), Value::String(metadata.key));
+                            map.insert(String::from("name"), Value::String(metadata.name));
+                            map.insert(String::from("size"), Value::from(metadata.size));
+                            map.insert(
+                                String::from("mime_type"),
+                                Value::String(metadata.mime_type),
+                            );
                             Value::Object(map)
                         }
-                        File::Local(_) => {
+                        Resource::Local(_) => {
                             unreachable!();
                         }
                     })
@@ -911,7 +908,7 @@ fn get_string_list_validators(
     };
 }
 
-fn get_file_list_validators(attribute: &Attribute) -> Option<Validators<Vec<(Key, File, ())>>> {
+fn get_file_list_validators(attribute: &Attribute) -> Option<Validators<Vec<(Key, Resource, ())>>> {
     return if attribute.required && AttributeType::Bool != attribute.r#type {
         Some(Validators::new().add(RequiredValidator::new(format!(
             "请上传文件{}",
@@ -922,7 +919,7 @@ fn get_file_list_validators(attribute: &Attribute) -> Option<Validators<Vec<(Key
     };
 }
 
-fn get_file_validators(attribute: &Attribute) -> Option<Validators<Option<File>>> {
+fn get_file_validators(attribute: &Attribute) -> Option<Validators<Option<Resource>>> {
     return if attribute.required && AttributeType::Bool != attribute.r#type {
         Some(Validators::new().add(RequiredValidator::new(format!(
             "请上传文件{}",
@@ -1139,12 +1136,12 @@ fn get_value(attribute: &Attribute, value: Value) -> AttributeValue {
                         .as_str()
                         .map(|value| value.to_string())
                         .unwrap_or_default();
-                    Some(File::Remote {
+                    Some(Resource::Remote(ResourceMetadata {
                         key: key,
                         name: name,
                         size: size,
                         mime_type: mime_type,
-                    })
+                    }))
                 }
                 _ => unreachable!(),
             };
@@ -1154,7 +1151,7 @@ fn get_value(attribute: &Attribute, value: Value) -> AttributeValue {
             ))
         }
         AttributeType::FileList => {
-            let value: Vec<(Key, File, ())> = value
+            let value: Vec<(Key, Resource, ())> = value
                 .as_array()
                 .map(|value| {
                     value
@@ -1182,12 +1179,12 @@ fn get_value(attribute: &Attribute, value: Value) -> AttributeValue {
                                         .as_str()
                                         .map(|value| value.to_string())
                                         .unwrap_or_default();
-                                    let file = File::Remote {
+                                    let file = Resource::Remote(ResourceMetadata {
                                         key: key,
                                         name: name,
                                         size: size,
                                         mime_type: mime_type,
-                                    };
+                                    });
                                     (gen_id().into(), file, ())
                                 })
                                 .unwrap()

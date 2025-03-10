@@ -61,6 +61,6 @@ url = "2"
 oauth2 = "4"
 openid = "0.13"
 tera = "1"
-object-storage-lib = "0.1.9"
+object-storage-lib = "0.1.12"
 server-sdk = { path="../server-sdk" }
 mould-extension-sdk = { path="../extension-sdk" }

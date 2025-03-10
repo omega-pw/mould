@@ -1,4 +1,5 @@
 use super::HashingFile;
+use super::ResourceMetadata;
 use crate::utils;
 use crate::LightString;
 use std::ops::Deref;
@@ -9,7 +10,7 @@ use yew::{html, Html};
 pub struct Props {
     pub file: HashingFile,
     #[prop_or_default]
-    pub ondone: Callback<Result<String, LightString>>,
+    pub ondone: Callback<Result<ResourceMetadata, LightString>>,
 }
 
 #[function_component]
@@ -28,12 +29,17 @@ pub fn UploadingFile(props: &Props) -> Html {
                     progress.set(if 0.0 >= total { 0.0 } else { loaded / total });
                 }) as Box<dyn FnMut(f64, f64)>;
                 let result = utils::upload_file(
-                    hashing_file.file,
-                    hashing_file.sha512,
+                    hashing_file.file.clone(),
+                    hashing_file.sha512.clone(),
                     Some(on_upload_progress),
                 )
                 .await
-                .map(|resp| resp.key);
+                .map(|resp| ResourceMetadata {
+                    key: resp.key,
+                    name: hashing_file.file.name(),
+                    size: hashing_file.file.size(),
+                    mime_type: hashing_file.file.type_(),
+                });
                 ondone.emit(result);
             });
         });

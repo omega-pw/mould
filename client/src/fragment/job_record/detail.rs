@@ -4,7 +4,8 @@ use crate::components::r#if::If;
 use crate::components::rich_text::render_rich_rext;
 use crate::components::running::Running;
 use crate::components::show::Show;
-use crate::components::File;
+use crate::components::Resource;
+use crate::components::ResourceMetadata;
 use crate::sdk;
 use crate::utils;
 use crate::utils::request::ApiExt;
@@ -223,7 +224,7 @@ fn render_steps(
                                         html! {}
                                     }
                                     StepRecord::Manual { job_step_record } => {
-                                        let files: Vec<File> = job_step_record.attachments.as_ref().map(|attachments| {
+                                        let files: Vec<Resource> = job_step_record.attachments.as_ref().map(|attachments| {
                                             serde_json::from_str::<Value>(&attachments).map(|value| {
                                                 value
                                                 .as_array()
@@ -253,12 +254,12 @@ fn render_steps(
                                                                         .as_str()
                                                                         .map(|value| value.to_string())
                                                                         .unwrap_or_default();
-                                                                    File::Remote {
+                                                                    Resource::Remote(ResourceMetadata {
                                                                         key: key,
                                                                         name: name,
                                                                         size: size,
                                                                         mime_type: mime_type,
-                                                                    }
+                                                                    })
                                                                 })
                                                                 .unwrap()
                                                         })
@@ -276,15 +277,15 @@ fn render_steps(
                                                     {
                                                         for files.iter().map(|file| {
                                                             match file {
-                                                                File::Remote { key, name, .. } => {
-                                                                    let url = format!("/{}", key);
+                                                                Resource::Remote(metadata) => {
+                                                                    let url = format!("/{}", metadata.key);
                                                                     html! {
                                                                         <div>
-                                                                            <a href={url} target="_blank" download={name.clone()}>{name}</a>
+                                                                            <a href={url} target="_blank" download={metadata.name.clone()}>{metadata.name.clone()}</a>
                                                                         </div>
                                                                     }
                                                                 }
-                                                                File::Local(hashing_file) => {
+                                                                Resource::Local(hashing_file) => {
                                                                     html! { hashing_file.file.name() }
                                                                 }
                                                             }

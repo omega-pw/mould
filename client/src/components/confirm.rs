@@ -1,7 +1,11 @@
+use super::button::Button;
+use super::button_group::ButtonGroup;
 use super::modal_dialog::ModalDialog;
 use crate::LightString;
+use js_sys::Function;
 use std::cell::Cell;
 use std::rc::Rc;
+use wasm_bindgen::prelude::*;
 use yew::prelude::*;
 use yew::{html, Component, Context, Html};
 
@@ -91,8 +95,10 @@ impl Component for Confirm {
             <ModalDialog title={self.state.title.clone()} closable=false z_index={self.state.z_index} center_style={center_style}>
                 <div style="min-height: 2em;padding:0.5em;">{&self.state.content}</div>
                 <div style={footer_style}>
-                    <button type="button" class="e-btn" onclick={on_ok} style={btn_style.clone()}>{&self.state.ok_text}</button>
-                    <button type="button" class="e-btn" onclick={on_cancel} style={btn_style.clone()}>{&self.state.cancel_text}</button>
+                    <ButtonGroup>
+                        <Button onclick={on_ok} style={btn_style.clone()}>{self.state.ok_text.clone()}</Button>
+                        <Button onclick={on_cancel} style={btn_style.clone()}>{self.state.cancel_text.clone()}</Button>
+                    </ButtonGroup>
                 </div>
             </ModalDialog>
         }
@@ -103,6 +109,16 @@ pub fn confirm(content: LightString, title: Option<LightString>, cb: impl Fn(boo
     let document = web_sys::window().unwrap().document().unwrap();
     let body = document.body().unwrap();
     let confirm_root = document.create_element("div").unwrap();
+    let on_root_click: Function = Closure::wrap(Box::new(|event: Event| {
+        //阻止mousedown事件冒泡，防止点击事件被document补货到，导致FocusArea组件触发离开事件
+        event.stop_propagation();
+    }) as Box<dyn FnMut(Event)>)
+    .into_js_value()
+    .dyn_into()
+    .unwrap();
+    confirm_root
+        .add_event_listener_with_callback("mousedown", &on_root_click)
+        .unwrap();
     body.append_child(&confirm_root).unwrap();
     let confirm_handle: Rc<Cell<Option<AppHandle<Confirm>>>> = Rc::new(Cell::new(None));
     let confirm_handle_clone = confirm_handle.clone();
@@ -121,6 +137,9 @@ pub fn confirm(content: LightString, title: Option<LightString>, cb: impl Fn(boo
                 let body = document.body().unwrap();
                 body.remove_child(&confirm_root_clone).unwrap();
             }
+            confirm_root_clone
+                .remove_event_listener_with_callback("mousedown", &on_root_click)
+                .unwrap();
         }),
     };
     confirm_handle.set(Some(

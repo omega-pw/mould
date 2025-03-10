@@ -1,7 +1,10 @@
+use super::button::Button;
 use super::modal_dialog::ModalDialog;
 use crate::LightString;
+use js_sys::Function;
 use std::cell::Cell;
 use std::rc::Rc;
+use wasm_bindgen::prelude::*;
 use yew::prelude::*;
 use yew::{html, Component, Context, Html};
 
@@ -91,7 +94,7 @@ impl Component for Alert {
                     {&self.state.content}
                 </div>
                 <div style={footer_style}>
-                    <button type="button" class="e-btn" onclick={on_click} style={btn_style}>{&self.state.ok_text}</button>
+                    <Button onclick={on_click} style={btn_style}>{self.state.ok_text.clone()}</Button>
                 </div>
             </ModalDialog>
         }
@@ -102,6 +105,16 @@ pub fn alert(content: LightString, title: Option<LightString>, cb: Option<impl F
     let document = web_sys::window().unwrap().document().unwrap();
     let body = document.body().unwrap();
     let alert_root = document.create_element("div").unwrap();
+    let on_root_click: Function = Closure::wrap(Box::new(|event: Event| {
+        //阻止mousedown事件冒泡，防止点击事件被document补货到，导致FocusArea组件触发离开事件
+        event.stop_propagation();
+    }) as Box<dyn FnMut(Event)>)
+    .into_js_value()
+    .dyn_into()
+    .unwrap();
+    alert_root
+        .add_event_listener_with_callback("mousedown", &on_root_click)
+        .unwrap();
     body.append_child(&alert_root).unwrap();
     let alert_handle: Rc<Cell<Option<AppHandle<Alert>>>> = Rc::new(Cell::new(None));
     let alert_handle_clone = alert_handle.clone();
@@ -121,6 +134,9 @@ pub fn alert(content: LightString, title: Option<LightString>, cb: Option<impl F
                 let body = document.body().unwrap();
                 body.remove_child(&alert_root_clone).unwrap();
             }
+            alert_root_clone
+                .remove_event_listener_with_callback("mousedown", &on_root_click)
+                .unwrap();
         })),
     };
     alert_handle.set(Some(

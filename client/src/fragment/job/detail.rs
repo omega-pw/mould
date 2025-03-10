@@ -4,7 +4,8 @@ use super::super::extension::parse_config;
 use super::super::extension::wrap_content;
 use crate::components::rich_text::render_rich_rext;
 use crate::components::show::Show;
-use crate::components::File;
+use crate::components::Resource;
+use crate::components::ResourceMetadata;
 use crate::sdk;
 use crate::utils;
 use crate::utils::request::ApiExt;
@@ -164,7 +165,7 @@ pub fn JobDetail(props: &Props) -> Html {
                                                                     }
                                                                 },
                                                                 JobStep::Manual { attachments, .. } => {
-                                                                    let files: Vec<File> = attachments.as_ref().map(|attachments| {
+                                                                    let files: Vec<Resource> = attachments.as_ref().map(|attachments| {
                                                                         serde_json::from_str::<Value>(&attachments).map(|value| {
                                                                             value
                                                                             .as_array()
@@ -194,12 +195,12 @@ pub fn JobDetail(props: &Props) -> Html {
                                                                                                     .as_str()
                                                                                                     .map(|value| value.to_string())
                                                                                                     .unwrap_or_default();
-                                                                                                File::Remote {
+                                                                                                Resource::Remote(ResourceMetadata {
                                                                                                     key: key,
                                                                                                     name: name,
                                                                                                     size: size,
                                                                                                     mime_type: mime_type,
-                                                                                                }
+                                                                                                })
                                                                                             })
                                                                                             .unwrap()
                                                                                     })
@@ -217,15 +218,15 @@ pub fn JobDetail(props: &Props) -> Html {
                                                                                 {
                                                                                     for files.iter().map(|file| {
                                                                                         match file {
-                                                                                            File::Remote { key, name, .. } => {
-                                                                                                let url = format!("/{}", key);
+                                                                                            Resource::Remote(metadata) => {
+                                                                                                let url = format!("/{}", metadata.key);
                                                                                                 html! {
                                                                                                     <div>
-                                                                                                        <a href={url} target="_blank" download={name.clone()}>{name}</a>
+                                                                                                        <a href={url} target="_blank" download={metadata.name.clone()}>{metadata.name.clone()}</a>
                                                                                                     </div>
                                                                                                 }
                                                                                             }
-                                                                                            File::Local(hashing_file) => {
+                                                                                            Resource::Local(hashing_file) => {
                                                                                                 html! { hashing_file.file.name() }
                                                                                             }
                                                                                         }

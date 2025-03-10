@@ -13,7 +13,8 @@ use crate::components::show::Show;
 use crate::components::uploading_files::upload_files;
 use crate::components::validate_wrapper::ValidateData;
 use crate::components::validate_wrapper::ValidateWrapper;
-use crate::components::File;
+use crate::components::Resource;
+use crate::components::ResourceMetadata;
 use crate::sdk;
 use crate::utils;
 use crate::utils::binding::Binding;
@@ -694,18 +695,13 @@ async fn upload_single_files(
             AttributeValue::File(file_value) => {
                 if let Some(file) = file_value.get() {
                     match file {
-                        File::Local(hashing_file) => {
+                        Resource::Local(hashing_file) => {
                             let handle = file_value.clone();
                             files.push((
                                 hashing_file.clone(),
                                 Callback::from(move |result| match result {
-                                    Ok(key) => {
-                                        handle.set(Some(File::Remote {
-                                            key: key,
-                                            name: hashing_file.file.name(),
-                                            size: hashing_file.file.size(),
-                                            mime_type: hashing_file.file.type_(),
-                                        }));
+                                    Ok(metadata) => {
+                                        handle.set(Some(Resource::Remote(metadata)));
                                     }
                                     Err(err) => {
                                         log::error!("上传文件失败: {:?}", err);
@@ -713,7 +709,7 @@ async fn upload_single_files(
                                 }),
                             ));
                         }
-                        File::Remote { .. } => (),
+                        Resource::Remote(_metadata) => (),
                     }
                 }
             }
@@ -725,7 +721,7 @@ async fn upload_single_files(
                 for (index, (_key, file, ())) in file_list.get().into_iter().enumerate() {
                     let lock_data = lock_data.clone();
                     match file {
-                        File::Local(hashing_file) => {
+                        Resource::Local(hashing_file) => {
                             let file_list = file_list.clone();
                             files.push((
                                 hashing_file.clone(),
@@ -735,13 +731,8 @@ async fn upload_single_files(
                                     lock_data.1 = finished_count;
                                     let new_files = &mut lock_data.0;
                                     match result {
-                                        Ok(key) => {
-                                            new_files[index].1 = File::Remote {
-                                                key: key,
-                                                name: hashing_file.file.name(),
-                                                size: hashing_file.file.size(),
-                                                mime_type: hashing_file.file.type_(),
-                                            };
+                                        Ok(metadata) => {
+                                            new_files[index].1 = Resource::Remote(metadata);
                                         }
                                         Err(err) => {
                                             log::error!("上传文件失败: {:?}", err);
@@ -753,7 +744,7 @@ async fn upload_single_files(
                                 }),
                             ));
                         }
-                        File::Remote { .. } => (),
+                        Resource::Remote(_metadata) => (),
                     }
                 }
             }
@@ -840,18 +831,13 @@ async fn try_upload_files(edit_form: &EditForm) -> Result<(), LightString> {
                     AttributeValue::File(file_value) => {
                         if let Some(file) = file_value.get() {
                             match file {
-                                File::Local(hashing_file) => {
+                                Resource::Local(hashing_file) => {
                                     let handle = file_value.clone();
                                     files.push((
                                         hashing_file.clone(),
                                         Callback::from(move |result| match result {
-                                            Ok(key) => {
-                                                handle.set(Some(File::Remote {
-                                                    key: key,
-                                                    name: hashing_file.file.name(),
-                                                    size: hashing_file.file.size(),
-                                                    mime_type: hashing_file.file.type_(),
-                                                }));
+                                            Ok(metadata) => {
+                                                handle.set(Some(Resource::Remote(metadata)));
                                             }
                                             Err(err) => {
                                                 log::error!("上传文件失败: {:?}", err);
@@ -859,7 +845,7 @@ async fn try_upload_files(edit_form: &EditForm) -> Result<(), LightString> {
                                         }),
                                     ));
                                 }
-                                File::Remote { .. } => (),
+                                Resource::Remote(_metadata) => (),
                             }
                         }
                     }
@@ -871,7 +857,7 @@ async fn try_upload_files(edit_form: &EditForm) -> Result<(), LightString> {
                         for (index, (_key, file, ())) in file_list.get().into_iter().enumerate() {
                             let lock_data = lock_data.clone();
                             match file {
-                                File::Local(hashing_file) => {
+                                Resource::Local(hashing_file) => {
                                     let file_list = file_list.clone();
                                     files.push((
                                         hashing_file.clone(),
@@ -881,13 +867,8 @@ async fn try_upload_files(edit_form: &EditForm) -> Result<(), LightString> {
                                             lock_data.1 = finished_count;
                                             let new_files = &mut lock_data.0;
                                             match result {
-                                                Ok(key) => {
-                                                    new_files[index].1 = File::Remote {
-                                                        key: key,
-                                                        name: hashing_file.file.name(),
-                                                        size: hashing_file.file.size(),
-                                                        mime_type: hashing_file.file.type_(),
-                                                    };
+                                                Ok(metadata) => {
+                                                    new_files[index].1 = Resource::Remote(metadata);
                                                 }
                                                 Err(err) => {
                                                     log::error!("上传文件失败: {:?}", err);
@@ -899,7 +880,7 @@ async fn try_upload_files(edit_form: &EditForm) -> Result<(), LightString> {
                                         }),
                                     ));
                                 }
-                                File::Remote { .. } => (),
+                                Resource::Remote(_metadata) => (),
                             }
                         }
                     }
