@@ -31,7 +31,6 @@ use mould_extension_sdk::Extension;
 use native_common::cache::RedisCache;
 use sdk::storage::UPLOAD_API;
 // use native_common::utils::Snowflake;
-use native_tls::{Certificate, TlsConnector};
 use oauth2::basic::BasicClient;
 use oauth2::reqwest::http_client;
 use oauth2::{
@@ -43,8 +42,9 @@ use object_storage_lib::Oss;
 use object_storage_lib::OssHandler;
 use openid::{Client as OpenidClient, DiscoveredClient};
 use pluginator::LoadedPlugin;
-use postgres_native_tls::MakeTlsConnector;
 use rsa::{RsaPrivateKey, RsaPublicKey};
+use rustls::ClientConfig;
+use rustls::RootCertStore;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::convert::TryInto;
@@ -66,6 +66,7 @@ use tokio::io::AsyncSeekExt;
 use tokio::io::AsyncWriteExt;
 use tokio_postgres::config::SslMode;
 use tokio_postgres::{Config as DbConfig, NoTls};
+use tokio_postgres_rustls::MakeRustlsConnect;
 use url::Url;
 use uuid::Uuid;
 
@@ -473,7 +474,17 @@ fn init_cache_pool(cache_server: &CacheServer) -> Result<deadpool_redis::Pool, R
     return Ok(cache_pool);
 }
 
-fn init_db_pool(data_source: &DataSource) -> Result<Pool, native_tls::Error> {
+fn load_native_certs() -> Result<RootCertStore, anyhow::Error> {
+    let mut root_cert_store = RootCertStore::empty();
+    let mut certs_result = rustls_native_certs::load_native_certs();
+    if let Some(err) = certs_result.errors.pop() {
+        return Err(err.into());
+    }
+    root_cert_store.add_parsable_certificates(certs_result.certs);
+    return Ok(root_cert_store);
+}
+
+fn init_db_pool(data_source: &DataSource) -> Result<Pool, anyhow::Error> {
     let mut cfg = DbConfig::new();
     cfg.host(&data_source.host);
     cfg.port(data_source.port);
@@ -485,13 +496,19 @@ fn init_db_pool(data_source: &DataSource) -> Result<Pool, native_tls::Error> {
     }
     let max_size = data_source.max_size.unwrap_or(2).max(1);
     let pool = if let Some(ssl_cfg) = &data_source.ssl {
-        let mut builder = TlsConnector::builder();
-        if let Some(root_cert) = ssl_cfg.root_cert.as_ref() {
-            let root_cert = Certificate::from_pem(root_cert.as_bytes())?;
-            builder.add_root_certificate(root_cert);
-        }
-        let connector = builder.danger_accept_invalid_certs(true).build()?;
-        let connector = MakeTlsConnector::new(connector);
+        let root_cert_store = if let Some(root_cert) = ssl_cfg.root_cert.as_ref() {
+            let certs =
+                rustls_pemfile::certs(&mut root_cert.as_bytes()).collect::<Result<Vec<_>, _>>()?;
+            let mut root_cert_store = RootCertStore::empty();
+            root_cert_store.add_parsable_certificates(certs);
+            root_cert_store
+        } else {
+            load_native_certs()?
+        };
+        let config = ClientConfig::builder()
+            .with_root_certificates(root_cert_store)
+            .with_no_client_auth();
+        let connector = MakeRustlsConnect::new(config);
         let mgr = Manager::new(cfg, connector);
         Pool::builder(mgr).max_size(max_size).build().unwrap()
     } else {

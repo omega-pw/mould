@@ -11,6 +11,6 @@ crate-type = ["cdylib"]
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 futures = "0.3"
-mysql_async = "0.34"
+mysql_async = { version = "0.34", default-features = false, features = ["default-rustls"] }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "fs"] }
 mould-extension-sdk = { path="../../extension-sdk" }

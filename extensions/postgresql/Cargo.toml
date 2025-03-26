@@ -13,6 +13,8 @@ serde = { version = "1.0", features = ["derive"] }
 futures = "0.3"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "fs"] }
 tokio-postgres = { version = "0.7" }
-native-tls = "0.2"
-postgres-native-tls = "0.5"
+tokio-postgres-rustls = "0.13"
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+rustls-pemfile = "2"
+rustls-native-certs = "0.8"
 mould-extension-sdk = { path="../../extension-sdk" }
