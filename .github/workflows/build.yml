@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Install dependencies
-      run: sudo apt-get update && apt-get install -y dos2unix protobuf-compiler libprotobuf-dev
+      run: sudo apt-get update && sudo apt-get install -y dos2unix protobuf-compiler libprotobuf-dev
     - name: Add execute permission
       working-directory: ./build
       run: chmod +x ./build.sh
