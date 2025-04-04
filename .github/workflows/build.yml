@@ -19,6 +19,7 @@ jobs:
       with:
         node-version: 22
         cache: 'npm'
+        cache-dependency-path: client/package-lock.json
 
     - name: Setup Rust
       uses: actions-rs/toolchain@v1
