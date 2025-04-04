@@ -21,4 +21,4 @@ jobs:
       run: chmod +x ./build.sh
     - name: Build
       working-directory: ./build
-      run: ./build.sh
+      run: sudo ./build.sh
