@@ -24,20 +24,37 @@ error_exit() {
 	exit 1
 }
 
-yum install dos2unix -y
+is_ubuntu() {
+    if [ -f /etc/os-release ]; then
+        source /etc/os-release
+        if [ "$ID" = "ubuntu" ]; then
+            return 0
+        else
+            return 1
+        fi
+    else
+        return 1
+    fi
+}
+if is_ubuntu; then
+    PKG_MGR=apt
+else
+    PKG_MGR=yum
+fi
+
+$PKG_MGR install dos2unix -y
 
 dos2unix $script_path/build-mould.sh
 chmod +x $script_path/build-mould.sh
 $script_path/build-mould.sh || error_exit "Build mould failed!"
 
-echo "Start to upload binary $BIN_NAME."
-curl -X POST -H "project: $PROJ_NAME" -H "artifact: $BIN_NAME" -H "token: $REPO_KEY" -T $WORKSPACE/target/release/$PROJ_NAME $REPO_ADDR/api/oss/upload || error_exit "Upload binary to repository failed!"
-echo "Start to upload binary $LATEST_BIN_NAME."
-curl -X POST -H "project: $PROJ_NAME" -H "artifact: $LATEST_BIN_NAME" -H "token: $REPO_KEY" -T $WORKSPACE/target/release/$PROJ_NAME $REPO_ADDR/api/oss/upload || error_exit "Upload binary to repository failed!"
-
 dos2unix $script_path/build-extensions.sh
 chmod +x $script_path/build-extensions.sh
 $script_path/build-extensions.sh || error_exit "Build extensions failed!"
+
+ls $WORKSPACE/target/release/
+
+exit 0
 
 echo "Start to package image."
 IMAGE_ROOT=$script_path/image-root
@@ -48,11 +65,6 @@ chmod +x $IMAGE_ROOT/$PROJ_NAME
 cd $IMAGE_ROOT/
 tar -zcvf $script_path/$IMAGE_NAME * || error_exit "Package image failed!"
 cd $script_path/
-
-echo "Start to upload image package $IMAGE_NAME."
-curl -X POST -H "project: $PROJ_NAME" -H "artifact: $IMAGE_NAME" -H "token: $REPO_KEY" -T $script_path/$IMAGE_NAME $REPO_ADDR/api/oss/upload || error_exit "Upload image package to repository failed!"
-echo "Start to upload image package $LATEST_IMAGE_NAME."
-curl -X POST -H "project: $PROJ_NAME" -H "artifact: $LATEST_IMAGE_NAME" -H "token: $REPO_KEY" -T $script_path/$IMAGE_NAME $REPO_ADDR/api/oss/upload || error_exit "Upload image package to repository failed!"
 
 echo "Start to build image."
 docker import -c "CMD [\"/$PROJ_NAME\", \"$CONFIG_FILE\"]" $script_path/$IMAGE_NAME $IMAGE_PATH:$GIT_COMMITID || error_exit "Build image failed!"
