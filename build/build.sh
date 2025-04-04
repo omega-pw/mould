@@ -44,9 +44,6 @@ fi
 
 $PKG_MGR install dos2unix -y
 
-apt-get update
-apt-get install -y protobuf-compiler libprotobuf-dev
-
 dos2unix $script_path/build-mould.sh
 chmod +x $script_path/build-mould.sh
 $script_path/build-mould.sh || error_exit "Build mould failed!"
