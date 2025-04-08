@@ -23,6 +23,7 @@ error_exit() {
 echo "Start to package image."
 IMAGE_ROOT=$script_path/image-root
 cp $WORKSPACE/target/release/$PROJ_NAME $IMAGE_ROOT/
+chmod +x $IMAGE_ROOT/lib/*
 chmod +x $IMAGE_ROOT/lib64/*
 chmod +x $IMAGE_ROOT/extensions/*
 chmod +x $IMAGE_ROOT/$PROJ_NAME
