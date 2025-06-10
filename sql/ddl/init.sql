@@ -175,3 +175,15 @@ create table job_step_resource_record
     created_time timestamptz not null,
     last_modified_time timestamptz not null
 );
+
+--验证码
+create table captcha
+(
+    id uuid not null primary key,
+    receiver_type smallint not null, --接收者类型
+    receiver varchar(128) not null, --接收者
+    scene smallint not null, --场景
+    captcha varchar(128) not null, --验证码
+    created_time timestamptz not null,
+    last_modified_time timestamptz not null
+);
