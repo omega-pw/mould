@@ -1,0 +1,101 @@
+{
+    "entity_name": "captcha",
+    "description": "验证码",
+    "pri_key": "id",
+    "enums": [
+        {
+            "enum_name": "receiver_type",
+            "description": "接收者类型",
+            "options": [
+                {
+                    "key": "Email",
+                    "value": 1,
+                    "label": "邮箱"
+                },
+                {
+                    "key": "Phone",
+                    "value": 2,
+                    "label": "电话"
+                }
+            ]
+        },
+        {
+            "enum_name": "scene",
+            "description": "场景",
+            "options": [
+                {
+                    "key": "Register",
+                    "value": 1,
+                    "label": "注册"
+                },
+                {
+                    "key": "ResetPassword",
+                    "value": 2,
+                    "label": "重置密码"
+                }
+            ]
+        }
+    ],
+    "properties": [
+        {
+            "property_name": "id",
+            "type": "Id",
+            "priKey": true,
+            "required": true,
+            "unique": true,
+            "description": "id"
+        },
+        {
+            "property_name": "receiver_type",
+            "type": "Enum",
+            "enum_name": "receiver_type",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "接收者类型"
+        },
+        {
+            "property_name": "receiver",
+            "type": "String",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "接收者",
+            "maxLength": 128
+        },
+        {
+            "property_name": "scene",
+            "type": "Enum",
+            "enum_name": "scene",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "场景"
+        },
+        {
+            "property_name": "captcha",
+            "type": "String",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "验证码",
+            "maxLength": 128
+        },
+        {
+            "property_name": "created_time",
+            "type": "DateTime",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "创建时间"
+        },
+        {
+            "property_name": "last_modified_time",
+            "type": "DateTime",
+            "priKey": false,
+            "required": true,
+            "unique": false,
+            "description": "更新时间"
+        }
+    ]
+}

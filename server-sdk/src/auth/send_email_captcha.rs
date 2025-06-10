@@ -5,7 +5,7 @@ use validator::Validate;
 
 pub const SEND_EMAIL_CAPTCHA_API: &str = "/api/auth/sendEmailCaptcha";
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub enum Scene {
     Register,
     ResetPassword,

@@ -30,6 +30,21 @@ pub fn fill_random_bytes(data: &mut [u8]) {
     }
 }
 
+pub const DEFAULT_SEED: &str = "0123456789abcdefghigklmnopqrstuvwxyzABCDEFGHIGKLMNOPQRSTUVWXYZ";
+
+pub fn fill_random(data: &mut [char], seed: &str) {
+    if seed.is_empty() {
+        return;
+    }
+    let seed: Vec<char> = seed.chars().collect();
+    let len = seed.len();
+    let len_f32 = len as f32;
+    for ch in data.iter_mut() {
+        let index = (random::<f32>() * len_f32).round() as usize % len;
+        *ch = seed[index];
+    }
+}
+
 pub fn encrypt_by_base64(plain: &[u8]) -> Result<String, LightString> {
     return Ok(BASE64_STANDARD.encode(plain));
 }
