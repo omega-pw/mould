@@ -21,7 +21,7 @@ cd $WEB_CLIENT_ROOT
 rm -rf $WEB_CLIENT_ROOT/dist
 
 echo "Start to install dependencies."
-npm install || error_exit "Install dependencies failed!"
+npm ci || error_exit "Install dependencies failed!"
 echo "Start to build package."
 npm run build || error_exit "Build package failed!"
 

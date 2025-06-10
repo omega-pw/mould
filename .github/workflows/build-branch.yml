@@ -1,4 +1,4 @@
-name: Build and Release
+name: Build branch
 
 on:
   workflow_dispatch
@@ -42,31 +42,15 @@ jobs:
       run: ./build.sh
 
     - name: Build Image
-      if: startsWith(github.ref, 'refs/tags/')
       env:
-        IMAGE_TAG: ${{ github.ref_name }}
+        IMAGE_TAG: ${{ github.ref_name }}-latest
       working-directory: ./build
       run: ./build-image.sh
 
     - name: Archive Image
-      if: startsWith(github.ref, 'refs/tags/')
       env:
-        IMAGE_TAG: ${{ github.ref_name }}
+        IMAGE_TAG: ${{ github.ref_name }}-latest
         REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
         REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
       working-directory: ./build
       run: ./archive-image.sh
-
-    - name: Create Release
-      id: create_release
-      uses: softprops/action-gh-release@v2
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-        name: Release ${{ github.ref_name }}
-        tag_name: ${{ github.ref_name }}
-        fail_on_unmatched_files: true
-        files: |
-          target/release/mould
-          target/release/*.so
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
