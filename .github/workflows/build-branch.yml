@@ -1,0 +1,56 @@
+name: Build branch
+
+on:
+  workflow_dispatch
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: 'npm'
+        cache-dependency-path: client/package-lock.json
+
+    - name: Setup Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y dos2unix protobuf-compiler libprotobuf-dev
+
+    - name: Add execute permission
+      working-directory: ./build
+      run: chmod +x ./build.sh ./build-image.sh ./archive-image.sh
+
+    - name: Build
+      working-directory: ./build
+      run: ./build.sh
+
+    - name: Build Image
+      env:
+        IMAGE_TAG: ${{ github.ref_name }}-latest
+      working-directory: ./build
+      run: ./build-image.sh
+
+    - name: Archive Image
+      env:
+        IMAGE_TAG: ${{ github.ref_name }}-latest
+        REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+        REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+      working-directory: ./build
+      run: ./archive-image.sh
