@@ -249,7 +249,7 @@ fn init_v8() {
 async fn main() -> Result<(), anyhow::Error> {
     init_v8();
     let config = Arguments::try_from_args()?;
-    let config = Config::try_load_from_file(&config.config_path)?;
+    let config = Config::try_load_from_file(&config.config_path).await?;
     let context = Context::try_init_from_config(config).await?;
     let context = Arc::new(context);
     let handler = get_handler(context.clone()).await?;

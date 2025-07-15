@@ -3,11 +3,12 @@ mod origin;
 
 use crate::native_common;
 pub use args::Arguments;
+use bytes::Bytes;
 use native_common::utils::new_rsa_pri_key;
 use native_common::utils::new_rsa_pub_key;
 use object_storage_lib::Oss;
 pub use origin::CacheServer;
-pub use origin::DataSource;
+use origin::DataSource as OriginDataSource;
 pub use origin::EmailAccount;
 pub use origin::EmailTemplate;
 pub use origin::Oauth2Server;
@@ -20,6 +21,45 @@ use std::net::Ipv4Addr;
 use std::sync::Arc;
 use tihu::base62;
 use tihu::LightString;
+use tokio::fs;
+
+#[derive(Debug)]
+pub struct DataSource {
+    pub host: String,
+    pub port: u16,
+    pub dbname: String,
+    pub user: String,
+    pub password: String,
+    pub max_size: Option<usize>,
+    pub ssl: bool,
+    pub root_cert: Option<Bytes>,
+}
+
+impl DataSource {
+    pub async fn try_from_origin(
+        origin_data_source: OriginDataSource,
+    ) -> Result<Self, LightString> {
+        let root_cert: Option<Bytes> = if let Some(root_cert) = origin_data_source.root_cert {
+            let root_cert = fs::read(root_cert).await.map_err(|err| {
+                log::error!("Read root cert of data source failed: {}", err);
+                return LightString::from_static("Read root cert of data source failed");
+            })?;
+            Some(root_cert.into())
+        } else {
+            None
+        };
+        return Ok(Self {
+            host: origin_data_source.host,
+            port: origin_data_source.port,
+            dbname: origin_data_source.dbname,
+            user: origin_data_source.user,
+            password: origin_data_source.password,
+            max_size: origin_data_source.max_size,
+            ssl: origin_data_source.ssl,
+            root_cert: root_cert,
+        });
+    }
+}
 
 #[derive(Debug)]
 pub struct Config {
@@ -46,7 +86,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn try_load_from_file(file_path: &str) -> Result<Self, LightString> {
+    pub async fn try_load_from_file(file_path: &str) -> Result<Self, LightString> {
         let config = origin::Config::try_load_from_file(file_path)?;
         let mut job_log_dir = config.job_log_dir;
         if job_log_dir.ends_with(&['/', '\\']) {
@@ -55,6 +95,7 @@ impl Config {
         let host = config.host.unwrap_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED));
         let sign_secret = Arc::new(config.sign_secret.as_bytes().to_vec());
         let port = config.port.unwrap_or(80);
+        let data_source = DataSource::try_from_origin(config.data_source).await?;
         let rsa_pub_key_content = read_to_string(&config.rsa_pub_key).map_err(|err| {
             log::error!("read server public key failed: {}", err);
             return LightString::from_static("read server public key failed");
@@ -96,7 +137,7 @@ impl Config {
             rsa_pub_key_content: rsa_pub_key_content.into(),
             server_random_value: server_random_value,
             cache_server: config.cache_server,
-            data_source: config.data_source,
+            data_source: data_source,
             oss: config.oss,
             public_path: config.public_path,
             oauth2_servers: config.oauth2_servers,

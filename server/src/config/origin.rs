@@ -17,11 +17,6 @@ pub struct CacheServer {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SslCfg {
-    pub root_cert: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DataSource {
     pub host: String,
     pub port: u16,
@@ -29,7 +24,9 @@ pub struct DataSource {
     pub user: String,
     pub password: String,
     pub max_size: Option<usize>,
-    pub ssl: Option<SslCfg>,
+    #[serde(default)]
+    pub ssl: bool,
+    pub root_cert: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

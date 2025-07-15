@@ -491,14 +491,14 @@ fn init_db_pool(data_source: &DataSource) -> Result<Pool, anyhow::Error> {
     cfg.dbname(&data_source.dbname);
     cfg.user(&data_source.user);
     cfg.password(&data_source.password);
-    if data_source.ssl.is_some() {
+    if data_source.ssl {
         cfg.ssl_mode(SslMode::Require);
     }
     let max_size = data_source.max_size.unwrap_or(2).max(1);
-    let pool = if let Some(ssl_cfg) = &data_source.ssl {
-        let root_cert_store = if let Some(root_cert) = ssl_cfg.root_cert.as_ref() {
+    let pool = if data_source.ssl {
+        let root_cert_store = if let Some(root_cert) = data_source.root_cert.as_ref() {
             let certs =
-                rustls_pemfile::certs(&mut root_cert.as_bytes()).collect::<Result<Vec<_>, _>>()?;
+                rustls_pemfile::certs(&mut root_cert.as_ref()).collect::<Result<Vec<_>, _>>()?;
             let mut root_cert_store = RootCertStore::empty();
             root_cert_store.add_parsable_certificates(certs);
             root_cert_store
