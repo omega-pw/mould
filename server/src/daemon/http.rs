@@ -119,6 +119,8 @@ fn handle_embed<B: RustEmbed>(req: Request<Incoming>) -> Response<Body> {
             let mime = mime_guess::from_path(actual_path).first_or_octet_stream();
             return Response::builder()
                 .header(header::CONTENT_TYPE, mime.as_ref())
+                .header(header::CONTENT_LENGTH, body.len())
+                .header(header::CACHE_CONTROL, "public, must-revalidate, max-age=300")
                 .header(header::ETAG, hash)
                 .body(Body::from(body))
                 .unwrap();
