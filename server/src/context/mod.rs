@@ -55,7 +55,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::http::HttpHandler;
 use tihu_native::ErrNo;
 use tokio::fs::create_dir;
@@ -78,7 +78,7 @@ pub const RPC_TIMEOUT: u64 = 10;
 
 pub struct ExtensionContext {
     pub oss_client: Arc<Client>,
-    pub bucket: LightString,
+    pub bucket: SharedString,
 }
 
 #[async_trait::async_trait]
@@ -259,16 +259,16 @@ impl Context {
         .await?;
         oss_handler
             .add_get_mapping(
-                LightString::from_static("/blob/"),
-                LightString::from_static("blob/"),
+                SharedString::from_static("/blob/"),
+                SharedString::from_static("blob/"),
             )
             .add_get_mapping(
-                LightString::from_static("/file/"),
-                LightString::from_static("file/"),
+                SharedString::from_static("/file/"),
+                SharedString::from_static("file/"),
             )
             .add_upload_mapping(
-                LightString::from_static(UPLOAD_API),
-                LightString::from_static("blob/"),
+                SharedString::from_static(UPLOAD_API),
+                SharedString::from_static("blob/"),
             );
         let oss_client = Arc::new(init_oss_client(&config.oss)?);
         let mut oauth2_clients = HashMap::with_capacity(config.oauth2_servers.len());
@@ -341,7 +341,7 @@ impl Context {
         return Ok(self.config.rsa_pri_key.clone());
     }
 
-    pub async fn get_rsa_pub_key_content(&self) -> Result<LightString, ErrNo> {
+    pub async fn get_rsa_pub_key_content(&self) -> Result<SharedString, ErrNo> {
         return Ok(self.config.rsa_pub_key_content.clone());
     }
 
@@ -369,7 +369,7 @@ impl Context {
         return self.oss_client.clone();
     }
 
-    pub fn get_bucket(&self) -> LightString {
+    pub fn get_bucket(&self) -> SharedString {
         return self.config.oss.bucket.clone();
     }
 
@@ -420,7 +420,7 @@ impl Context {
     ) -> Result<(&Arc<BasicClient>, &Oauth2Server), ErrNo> {
         let (oauth2_client, oauth2_server) =
             self.oauth2_clients.get(provider).ok_or_else(|| {
-                ErrNo::CommonError(LightString::from(format!(
+                ErrNo::CommonError(SharedString::from(format!(
                     "没有对应的oauth2 provider: {}",
                     provider,
                 )))
@@ -433,7 +433,7 @@ impl Context {
     ) -> Result<(&Arc<OpenidClient>, &OpenidServer), ErrNo> {
         let (openid_client, openid_server) =
             self.openid_clients.get(provider).ok_or_else(|| {
-                ErrNo::CommonError(LightString::from(format!(
+                ErrNo::CommonError(SharedString::from(format!(
                     "没有对应的oidc provider: {}",
                     provider,
                 )))

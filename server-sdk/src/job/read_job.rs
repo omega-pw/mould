@@ -2,8 +2,8 @@ use serde;
 use serde::{Deserialize, Serialize};
 use tihu::Api;
 use tihu::Id;
-use tihu::LightString;
 use tihu::PrimaryKey;
+use tihu::SharedString;
 
 pub const READ_JOB_API: &str = "/api/job/readJob";
 
@@ -43,7 +43,7 @@ pub struct ReadJobApi;
 impl Api for ReadJobApi {
     type Input = ReadJobReq;
     type Output = ReadJobResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(READ_JOB_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(READ_JOB_API);
     }
 }

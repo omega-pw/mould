@@ -4,7 +4,7 @@ use chrono::Utc;
 use tihu::datetime_format;
 use tihu::datetime_format_opt;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use native_common::model::Property;
 use native_common::model::PropertyDefine;
 use native_common::model::PropertyType;
@@ -21,7 +21,7 @@ pub mod properties {
 }
 
 pub mod enums {
-    use tihu::LightString;
+    use tihu::SharedString;
     use std::error::Error;
     use serde::{Serialize, Deserialize};
     use tokio_postgres::types::{ToSql, Type, IsNull, to_sql_checked};
@@ -31,7 +31,7 @@ pub mod enums {
         Openid = 1, //Open Id
         Oauth2 = 2, //Oauth2
     }
-    pub fn try_i16_to_provider_type(val: i16) -> Result<ProviderType, LightString> {
+    pub fn try_i16_to_provider_type(val: i16) -> Result<ProviderType, SharedString> {
         match val {
             1 => Ok(ProviderType::Openid),
             2 => Ok(ProviderType::Oauth2),
@@ -67,37 +67,37 @@ impl Property for ExternalUserProperty {
     fn property_define(&self) -> PropertyDefine {
         match self {
 			ExternalUserProperty::Id(_) => PropertyDefine {
-                key: LightString::from_static(properties::ID),
+                key: SharedString::from_static(properties::ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			ExternalUserProperty::ProviderType(_) => PropertyDefine {
-                key: LightString::from_static(properties::PROVIDER_TYPE),
+                key: SharedString::from_static(properties::PROVIDER_TYPE),
                 value_type: PropertyType::Enum,
 				required: true,
             },
 			ExternalUserProperty::Provider(_) => PropertyDefine {
-                key: LightString::from_static(properties::PROVIDER),
+                key: SharedString::from_static(properties::PROVIDER),
                 value_type: PropertyType::String,
 				required: true,
             },
 			ExternalUserProperty::Openid(_) => PropertyDefine {
-                key: LightString::from_static(properties::OPENID),
+                key: SharedString::from_static(properties::OPENID),
                 value_type: PropertyType::String,
 				required: true,
             },
 			ExternalUserProperty::Detail(_) => PropertyDefine {
-                key: LightString::from_static(properties::DETAIL),
+                key: SharedString::from_static(properties::DETAIL),
                 value_type: PropertyType::String,
 				required: false,
             },
 			ExternalUserProperty::CreatedTime(_) => PropertyDefine {
-                key: LightString::from_static(properties::CREATED_TIME),
+                key: SharedString::from_static(properties::CREATED_TIME),
                 value_type: PropertyType::DateTime,
 				required: true,
             },
 			ExternalUserProperty::LastModifiedTime(_) => PropertyDefine {
-                key: LightString::from_static(properties::LAST_MODIFIED_TIME),
+                key: SharedString::from_static(properties::LAST_MODIFIED_TIME),
                 value_type: PropertyType::DateTime,
 				required: true,
             },

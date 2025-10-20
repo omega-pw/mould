@@ -6,7 +6,7 @@ use std::fmt;
 use tihu::datetime_format;
 use tihu::Api;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 
 pub const READ_JOB_RECORD_API: &str = "/api/job/readJobRecord";
 
@@ -115,7 +115,7 @@ pub struct ReadJobRecordApi;
 impl Api for ReadJobRecordApi {
     type Input = ReadJobRecordReq;
     type Output = ReadJobRecordResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(READ_JOB_RECORD_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(READ_JOB_RECORD_API);
     }
 }

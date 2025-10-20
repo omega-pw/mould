@@ -1,13 +1,13 @@
-use crate::LightString;
+use crate::SharedString;
 use yew::html::Scope;
 use yew::prelude::*;
 use yew::{html, Component, Context, Html};
 
 struct State {
-    title: LightString,
+    title: SharedString,
     closable: bool,
-    style: LightString,
-    content_style: LightString,
+    style: SharedString,
+    content_style: SharedString,
 }
 
 pub enum Msg {
@@ -16,12 +16,12 @@ pub enum Msg {
 
 #[derive(Clone, PartialEq, Properties)]
 pub struct Props {
-    pub title: LightString,
+    pub title: SharedString,
     pub closable: bool,
     #[prop_or_default]
-    pub style: LightString,
+    pub style: SharedString,
     #[prop_or_default]
-    pub content_style: LightString,
+    pub content_style: SharedString,
     #[prop_or_default]
     pub onclose: Option<Callback<()>>,
     pub children: Children,

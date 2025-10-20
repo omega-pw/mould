@@ -11,8 +11,8 @@ use crate::service::base::JobStepBaseService;
 use chrono::Utc;
 use sdk::job::insert_job::InsertJobReq;
 use tihu::Id;
-use tihu::LightString;
 use tihu::PrimaryKey;
+use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
@@ -72,7 +72,7 @@ pub async fn insert_job(
                     let (extension_info, extension) = context
                         .get_extension_info(&schema_resource.extension_id)
                         .ok_or_else(|| -> ErrNo {
-                            ErrNo::CommonError(LightString::from(format!(
+                            ErrNo::CommonError(SharedString::from(format!(
                                 "扩展\"{}\"未找到!",
                                 schema_resource.extension_name,
                             )))
@@ -86,7 +86,7 @@ pub async fn insert_job(
                             serde_json::from_str::<serde_json::Value>(&operation_parameter)
                                 .map_err(|err| -> ErrNo {
                                     log::error!("操作参数格式不正确：{}", err);
-                                    return ErrNo::CommonError(LightString::Static(
+                                    return ErrNo::CommonError(SharedString::Static(
                                         "操作参数格式不正确",
                                     ));
                                 })?;
@@ -111,13 +111,13 @@ pub async fn insert_job(
                             last_modified_time: curr_time,                //更新时间
                         });
                     } else {
-                        return Err(ErrNo::CommonError(LightString::from(format!(
+                        return Err(ErrNo::CommonError(SharedString::from(format!(
                             "扩展\"{}\"没有id为\"{}\"的操作!",
                             schema_resource.extension_name, operation_id
                         ))));
                     }
                 } else {
-                    return Err(ErrNo::CommonError(LightString::from(format!(
+                    return Err(ErrNo::CommonError(SharedString::from(format!(
                         "步骤\"{}\"所操作的环境资源不存在!",
                         name
                     ))));

@@ -1,17 +1,17 @@
-use crate::LightString;
+use crate::SharedString;
 use yew::prelude::*;
 use yew::{html, Component, Context, Html};
 
 struct State {
-    content_style: LightString,
+    content_style: SharedString,
 }
 
 pub enum Msg {}
 
 #[derive(Clone, PartialEq, Properties)]
 pub struct Props {
-    #[prop_or(LightString::Static(""))]
-    pub content_style: LightString,
+    #[prop_or(SharedString::Static(""))]
+    pub content_style: SharedString,
     pub children: Children,
 }
 

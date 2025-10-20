@@ -1,4 +1,4 @@
-use tihu::LightString;
+use tihu::SharedString;
 use tokio_postgres::types::ToSql;
 
 // fn calcDigitCount(n: usize) -> usize {
@@ -17,8 +17,8 @@ use tokio_postgres::types::ToSql;
 const CONNECTOR: &str = " and ";
 
 pub struct Condition {
-    pub field: LightString,
-    pub operator: Option<LightString>,
+    pub field: SharedString,
+    pub operator: Option<SharedString>,
 }
 
 // impl Condition {

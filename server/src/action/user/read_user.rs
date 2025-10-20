@@ -11,7 +11,7 @@ use sdk::user::read_user::ReadUserReq;
 use sdk::user::read_user::ReadUserResp;
 use sdk::user::read_user::SystemUser;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
@@ -44,7 +44,7 @@ pub async fn read_user(
                 let system_user_base_service = SystemUserBaseService::new(&transaction);
                 let system_user_opt = system_user_base_service.read_system_user(user.id).await?;
                 let system_user = system_user_opt.ok_or_else(|| -> ErrNo {
-                    ErrNo::CommonError(LightString::from_static("不存在此用户！"))
+                    ErrNo::CommonError(SharedString::from_static("不存在此用户！"))
                 })?;
                 sdk::user::read_user::UserSource::System(SystemUser {
                     id: system_user.id,
@@ -59,7 +59,7 @@ pub async fn read_user(
                     .read_external_user(user.id)
                     .await?;
                 let external_user = external_user_opt.ok_or_else(|| -> ErrNo {
-                    ErrNo::CommonError(LightString::from_static("不存在此用户！"))
+                    ErrNo::CommonError(SharedString::from_static("不存在此用户！"))
                 })?;
                 sdk::user::read_user::UserSource::External(ExternalUser {
                     id: external_user.id,

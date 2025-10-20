@@ -9,7 +9,7 @@ use sdk::environment_schema::read_environment_schema::EnvironmentSchema;
 use sdk::environment_schema::read_environment_schema::ReadEnvironmentSchemaReq;
 use sdk::environment_schema::read_environment_schema::SchemaResource;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
@@ -34,7 +34,7 @@ pub async fn read_environment_schema(
         .query_environment_schema_one(&params)
         .await?;
     let environment_schema = environment_schema_opt.ok_or_else(|| -> ErrNo {
-        ErrNo::CommonError(LightString::from_static("该环境规格不存在！"))
+        ErrNo::CommonError(SharedString::from_static("该环境规格不存在！"))
     })?;
     //查询已有的资源
     let environment_schema_resource_list = environment_schema_resource_base_service

@@ -22,7 +22,7 @@ use signature::SignatureEncoding;
 use std::fmt;
 use std::fs;
 use std::path::Path;
-use tihu::LightString;
+use tihu::SharedString;
 
 pub fn fill_random_bytes(data: &mut [u8]) {
     for ch in data.iter_mut() {
@@ -45,16 +45,16 @@ pub fn fill_random(data: &mut [char], seed: &str) {
     }
 }
 
-pub fn encrypt_by_base64(plain: &[u8]) -> Result<String, LightString> {
+pub fn encrypt_by_base64(plain: &[u8]) -> Result<String, SharedString> {
     return Ok(BASE64_STANDARD.encode(plain));
 }
 
-pub fn decrypt_by_base64(cipher: &str) -> Result<Vec<u8>, LightString> {
+pub fn decrypt_by_base64(cipher: &str) -> Result<Vec<u8>, SharedString> {
     return BASE64_STANDARD
         .decode(cipher)
-        .map_err(|err| -> LightString {
+        .map_err(|err| -> SharedString {
             log::error!("base64 decode failed: {}, original data: {}", err, cipher);
-            LightString::from_static("base64 decode failed")
+            SharedString::from_static("base64 decode failed")
         });
 }
 
@@ -93,94 +93,94 @@ pub fn sha512(data: &[u8]) -> [u8; 64] {
     return out;
 }
 
-pub fn new_rsa_key_pair() -> Result<(RsaPublicKey, RsaPrivateKey), LightString> {
+pub fn new_rsa_key_pair() -> Result<(RsaPublicKey, RsaPrivateKey), SharedString> {
     let mut rng = rand::thread_rng();
-    let rsa_pri_key = RsaPrivateKey::new(&mut rng, 2048).map_err(|err| -> LightString {
+    let rsa_pri_key = RsaPrivateKey::new(&mut rng, 2048).map_err(|err| -> SharedString {
         log::error!("generate rsa key pair failed: {}", err);
-        LightString::from_static("generate rsa key pair failed")
+        SharedString::from_static("generate rsa key pair failed")
     })?;
     let rsa_pub_key = rsa_pri_key.to_public_key();
     return Ok((rsa_pub_key, rsa_pri_key));
 }
 
-pub fn read_rsa_pub_key<P: AsRef<Path>>(rsa_pub_key: P) -> Result<RsaPublicKey, LightString> {
-    let content = fs::read_to_string(rsa_pub_key.as_ref()).map_err(|err| -> LightString {
+pub fn read_rsa_pub_key<P: AsRef<Path>>(rsa_pub_key: P) -> Result<RsaPublicKey, SharedString> {
+    let content = fs::read_to_string(rsa_pub_key.as_ref()).map_err(|err| -> SharedString {
         log::error!("read public key error: {}", err);
-        LightString::from_static("read public key error")
+        SharedString::from_static("read public key error")
     })?;
-    return RsaPublicKey::from_public_key_pem(&content).map_err(|err| -> LightString {
+    return RsaPublicKey::from_public_key_pem(&content).map_err(|err| -> SharedString {
         log::error!(
             "public key is invalid: {}, key path: {:?}",
             err,
             rsa_pub_key.as_ref()
         );
-        LightString::from_static("public key is invalid")
+        SharedString::from_static("public key is invalid")
     });
 }
 
-pub fn new_rsa_pub_key(content: &str) -> Result<RsaPublicKey, LightString> {
-    return RsaPublicKey::from_public_key_pem(content).map_err(|err| -> LightString {
+pub fn new_rsa_pub_key(content: &str) -> Result<RsaPublicKey, SharedString> {
+    return RsaPublicKey::from_public_key_pem(content).map_err(|err| -> SharedString {
         log::error!("public key is invalid: {}, content: {}", err, content);
-        LightString::from_static("public key is invalid")
+        SharedString::from_static("public key is invalid")
     });
 }
 
-pub fn read_rsa_pri_key<P: AsRef<Path>>(rsa_pri_key: P) -> Result<RsaPrivateKey, LightString> {
-    let content = fs::read_to_string(rsa_pri_key.as_ref()).map_err(|err| -> LightString {
+pub fn read_rsa_pri_key<P: AsRef<Path>>(rsa_pri_key: P) -> Result<RsaPrivateKey, SharedString> {
+    let content = fs::read_to_string(rsa_pri_key.as_ref()).map_err(|err| -> SharedString {
         log::error!("read private key error: {}", err);
-        LightString::from_static("read private key error")
+        SharedString::from_static("read private key error")
     })?;
-    return RsaPrivateKey::from_pkcs1_pem(&content).map_err(|err| -> LightString {
+    return RsaPrivateKey::from_pkcs1_pem(&content).map_err(|err| -> SharedString {
         log::error!(
             "private key is invalid: {}, key path: {:?}",
             err,
             rsa_pri_key.as_ref()
         );
-        LightString::from_static("private key is invalid")
+        SharedString::from_static("private key is invalid")
     });
 }
 
-pub fn new_rsa_pri_key(content: &str) -> Result<RsaPrivateKey, LightString> {
-    return RsaPrivateKey::from_pkcs1_pem(content).map_err(|err| -> LightString {
+pub fn new_rsa_pri_key(content: &str) -> Result<RsaPrivateKey, SharedString> {
+    return RsaPrivateKey::from_pkcs1_pem(content).map_err(|err| -> SharedString {
         log::error!("private key is invalid: {}, content: {}", err, content);
-        LightString::from_static("private key is invalid")
+        SharedString::from_static("private key is invalid")
     });
 }
 
 pub fn encrypt_by_rsa_pub_key(
     data: &[u8],
     rsa_pub_key: &RsaPublicKey,
-) -> Result<Vec<u8>, LightString> {
+) -> Result<Vec<u8>, SharedString> {
     let mut rng = rand::thread_rng();
     return rsa_pub_key
         .encrypt(&mut rng, Pkcs1v15Encrypt, data)
-        .map_err(|err| -> LightString {
+        .map_err(|err| -> SharedString {
             log::error!("public encrypt failed: {}", err);
-            LightString::from_static("public encrypt failed")
+            SharedString::from_static("public encrypt failed")
         });
 }
 
-// pub fn encrypt_by_rsa_pri_key(data: &str, rsa_pri_key: &Rsa<Private>) -> Result<String, LightString> {
+// pub fn encrypt_by_rsa_pri_key(data: &str, rsa_pri_key: &Rsa<Private>) -> Result<String, SharedString> {
 //     let mut output = vec![0; rsa_pri_key.size() as usize];
 //     rsa_pri_key
 //         .private_encrypt(data.as_bytes(), &mut output, Padding::PKCS1)
-//         .map_err(|err| -> LightString {
+//         .map_err(|err| -> SharedString {
 //             log::error!("private encrypt failed: {}", err);
 //             "private encrypt failed".into()
 //         })?;
 //     return Ok(base62::encode(&output));
 // }
 
-// pub fn decrypt_by_rsa_pub_key(cipher: &str, rsa_pub_key: &Rsa<Public>) -> Result<String, LightString> {
+// pub fn decrypt_by_rsa_pub_key(cipher: &str, rsa_pub_key: &Rsa<Public>) -> Result<String, SharedString> {
 //     //先对密文进行base62解码
-//     let cipher_raw = base62::decode(cipher).map_err(|err| -> LightString {
+//     let cipher_raw = base62::decode(cipher).map_err(|err| -> SharedString {
 //         log::error!("base62 decode failed: {}, original data: {}", err, cipher);
 //         "base62 decode failed".into()
 //     })?;
 //     let mut output = vec![0; rsa_pub_key.size() as usize];
 //     let ret_len = rsa_pub_key
 //         .public_decrypt(&cipher_raw, &mut output, Padding::PKCS1)
-//         .map_err(|err| -> LightString {
+//         .map_err(|err| -> SharedString {
 //             log::error!("public decrypt failed: {}", err);
 //             "public decrypt failed".into()
 //         })?;
@@ -191,12 +191,12 @@ pub fn encrypt_by_rsa_pub_key(
 pub fn decrypt_by_rsa_pri_key(
     cipher: &[u8],
     rsa_pri_key: &RsaPrivateKey,
-) -> Result<Vec<u8>, LightString> {
+) -> Result<Vec<u8>, SharedString> {
     return rsa_pri_key
         .decrypt(Pkcs1v15Encrypt, cipher)
-        .map_err(|err| -> LightString {
+        .map_err(|err| -> SharedString {
             log::error!("private decrypt failed: {}", err);
-            LightString::from_static("private decrypt failed")
+            SharedString::from_static("private decrypt failed")
         });
 }
 
@@ -221,7 +221,7 @@ pub fn verify_by_pub_pri_key(
     return pub_key.verify(Pkcs1v15Sign::new::<sha2::Sha256>(), &hash, signature);
 }
 
-pub fn encrypt_by_aes_256(data: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, LightString> {
+pub fn encrypt_by_aes_256(data: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, SharedString> {
     let mut encryptor = ecb_encryptor(KeySize::KeySize256, key, PkcsPadding);
     let mut final_result = Vec::<u8>::new();
     let mut read_buffer = RefReadBuffer::new(data);
@@ -230,9 +230,9 @@ pub fn encrypt_by_aes_256(data: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, LightS
     loop {
         let result = encryptor
             .encrypt(&mut read_buffer, &mut write_buffer, true)
-            .map_err(|err| -> LightString {
+            .map_err(|err| -> SharedString {
                 log::error!("Aes encrypt failed: {:?}", err);
-                LightString::from_static("Aes encrypt failed")
+                SharedString::from_static("Aes encrypt failed")
             })?;
         final_result.extend(
             write_buffer
@@ -249,7 +249,7 @@ pub fn encrypt_by_aes_256(data: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, LightS
     Ok(final_result)
 }
 
-pub fn decrypt_by_aes_256(data: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, LightString> {
+pub fn decrypt_by_aes_256(data: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, SharedString> {
     let mut decryptor = ecb_decryptor(KeySize::KeySize256, key, PkcsPadding);
     let mut final_result = Vec::<u8>::new();
     let mut read_buffer = RefReadBuffer::new(data);
@@ -258,9 +258,9 @@ pub fn decrypt_by_aes_256(data: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, LightS
     loop {
         let result = decryptor
             .decrypt(&mut read_buffer, &mut write_buffer, true)
-            .map_err(|err| -> LightString {
+            .map_err(|err| -> SharedString {
                 log::error!("Aes decrypt failed: {:?}", err);
-                LightString::from_static("Aes decrypt failed")
+                SharedString::from_static("Aes decrypt failed")
             })?;
         final_result.extend(
             write_buffer

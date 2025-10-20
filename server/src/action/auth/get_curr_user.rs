@@ -19,7 +19,7 @@ use sdk::auth::get_curr_user::User;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
@@ -71,12 +71,12 @@ pub async fn get_user_info(
             let user_base_service = UserBaseService::new(&transaction);
             let user_opt = user_base_service.read_user(user_id).await?;
             let user = user_opt.ok_or_else(|| -> ErrNo {
-                ErrNo::CommonError(LightString::from_static("不存在此用户！"))
+                ErrNo::CommonError(SharedString::from_static("不存在此用户！"))
             })?;
             let system_user_base_service = SystemUserBaseService::new(&transaction);
             let system_user_opt = system_user_base_service.read_system_user(user_id).await?;
             let system_user = system_user_opt.ok_or_else(|| -> ErrNo {
-                ErrNo::CommonError(LightString::from_static("不存在此用户！"))
+                ErrNo::CommonError(SharedString::from_static("不存在此用户！"))
             })?;
             return Ok(User {
                 id: user_id,
@@ -105,7 +105,7 @@ pub async fn get_user_info(
                 .await
                 .map_err(|err| ErrNo::ApiError(err.into()))?;
             let openid = userinfo.sub.clone().ok_or_else(|| {
-                ErrNo::CommonError(LightString::from(
+                ErrNo::CommonError(SharedString::from(
                     "No property \"sub\" found in user infomation!",
                 ))
             })?;
@@ -192,7 +192,7 @@ pub async fn get_user_info(
                     },
                 });
             } else {
-                return Err(ErrNo::CommonError(LightString::from(format!(
+                return Err(ErrNo::CommonError(SharedString::from(format!(
                     "Unsupported oauth2 provider \"{}\"!",
                     oauth2_token.provider
                 ))));

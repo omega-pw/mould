@@ -1,5 +1,5 @@
 use super::gen_id;
-use crate::LightString;
+use crate::SharedString;
 use js_sys::decode_uri_component;
 use js_sys::Function;
 use js_sys::Promise;
@@ -34,7 +34,7 @@ pub enum Request<Req: Serialize> {
 pub trait ResponseExtractor {
     type Output;
     fn response_type() -> XmlHttpRequestResponseType;
-    fn extract(xhr: &XmlHttpRequest) -> Result<Self::Output, LightString>
+    fn extract(xhr: &XmlHttpRequest) -> Result<Self::Output, SharedString>
     where
         Self: Sized;
 }
@@ -44,8 +44,8 @@ impl ResponseExtractor for Uint8Array {
     fn response_type() -> XmlHttpRequestResponseType {
         XmlHttpRequestResponseType::Arraybuffer
     }
-    fn extract(xhr: &XmlHttpRequest) -> Result<Self::Output, LightString> {
-        let response = xhr.response().map_err(|err| -> LightString {
+    fn extract(xhr: &XmlHttpRequest) -> Result<Self::Output, SharedString> {
+        let response = xhr.response().map_err(|err| -> SharedString {
             log::error!("获取buffer响应失败: {:?}", err);
             return "获取响应失败".into();
         })?;
@@ -64,13 +64,13 @@ where
     fn response_type() -> XmlHttpRequestResponseType {
         XmlHttpRequestResponseType::Json
     }
-    fn extract(xhr: &XmlHttpRequest) -> Result<T, LightString> {
-        let response = xhr.response().map_err(|err| -> LightString {
+    fn extract(xhr: &XmlHttpRequest) -> Result<T, SharedString> {
+        let response = xhr.response().map_err(|err| -> SharedString {
             log::error!("获取json响应失败: {:?}", err);
             return "获取响应失败".into();
         })?;
         let result = serde_wasm_bindgen::from_value(response);
-        return result.map_err(|err| -> LightString {
+        return result.map_err(|err| -> SharedString {
             log::error!("Deserialize response data failed: {:?}", err);
             return "Deserialize response data failed!".into();
         });
@@ -93,8 +93,11 @@ fn get_file_name_from_header(content_disposition: Option<&str>) -> Option<&str> 
     return None;
 }
 
-fn get_file_name_from_url(url: &str, allow_no_suffix: bool) -> Result<Option<String>, LightString> {
-    let url = decode_uri_component(url).map_err(|err| -> LightString {
+fn get_file_name_from_url(
+    url: &str,
+    allow_no_suffix: bool,
+) -> Result<Option<String>, SharedString> {
+    let url = decode_uri_component(url).map_err(|err| -> SharedString {
         log::error!("根据url获取文件名称时url解码失败: {:?}", err);
         return "获取文件名称失败".into();
     })?;
@@ -120,15 +123,15 @@ impl ResponseExtractor for File {
     fn response_type() -> XmlHttpRequestResponseType {
         XmlHttpRequestResponseType::Blob
     }
-    fn extract(xhr: &XmlHttpRequest) -> Result<Self::Output, LightString> {
+    fn extract(xhr: &XmlHttpRequest) -> Result<Self::Output, SharedString> {
         let url = xhr.response_url();
-        let response = xhr.response().map_err(|err| -> LightString {
+        let response = xhr.response().map_err(|err| -> SharedString {
             log::error!("获取文件响应失败: {:?}", err);
             return "获取响应失败".into();
         })?;
         let content_disposition =
             xhr.get_response_header("content-disposition")
-                .map_err(|err| -> LightString {
+                .map_err(|err| -> SharedString {
                     log::error!("获取content-disposition响应头失败: {:?}", err);
                     return "获取文件名称失败".into();
                 })?;
@@ -141,7 +144,7 @@ impl ResponseExtractor for File {
             };
         let file_name = file_name.unwrap_or_else(gen_id);
         let file =
-            File::new_with_blob_sequence(&response, &file_name).map_err(|err| -> LightString {
+            File::new_with_blob_sequence(&response, &file_name).map_err(|err| -> SharedString {
                 log::error!("构造文件对象失败: {:?}", err);
                 return "获取响应文件失败".into();
             })?;
@@ -155,8 +158,8 @@ fn try_ajax<Req: Serialize, Resp: ResponseExtractor>(
     option: &mut Option<RequestOption>,
     resolve: Function,
     reject: Function,
-) -> Result<(), LightString> {
-    let xhr = XmlHttpRequest::new().map_err(|err| -> LightString {
+) -> Result<(), SharedString> {
+    let xhr = XmlHttpRequest::new().map_err(|err| -> SharedString {
         log::error!("构造请求对象失败: {:?}", err);
         return "请求失败".into();
     })?;
@@ -171,7 +174,7 @@ fn try_ajax<Req: Serialize, Resp: ResponseExtractor>(
         }) as Box<dyn FnMut()>)
         .into_js_value()
         .dyn_into()
-        .map_err(|err| -> LightString {
+        .map_err(|err| -> SharedString {
             log::error!("构造load事件回调失败: {:?}", err);
             return "请求失败".into();
         })?
@@ -188,7 +191,7 @@ fn try_ajax<Req: Serialize, Resp: ResponseExtractor>(
         }) as Box<dyn FnMut(ProgressEvent)>)
         .into_js_value()
         .dyn_into()
-        .map_err(|err| -> LightString {
+        .map_err(|err| -> SharedString {
             log::error!("构造progress事件回调失败: {:?}", err);
             return "请求失败".into();
         })?;
@@ -199,7 +202,7 @@ fn try_ajax<Req: Serialize, Resp: ResponseExtractor>(
         .map(|option| option.on_upload_progress.take())
         .flatten()
     {
-        let upload = xhr.upload().map_err(|err| -> LightString {
+        let upload = xhr.upload().map_err(|err| -> SharedString {
             log::error!("获取上传对象失败: {:?}", err);
             return "请求失败".into();
         })?;
@@ -209,7 +212,7 @@ fn try_ajax<Req: Serialize, Resp: ResponseExtractor>(
             as Box<dyn FnMut(ProgressEvent)>)
         .into_js_value()
         .dyn_into()
-        .map_err(|err| -> LightString {
+        .map_err(|err| -> SharedString {
             log::error!("构造上传对象的progress事件回调失败: {:?}", err);
             return "请求失败".into();
         })?;
@@ -225,7 +228,7 @@ fn try_ajax<Req: Serialize, Resp: ResponseExtractor>(
         }) as Box<dyn FnMut(Event)>)
         .into_js_value()
         .dyn_into()
-        .map_err(|err| -> LightString {
+        .map_err(|err| -> SharedString {
             log::error!("构造error事件回调失败: {:?}", err);
             return "请求失败".into();
         })?
@@ -239,7 +242,7 @@ fn try_ajax<Req: Serialize, Resp: ResponseExtractor>(
     }) as Box<dyn FnMut(Event)>)
     .into_js_value()
     .dyn_into()
-    .map_err(|err| -> LightString {
+    .map_err(|err| -> SharedString {
         log::error!("构造abort事件回调失败: {:?}", err);
         return "请求失败".into();
     })?;
@@ -261,7 +264,7 @@ fn try_ajax<Req: Serialize, Resp: ResponseExtractor>(
     //     }
     // }
     xhr.open_with_async(method, url, true)
-        .map_err(|err| -> LightString {
+        .map_err(|err| -> SharedString {
             log::error!("发起ajax请求失败: {:?}", err);
             return "发起请求失败".into();
         })?;
@@ -280,7 +283,7 @@ fn try_ajax<Req: Serialize, Resp: ResponseExtractor>(
         for (key, values) in headers {
             for value in values {
                 xhr.set_request_header(&key, &value)
-                    .map_err(|err| -> LightString {
+                    .map_err(|err| -> SharedString {
                         log::error!("添加请求头{}失败: {:?}", key, err);
                         return "请求失败".into();
                     })?;
@@ -292,29 +295,29 @@ fn try_ajax<Req: Serialize, Resp: ResponseExtractor>(
             Request::Json(data) => {
                 let json = serde_json::to_string(&data).map_err(|err| {
                     log::error!("序列化请求数据失败: {:?}", err);
-                    LightString::from("Serialize request data failed!")
+                    SharedString::from("Serialize request data failed!")
                 })?;
                 xhr.set_request_header("Content-Type", "application/json")
-                    .map_err(|err| -> LightString {
+                    .map_err(|err| -> SharedString {
                         log::error!("设置json请求头失败: {:?}", err);
                         return "请求失败".into();
                     })?;
                 xhr.send_with_opt_str(Some(&json))
-                    .map_err(|err| -> LightString {
+                    .map_err(|err| -> SharedString {
                         log::error!("发送json请求体失败: {:?}", err);
                         return "请求失败".into();
                     })?;
             }
             Request::Form(form_data) => {
                 xhr.send_with_opt_form_data(Some(&form_data))
-                    .map_err(|err| -> LightString {
+                    .map_err(|err| -> SharedString {
                         log::error!("发送表单请求体失败: {:?}", err);
                         return "请求失败".into();
                     })?;
             }
         }
     } else {
-        xhr.send().map_err(|err| -> LightString {
+        xhr.send().map_err(|err| -> SharedString {
             log::error!("发送请求失败: {:?}", err);
             return "请求失败".into();
         })?;
@@ -326,7 +329,7 @@ pub async fn ajax<Req, Resp>(
     url: String,
     req: Option<Request<Req>>,
     mut option: Option<RequestOption>,
-) -> Result<Resp::Output, LightString>
+) -> Result<Resp::Output, SharedString>
 where
     Req: Serialize,
     Resp: ResponseExtractor,
@@ -343,16 +346,16 @@ where
     let promise = Promise::new(&mut promise_fn);
     let xhr: XmlHttpRequest = JsFuture::from(promise)
         .await
-        .map_err(|err| -> LightString {
+        .map_err(|err| -> SharedString {
             log::error!("ajax请求失败: {:?}", err);
             return "请求失败".into();
         })?
         .dyn_into()
-        .map_err(|err| -> LightString {
+        .map_err(|err| -> SharedString {
             log::error!("请求完成输出的不是XmlHttpRequest: {:?}", err);
             return "请求失败".into();
         })?;
-    let status = xhr.status().map_err(|err| -> LightString {
+    let status = xhr.status().map_err(|err| -> SharedString {
         log::error!("获取响应码失败: {:?}", err);
         return "请求失败".into();
     })?;
@@ -360,9 +363,9 @@ where
         return Resp::extract(&xhr);
     } else if 0 == status {
         log::error!("ajax请求异常, 状态码为0");
-        return Err(LightString::from("network error"));
+        return Err(SharedString::from("network error"));
     } else {
         log::error!("ajax请求失败: {:?}", xhr);
-        return Err(LightString::from("server error"));
+        return Err(SharedString::from("server error"));
     }
 }

@@ -1,7 +1,7 @@
 use super::get_curr_user::GetCurrUserResp;
 use serde::{Deserialize, Serialize};
 use tihu::Api;
-use tihu::LightString;
+use tihu::SharedString;
 use validator::Validate;
 
 pub const LOGIN_API: &str = "/api/auth/login";
@@ -19,7 +19,7 @@ pub struct LoginApi;
 impl Api for LoginApi {
     type Input = LoginReq;
     type Output = LoginResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(LOGIN_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(LOGIN_API);
     }
 }

@@ -7,7 +7,7 @@ use tihu::datetime_format;
 use tihu::pagination::PaginationList;
 use tihu::Api;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 
 pub const QUERY_JOB_API: &str = "/api/job/queryJob";
 
@@ -47,7 +47,7 @@ pub struct QueryJobApi;
 impl Api for QueryJobApi {
     type Input = QueryJobReq;
     type Output = QueryJobResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(QUERY_JOB_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(QUERY_JOB_API);
     }
 }

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use tihu::Api;
-use tihu::LightString;
+use tihu::SharedString;
 
 pub const CHANGE_PASSWORD_API: &str = "/api/auth/changePassword";
 
@@ -17,7 +17,7 @@ pub struct ChangePasswordApi;
 impl Api for ChangePasswordApi {
     type Input = ChangePasswordReq;
     type Output = ChangePasswordResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(CHANGE_PASSWORD_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(CHANGE_PASSWORD_API);
     }
 }

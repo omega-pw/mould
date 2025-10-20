@@ -29,7 +29,7 @@ use sdk::auth::login_by_oauth2_code::LoginByOauth2CodeReq;
 use sdk::auth::login_by_oauth2_code::LoginByOauth2CodeResp;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
@@ -255,7 +255,7 @@ pub async fn login_by_oauth2_code(
             if let Some(pkce_verifier) = pkce_verifier {
                 client = client.set_pkce_verifier(PkceCodeVerifier::new(pkce_verifier));
             } else {
-                return Err(ErrNo::CommonError(LightString::from_static(
+                return Err(ErrNo::CommonError(SharedString::from_static(
                     "Parameter \"pkce_verifier\" required!",
                 )));
             }
@@ -416,7 +416,7 @@ pub async fn login_by_oauth2_code(
             .map_err(commit_transaction_error)?;
         (session_info, curr_user)
     } else {
-        return Err(ErrNo::CommonError(LightString::from(format!(
+        return Err(ErrNo::CommonError(SharedString::from(format!(
             "Unsupported oauth2 provider \"{}\"!",
             provider
         ))));

@@ -21,7 +21,7 @@ use native_common::cache::EliminateType;
 use native_common::utils::decrypt_by_base64;
 use native_common::utils::decrypt_by_rsa_pri_key;
 use rsa::RsaPrivateKey;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::ErrNo;
 
 const NONCE_PREFIX: &'static str = "nonce-";
@@ -39,21 +39,21 @@ fn decrypt_base64_data_by_rsa_pri_key(
     name: &str,
     nonce: &[u8],
     rsa_pri_key: &RsaPrivateKey,
-) -> Result<Vec<u8>, LightString> {
-    let content_bytes = decrypt_by_base64(content).map_err(|err| -> LightString {
+) -> Result<Vec<u8>, SharedString> {
+    let content_bytes = decrypt_by_base64(content).map_err(|err| -> SharedString {
         log::error!("base64解码{}失败: {:?}", name, err);
         let err_msg = format!("解码{}失败！", name);
         return err_msg.into();
     })?;
     let mut content =
-        decrypt_by_rsa_pri_key(&content_bytes, rsa_pri_key).map_err(|err| -> LightString {
+        decrypt_by_rsa_pri_key(&content_bytes, rsa_pri_key).map_err(|err| -> SharedString {
             log::error!("{}解密失败: {:?},密文：{}", name, err, content);
             let err_msg = format!("{}解密失败！", name);
             return err_msg.into();
         })?;
     //把nonce放在实际数据后边，方便字符串移除，如果放在前面，还要新生成一个字符串
     if !content.ends_with(nonce) {
-        return Err(LightString::from_static("非法访问，数据签名校验失败！"));
+        return Err(SharedString::from_static("非法访问，数据签名校验失败！"));
     } else {
         let drop_len = nonce.len();
         content.truncate(content.len() - drop_len);

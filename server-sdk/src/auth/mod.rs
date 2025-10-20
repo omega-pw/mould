@@ -12,7 +12,7 @@ pub mod register;
 pub mod reset_password;
 pub mod send_email_captcha;
 use super::utils::pbkdf2;
-use tihu::LightString;
+use tihu::SharedString;
 
 pub enum RandomValue<'a, const N: usize> {
     Client([u8; N]),
@@ -45,7 +45,7 @@ fn concat_by_copy(trunks: &[&[u8]]) -> Vec<u8> {
 pub fn calc_salt(
     random_value: RandomValue<32>,
     sha512: impl Fn(&[u8]) -> [u8; 64],
-) -> Result<[u8; 64], LightString> {
+) -> Result<[u8; 64], SharedString> {
     let data = match random_value {
         RandomValue::Client(client_random_value) => concat_by_copy(&[&client_random_value]),
         RandomValue::Server(account, server_random_value) => {

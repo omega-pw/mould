@@ -9,7 +9,7 @@ use crate::sdk;
 use crate::utils::format_time_local;
 use crate::utils::request::ApiExt;
 use crate::utils::LoadStatus;
-use crate::LightString;
+use crate::SharedString;
 use sdk::user::query_user::QueryUserApi;
 use sdk::user::query_user::QueryUserReq;
 use sdk::user::query_user::User;
@@ -174,7 +174,7 @@ fn row_view(
             <td class="e-table-cell align-center">{&user.name}</td>
             <td class="e-table-cell align-center">
                 if let Some(avatar_url) = user.avatar_url.as_ref() {
-                    <Image src={LightString::from(avatar_url.clone())} style="max-height: 3em;"/>
+                    <Image src={SharedString::from(avatar_url.clone())} style="max-height: 3em;"/>
                 }
             </td>
             <td class="e-table-cell align-center">{ html!{&format_time_local(&user.created_time)} }</td>

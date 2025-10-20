@@ -14,6 +14,7 @@ default = ["console_error_panic_hook"]
 log = "0.4"
 async-trait = "0.1"
 futures = "0.3"
+validator = "0.20"
 chrono = { version = "0.4.10", features = ["serde"] }
 serde = "1"
 serde_derive = "1"

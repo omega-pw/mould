@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 use tihu::Api;
 use tihu::Id;
-use tihu::LightString;
 use tihu::PrimaryKey;
+use tihu::SharedString;
 
 pub const READ_ENVIRONMENT_API: &str = "/api/environment/readEnvironment";
 
@@ -42,7 +42,7 @@ pub struct ReadEnvironmentApi;
 impl Api for ReadEnvironmentApi {
     type Input = ReadEnvironmentReq;
     type Output = ReadEnvironmentResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(READ_ENVIRONMENT_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(READ_ENVIRONMENT_API);
     }
 }

@@ -8,7 +8,7 @@ use tihu::datetime_format;
 use tihu::pagination::PaginationList;
 use tihu::Api;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 
 pub const QUERY_USER_API: &str = "/api/user/queryUser";
 
@@ -51,7 +51,7 @@ pub struct QueryUserApi;
 impl Api for QueryUserApi {
     type Input = QueryUserReq;
     type Output = QueryUserResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(QUERY_USER_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(QUERY_USER_API);
     }
 }

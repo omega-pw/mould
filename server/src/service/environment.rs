@@ -12,7 +12,7 @@ use native_common::utils::add_vals;
 use native_common::utils::calc_sql_pagination;
 use native_common::utils::Condition;
 use std::borrow::Cow;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::execute_error;
 use tihu_native::errno::extract_data_error;
 use tihu_native::errno::prepare_statement_error;
@@ -71,7 +71,7 @@ fn opt_to_conditions<'a>(
     if let Some(id) = opt.id.as_ref() {
         pairs.push((
             Condition {
-                field: LightString::from_static(properties::ID),
+                field: SharedString::from_static(properties::ID),
                 operator: None,
             },
             id,
@@ -80,7 +80,7 @@ fn opt_to_conditions<'a>(
     if let Some(environment_schema_id) = opt.environment_schema_id.as_ref() {
         pairs.push((
             Condition {
-                field: LightString::from_static(properties::ENVIRONMENT_SCHEMA_ID),
+                field: SharedString::from_static(properties::ENVIRONMENT_SCHEMA_ID),
                 operator: None,
             },
             environment_schema_id,
@@ -89,7 +89,7 @@ fn opt_to_conditions<'a>(
     if let Some(name) = opt.name.as_ref() {
         pairs.push((
             Condition {
-                field: LightString::from_static(properties::NAME),
+                field: SharedString::from_static(properties::NAME),
                 operator: None,
             },
             name,
@@ -98,7 +98,7 @@ fn opt_to_conditions<'a>(
     if let Some(created_time) = opt.created_time.as_ref() {
         pairs.push((
             Condition {
-                field: LightString::from_static(properties::CREATED_TIME),
+                field: SharedString::from_static(properties::CREATED_TIME),
                 operator: None,
             },
             created_time,
@@ -107,7 +107,7 @@ fn opt_to_conditions<'a>(
     if let Some(last_modified_time) = opt.last_modified_time.as_ref() {
         pairs.push((
             Condition {
-                field: LightString::from_static(properties::LAST_MODIFIED_TIME),
+                field: SharedString::from_static(properties::LAST_MODIFIED_TIME),
                 operator: None,
             },
             last_modified_time,

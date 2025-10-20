@@ -4,7 +4,7 @@ use crate::sdk;
 use sdk::extension::test_configuration::TestConfigurationReq;
 use sdk::extension::test_configuration::TestConfigurationResp;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::ErrNo;
 
 pub async fn test_configuration(
@@ -20,7 +20,7 @@ pub async fn test_configuration(
     let extension = context
         .get_extension(&extension_id)
         .ok_or_else(|| -> ErrNo {
-            ErrNo::CommonError(LightString::from(format!(
+            ErrNo::CommonError(SharedString::from(format!(
                 "id为\"{}\"的扩展未找到!",
                 extension_id,
             )))
@@ -30,7 +30,7 @@ pub async fn test_configuration(
     )
     .map_err(|err| -> ErrNo {
         log::error!("扩展配置格式不正确：{}", err);
-        return ErrNo::CommonError(LightString::Static("扩展配置格式不正确"));
+        return ErrNo::CommonError(SharedString::Static("扩展配置格式不正确"));
     })?;
     extension
         .test_configuration(extension_configuration, context.get_extension_context())

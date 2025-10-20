@@ -5,7 +5,7 @@ use crate::components::input::BindingInput;
 use crate::js;
 use crate::sdk;
 use crate::utils::request::ApiExt;
-use crate::LightString;
+use crate::SharedString;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use js::RsaPubKey2048;
@@ -27,8 +27,8 @@ use yew::prelude::*;
 
 #[derive(Clone)]
 struct LoginForm {
-    account: UseStateHandle<LightString>,
-    password: UseStateHandle<LightString>,
+    account: UseStateHandle<SharedString>,
+    password: UseStateHandle<SharedString>,
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -42,9 +42,9 @@ pub fn Login(props: &Props) -> Html {
         account: use_state(|| "".into()),
         password: use_state(|| "".into()),
     };
-    let rsa_pub_key: UseStateHandle<Option<LightString>> = use_state(|| None);
+    let rsa_pub_key: UseStateHandle<Option<SharedString>> = use_state(|| None);
     let is_logining: UseStateHandle<bool> = use_state(|| false);
-    let err_msg: UseStateHandle<Option<LightString>> = use_state(|| None);
+    let err_msg: UseStateHandle<Option<SharedString>> = use_state(|| None);
     let rsa_pub_key_clone = rsa_pub_key.clone();
     let openid_providers: UseStateHandle<Vec<OpenidProvider>> = use_state(Default::default);
     // let on_wechat = Callback::from(move |_| {
@@ -137,16 +137,16 @@ pub fn Login(props: &Props) -> Html {
 }
 
 async fn get_rsa_pub_key(
-    rsa_pub_key: &UseStateHandle<Option<LightString>>,
-) -> Result<(), LightString> {
+    rsa_pub_key: &UseStateHandle<Option<SharedString>>,
+) -> Result<(), SharedString> {
     let params = GetRsaPubKeyReq {};
     let pub_key = GetRsaPubKeyApi.call(&params).await?;
     rsa_pub_key.set(Some(pub_key.into()));
     return Ok(());
 }
 
-fn chk_form_err(form: &LoginForm) -> Vec<LightString> {
-    let mut err_msgs: Vec<LightString> = Vec::new();
+fn chk_form_err(form: &LoginForm) -> Vec<SharedString> {
+    let mut err_msgs: Vec<SharedString> = Vec::new();
     if form.account.is_empty() {
         err_msgs.push("请输入邮箱".into());
     }
@@ -157,10 +157,10 @@ fn chk_form_err(form: &LoginForm) -> Vec<LightString> {
 }
 
 async fn start_login(
-    rsa_pub_key: &UseStateHandle<Option<LightString>>,
+    rsa_pub_key: &UseStateHandle<Option<SharedString>>,
     is_logining: &UseStateHandle<bool>,
     form: &LoginForm,
-    err_msg: &UseStateHandle<Option<LightString>>,
+    err_msg: &UseStateHandle<Option<SharedString>>,
     ondone: &Callback<GetCurrUserResp>,
 ) {
     let mut err_msgs = chk_form_err(form);
@@ -190,7 +190,7 @@ async fn start_login(
     }
 }
 
-async fn login(rsa_pub_key: &str, form: &LoginForm) -> Result<LoginResp, LightString> {
+async fn login(rsa_pub_key: &str, form: &LoginForm) -> Result<LoginResp, SharedString> {
     let salt = GetSaltApi
         .call(&GetSaltReq {
             account: form.account.to_string(),
@@ -198,7 +198,7 @@ async fn login(rsa_pub_key: &str, form: &LoginForm) -> Result<LoginResp, LightSt
         .await?;
     let salt = BASE64_STANDARD
         .decode(&salt)
-        .map_err(|err| -> LightString {
+        .map_err(|err| -> SharedString {
             log::error!("解码盐值失败: {:?}", err);
             return "解码盐值失败！".into();
         })?;
@@ -209,11 +209,11 @@ async fn login(rsa_pub_key: &str, form: &LoginForm) -> Result<LoginResp, LightSt
     let rsa_pub_key = RsaPubKey2048::try_from_string(rsa_pub_key);
     let cipher_account = rsa_pub_key
         .encrypt(&[form.account.as_bytes(), nonce.as_bytes()].concat())
-        .ok_or_else(|| LightString::from("加密账户失败！"))?;
+        .ok_or_else(|| SharedString::from("加密账户失败！"))?;
     let cipher_account = BASE64_STANDARD.encode(&cipher_account.to_vec());
     let cipher_auth_key = rsa_pub_key
         .encrypt(&[auth_key.as_bytes(), nonce.as_bytes()].concat())
-        .ok_or_else(|| LightString::from("加密授权秘钥失败！"))?;
+        .ok_or_else(|| SharedString::from("加密授权秘钥失败！"))?;
     let cipher_auth_key = BASE64_STANDARD.encode(&cipher_auth_key.to_vec());
     let params = LoginReq {
         nonce: nonce,
@@ -226,7 +226,7 @@ async fn login(rsa_pub_key: &str, form: &LoginForm) -> Result<LoginResp, LightSt
 
 async fn get_openid_providers(
     openid_providers: &UseStateHandle<Vec<OpenidProvider>>,
-) -> Result<Vec<OpenidProvider>, LightString> {
+) -> Result<Vec<OpenidProvider>, SharedString> {
     let result = GetOpenidProvidersApi
         .call(&GetOpenidProvidersReq {})
         .await?;

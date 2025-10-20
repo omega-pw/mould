@@ -2,7 +2,7 @@ use serde;
 use serde::{Deserialize, Serialize};
 use tihu::Api;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 
 pub const UPDATE_JOB_API: &str = "/api/job/updateJob";
 
@@ -40,7 +40,7 @@ pub struct UpdateJobApi;
 impl Api for UpdateJobApi {
     type Input = UpdateJobReq;
     type Output = UpdateJobResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(UPDATE_JOB_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(UPDATE_JOB_API);
     }
 }

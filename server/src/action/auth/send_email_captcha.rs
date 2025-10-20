@@ -19,7 +19,7 @@ use sdk::auth::send_email_captcha::Scene as SdkScene;
 use sdk::auth::send_email_captcha::SendEmailCaptchaReq;
 use sdk::auth::send_email_captcha::SendEmailCaptchaResp;
 use tera::Tera;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
@@ -85,7 +85,7 @@ pub async fn send_email_captcha(
                 .render_str(&context.config.email_template.register_captcha, &data)
                 .map_err(|err| {
                     log::error!("组装注册验证码邮件内容失败: {}", err);
-                    return ErrNo::CommonError(LightString::from_static(
+                    return ErrNo::CommonError(SharedString::from_static(
                         "Failed to assemble registration verification code email content",
                     ));
                 })?;
@@ -106,6 +106,7 @@ pub async fn send_email_captcha(
             return send_mail(
                 &email_account.mail_host,
                 email_account.mail_port,
+                email_account.starttls,
                 email_account.username.clone(),
                 email_account.password.clone(),
                 Some(email_account.name.clone()),
@@ -118,7 +119,7 @@ pub async fn send_email_captcha(
             .await
             .map_err(|err| {
                 log::error!("通过邮件发送注册验证码失败: {}", err);
-                return ErrNo::CommonError(LightString::from_static("发送注册验证码失败"));
+                return ErrNo::CommonError(SharedString::from_static("发送注册验证码失败"));
             });
         }
         SdkScene::ResetPassword => {
@@ -128,7 +129,7 @@ pub async fn send_email_captcha(
                 .render_str(&context.config.email_template.reset_password_captcha, &data)
                 .map_err(|err| {
                     log::error!("组装重置密码验证码邮件内容失败: {}", err);
-                    return ErrNo::CommonError(LightString::from_static(
+                    return ErrNo::CommonError(SharedString::from_static(
                         "Failed to assemble reset verification code email content",
                     ));
                 })?;
@@ -149,6 +150,7 @@ pub async fn send_email_captcha(
             return send_mail(
                 &email_account.mail_host,
                 email_account.mail_port,
+                email_account.starttls,
                 email_account.username.clone(),
                 email_account.password.clone(),
                 Some(email_account.name.clone()),
@@ -161,7 +163,7 @@ pub async fn send_email_captcha(
             .await
             .map_err(|err| {
                 log::error!("通过邮件发送重置密码验证码失败: {}", err);
-                return ErrNo::CommonError(LightString::from_static("发送重置密码验证码失败"));
+                return ErrNo::CommonError(SharedString::from_static("发送重置密码验证码失败"));
             });
         }
     }

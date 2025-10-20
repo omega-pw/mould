@@ -1,6 +1,6 @@
 use super::button::Button;
 use super::modal_dialog::ModalDialog;
-use crate::LightString;
+use crate::SharedString;
 use js_sys::Function;
 use std::cell::Cell;
 use std::rc::Rc;
@@ -9,10 +9,10 @@ use yew::prelude::*;
 use yew::{html, Component, Context, Html};
 
 struct State {
-    title: LightString,
-    content: LightString,
+    title: SharedString,
+    content: SharedString,
     z_index: u64,
-    ok_text: LightString,
+    ok_text: SharedString,
 }
 
 pub enum Msg {
@@ -21,13 +21,13 @@ pub enum Msg {
 
 #[derive(Clone, PartialEq, Properties)]
 pub struct Props {
-    #[prop_or_else(||LightString::from("提示"))]
-    pub title: LightString,
-    pub content: LightString,
+    #[prop_or_else(||SharedString::from("提示"))]
+    pub title: SharedString,
+    pub content: SharedString,
     #[prop_or(999)]
     pub z_index: u64,
-    #[prop_or_else(||LightString::from("确定"))]
-    pub ok_text: LightString,
+    #[prop_or_else(||SharedString::from("确定"))]
+    pub ok_text: SharedString,
     #[prop_or_default]
     pub onok: Option<Callback<()>>,
 }
@@ -101,7 +101,7 @@ impl Component for Alert {
     }
 }
 
-pub fn alert(content: LightString, title: Option<LightString>, cb: Option<impl Fn() + 'static>) {
+pub fn alert(content: SharedString, title: Option<SharedString>, cb: Option<impl Fn() + 'static>) {
     let document = web_sys::window().unwrap().document().unwrap();
     let body = document.body().unwrap();
     let alert_root = document.create_element("div").unwrap();
@@ -120,10 +120,10 @@ pub fn alert(content: LightString, title: Option<LightString>, cb: Option<impl F
     let alert_handle_clone = alert_handle.clone();
     let alert_root_clone = alert_root.clone();
     let props = Props {
-        title: title.unwrap_or_else(|| LightString::from("提示")),
+        title: title.unwrap_or_else(|| SharedString::from("提示")),
         content: content,
         z_index: 999,
-        ok_text: LightString::from("确定"),
+        ok_text: SharedString::from("确定"),
         onok: Some(Callback::from(move |_: ()| {
             if let Some(cb) = cb.as_ref() {
                 cb();

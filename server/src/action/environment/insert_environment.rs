@@ -11,8 +11,8 @@ use crate::service::base::EnvironmentSchemaResourceBaseService;
 use chrono::Utc;
 use sdk::environment::insert_environment::InsertEnvironmentReq;
 use tihu::Id;
-use tihu::LightString;
 use tihu::PrimaryKey;
+use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
@@ -32,7 +32,7 @@ pub async fn insert_environment(
         let extension = context
             .get_extension(&schema_resource.extension_id)
             .ok_or_else(|| -> ErrNo {
-                ErrNo::CommonError(LightString::from(format!(
+                ErrNo::CommonError(SharedString::from(format!(
                     "id为\"{}\"的扩展未找到!",
                     schema_resource.extension_id,
                 )))
@@ -42,7 +42,7 @@ pub async fn insert_environment(
                 serde_json::from_str::<serde_json::Value>(&resource.extension_configuration)
                     .map_err(|err| -> ErrNo {
                         log::error!("扩展配置格式不正确：{}", err);
-                        return ErrNo::CommonError(LightString::Static("扩展配置格式不正确"));
+                        return ErrNo::CommonError(SharedString::Static("扩展配置格式不正确"));
                     })?;
             extension
                 .validate_configuration(extension_configuration)
@@ -81,14 +81,14 @@ pub async fn insert_environment(
     let mut resource_list = Vec::new();
     for (environment_schema_resource, schema_resource_list) in environment_schema_resource_list {
         if schema_resource_list.is_empty() {
-            return Err(ErrNo::CommonError(LightString::from(format!(
+            return Err(ErrNo::CommonError(SharedString::from(format!(
                 "没有添加\"{}\"对应的资源",
                 environment_schema_resource.name
             ))));
         } else {
             for schema_resource in schema_resource_list {
                 if schema_resource.resource_list.is_empty() {
-                    return Err(ErrNo::CommonError(LightString::from(format!(
+                    return Err(ErrNo::CommonError(SharedString::from(format!(
                         "没有添加\"{}\"对应的资源",
                         environment_schema_resource.name
                     ))));

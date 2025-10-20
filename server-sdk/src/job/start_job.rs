@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 use tihu::Api;
 use tihu::Id;
-use tihu::LightString;
 use tihu::PrimaryKey;
+use tihu::SharedString;
 
 pub const START_JOB_API: &str = "/api/job/startJob";
 
@@ -17,7 +17,7 @@ pub struct StartJobApi;
 impl Api for StartJobApi {
     type Input = StartJobReq;
     type Output = StartJobResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(START_JOB_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(START_JOB_API);
     }
 }

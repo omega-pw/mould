@@ -16,7 +16,7 @@ use crate::service::base::JobStepBaseService;
 use chrono::Utc;
 use sdk::job::update_job::UpdateJobReq;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
@@ -47,7 +47,7 @@ pub async fn update_job(
     };
     let job_opt = job_base_service.query_job_one(&params).await?;
     let job = job_opt.ok_or_else(|| -> ErrNo {
-        ErrNo::CommonError(LightString::from_static("待更新的任务不存在！"))
+        ErrNo::CommonError(SharedString::from_static("待更新的任务不存在！"))
     })?;
     //查询任务对应的环境规格可以操作哪些资源
     let schema_resource_list = environment_schema_resource_base_service
@@ -78,7 +78,7 @@ pub async fn update_job(
                     let (extension_info, extension) = context
                         .get_extension_info(&schema_resource.extension_id)
                         .ok_or_else(|| -> ErrNo {
-                            ErrNo::CommonError(LightString::from(format!(
+                            ErrNo::CommonError(SharedString::from(format!(
                                 "扩展\"{}\"未找到!",
                                 schema_resource.extension_name,
                             )))
@@ -92,7 +92,7 @@ pub async fn update_job(
                             serde_json::from_str::<serde_json::Value>(&operation_parameter)
                                 .map_err(|err| -> ErrNo {
                                     log::error!("操作参数格式不正确：{}", err);
-                                    return ErrNo::CommonError(LightString::Static(
+                                    return ErrNo::CommonError(SharedString::Static(
                                         "操作参数格式不正确",
                                     ));
                                 })?;
@@ -132,13 +132,13 @@ pub async fn update_job(
                             });
                         }
                     } else {
-                        return Err(ErrNo::CommonError(LightString::from(format!(
+                        return Err(ErrNo::CommonError(SharedString::from(format!(
                             "扩展\"{}\"没有id为\"{}\"的操作!",
                             schema_resource.extension_name, operation_id
                         ))));
                     }
                 } else {
-                    return Err(ErrNo::CommonError(LightString::from(format!(
+                    return Err(ErrNo::CommonError(SharedString::from(format!(
                         "步骤\"{}\"所操作的环境资源不存在!",
                         name
                     ))));

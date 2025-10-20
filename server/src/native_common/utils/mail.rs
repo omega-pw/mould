@@ -1,4 +1,5 @@
 use lettre::address::Address;
+use lettre::message::header::ContentType;
 use lettre::message::IntoBody;
 use lettre::message::Mailbox;
 use lettre::transport::smtp::authentication::Credentials;
@@ -8,6 +9,7 @@ use std::str::FromStr;
 pub async fn send_mail<S: Into<String>, T: IntoBody>(
     mail_host: &str,
     mail_port: u16,
+    starttls: bool,
     username: String,
     password: String,
     from_name: Option<String>,
@@ -26,14 +28,17 @@ pub async fn send_mail<S: Into<String>, T: IntoBody>(
             name: to_name,
             email: Address::from_str(to_addr)?,
         })
+        .header(ContentType::TEXT_HTML)
         .subject(subject)
         .body(body)?;
-    let creds = Credentials::new(username, password);
-    let mailer: AsyncSmtpTransport<Tokio1Executor> =
+    let credentials = Credentials::new(username, password);
+    let builder = if starttls {
         AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(mail_host)?
-            .port(mail_port)
-            .credentials(creds)
-            .build();
+    } else {
+        AsyncSmtpTransport::<Tokio1Executor>::relay(mail_host)?
+    };
+    let mailer: AsyncSmtpTransport<Tokio1Executor> =
+        builder.port(mail_port).credentials(credentials).build();
     mailer.send(email).await?;
     return Ok(());
 }

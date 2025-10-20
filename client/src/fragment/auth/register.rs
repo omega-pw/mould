@@ -5,7 +5,7 @@ use crate::js;
 use crate::sdk;
 use crate::utils;
 use crate::utils::request::ApiExt;
-use crate::LightString;
+use crate::SharedString;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use js::sha512;
@@ -23,15 +23,15 @@ use sdk::auth::send_email_captcha::Scene;
 use sdk::auth::send_email_captcha::SendEmailCaptchaApi;
 use sdk::auth::send_email_captcha::SendEmailCaptchaReq;
 use sdk::auth::RandomValue;
-use tihu::validator::ValidateEmail;
+use validator::ValidateEmail;
 use yew::prelude::*;
 
 #[derive(Clone)]
 struct RegisterForm {
-    account: UseStateHandle<LightString>,
-    password: UseStateHandle<LightString>,
-    confirm_password: UseStateHandle<LightString>,
-    captcha: UseStateHandle<LightString>,
+    account: UseStateHandle<SharedString>,
+    password: UseStateHandle<SharedString>,
+    confirm_password: UseStateHandle<SharedString>,
+    captcha: UseStateHandle<SharedString>,
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -47,9 +47,9 @@ pub fn Register(props: &Props) -> Html {
         confirm_password: use_state(|| "".into()),
         captcha: use_state(|| "".into()),
     };
-    let rsa_pub_key: UseStateHandle<Option<LightString>> = use_state(|| None);
+    let rsa_pub_key: UseStateHandle<Option<SharedString>> = use_state(|| None);
     let is_registering: UseStateHandle<bool> = use_state(|| false);
-    let err_msg: UseStateHandle<Option<LightString>> = use_state(|| None);
+    let err_msg: UseStateHandle<Option<SharedString>> = use_state(|| None);
     let rsa_pub_key_clone = rsa_pub_key.clone();
     use_effect_with((), move |_| {
         wasm_bindgen_futures::spawn_local(async move {
@@ -133,16 +133,16 @@ pub fn Register(props: &Props) -> Html {
 }
 
 async fn get_rsa_pub_key(
-    rsa_pub_key: &UseStateHandle<Option<LightString>>,
-) -> Result<(), LightString> {
+    rsa_pub_key: &UseStateHandle<Option<SharedString>>,
+) -> Result<(), SharedString> {
     let params = GetRsaPubKeyReq {};
     let pub_key = GetRsaPubKeyApi.call(&params).await?;
     rsa_pub_key.set(Some(pub_key.into()));
     return Ok(());
 }
 
-fn chk_form_err(form: &RegisterForm) -> Vec<LightString> {
-    let mut err_msgs: Vec<LightString> = Vec::new();
+fn chk_form_err(form: &RegisterForm) -> Vec<SharedString> {
+    let mut err_msgs: Vec<SharedString> = Vec::new();
     if form.account.is_empty() {
         err_msgs.push("请输入邮箱".into());
     }
@@ -161,21 +161,21 @@ fn chk_form_err(form: &RegisterForm) -> Vec<LightString> {
     return err_msgs;
 }
 
-async fn start_send_captcha(account: String) -> Result<(), LightString> {
+async fn start_send_captcha(account: String) -> Result<(), SharedString> {
     let params = SendEmailCaptchaReq {
         scene: Scene::Register,
         email: account,
     };
     SendEmailCaptchaApi.call(&params).await?;
-    utils::success(LightString::from("发送成功"));
+    utils::success(SharedString::from("发送成功"));
     return Ok(());
 }
 
 async fn start_register(
-    rsa_pub_key: &UseStateHandle<Option<LightString>>,
+    rsa_pub_key: &UseStateHandle<Option<SharedString>>,
     is_registering: &UseStateHandle<bool>,
     form: &RegisterForm,
-    err_msg: &UseStateHandle<Option<LightString>>,
+    err_msg: &UseStateHandle<Option<SharedString>>,
     ondone: &Callback<GetCurrUserResp>,
 ) {
     let mut err_msgs = chk_form_err(form);
@@ -209,7 +209,7 @@ async fn start_register(
 async fn register(
     server_rsa_pub_key: &str,
     form: &RegisterForm,
-) -> Result<GetCurrUserResp, LightString> {
+) -> Result<GetCurrUserResp, SharedString> {
     let mut user_random_value = [0u8; 32];
     utils::fill_random_bytes(&mut user_random_value);
     let params = GetNonceReq {};
@@ -217,15 +217,15 @@ async fn register(
     let server_rsa_pub_key = RsaPubKey2048::try_from_string(server_rsa_pub_key);
     let cipher_account = server_rsa_pub_key
         .encrypt(&[form.account.as_bytes(), nonce.as_bytes()].concat())
-        .ok_or_else(|| LightString::from("加密账户失败！"))?;
+        .ok_or_else(|| SharedString::from("加密账户失败！"))?;
     let cipher_account = BASE64_STANDARD.encode(&cipher_account);
     let salt = calc_salt(RandomValue::Client(user_random_value), sha512)
-        .map_err(|err| LightString::from(err.to_string()))?;
+        .map_err(|err| SharedString::from(err.to_string()))?;
     let (auth_key, _encryption_key) = sdk::auth::calc_derived_key(form.password.as_bytes(), &salt);
     let auth_key = BASE64_STANDARD.encode(&auth_key);
     let cipher_auth_key = server_rsa_pub_key
         .encrypt(&[auth_key.as_bytes(), nonce.as_bytes()].concat())
-        .ok_or_else(|| LightString::from("加密授权秘钥失败！"))?;
+        .ok_or_else(|| SharedString::from("加密授权秘钥失败！"))?;
     let cipher_auth_key = BASE64_STANDARD.encode(&cipher_auth_key);
     let user_random_value = BASE64_STANDARD.encode(&user_random_value);
     let params = RegisterReq {

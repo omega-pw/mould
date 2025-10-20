@@ -1,7 +1,7 @@
 use super::HashingFile;
 use super::ResourceMetadata;
 use crate::utils;
-use crate::LightString;
+use crate::SharedString;
 use std::ops::Deref;
 use yew::prelude::*;
 use yew::{html, Html};
@@ -10,7 +10,7 @@ use yew::{html, Html};
 pub struct Props {
     pub file: HashingFile,
     #[prop_or_default]
-    pub ondone: Callback<Result<ResourceMetadata, LightString>>,
+    pub ondone: Callback<Result<ResourceMetadata, SharedString>>,
 }
 
 #[function_component]

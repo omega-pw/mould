@@ -4,7 +4,7 @@ use chrono::Utc;
 use tihu::datetime_format;
 use tihu::datetime_format_opt;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use native_common::model::Property;
 use native_common::model::PropertyDefine;
 use native_common::model::PropertyType;
@@ -21,7 +21,7 @@ pub mod properties {
 }
 
 pub mod enums {
-    use tihu::LightString;
+    use tihu::SharedString;
     use std::error::Error;
     use serde::{Serialize, Deserialize};
     use tokio_postgres::types::{ToSql, Type, IsNull, to_sql_checked};
@@ -31,7 +31,7 @@ pub mod enums {
         System = 1, //系统用户
         External = 2, //外部用户
     }
-    pub fn try_i16_to_user_source(val: i16) -> Result<UserSource, LightString> {
+    pub fn try_i16_to_user_source(val: i16) -> Result<UserSource, SharedString> {
         match val {
             1 => Ok(UserSource::System),
             2 => Ok(UserSource::External),
@@ -67,37 +67,37 @@ impl Property for UserProperty {
     fn property_define(&self) -> PropertyDefine {
         match self {
 			UserProperty::Id(_) => PropertyDefine {
-                key: LightString::from_static(properties::ID),
+                key: SharedString::from_static(properties::ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			UserProperty::OrgId(_) => PropertyDefine {
-                key: LightString::from_static(properties::ORG_ID),
+                key: SharedString::from_static(properties::ORG_ID),
                 value_type: PropertyType::Id,
 				required: false,
             },
 			UserProperty::UserSource(_) => PropertyDefine {
-                key: LightString::from_static(properties::USER_SOURCE),
+                key: SharedString::from_static(properties::USER_SOURCE),
                 value_type: PropertyType::Enum,
 				required: true,
             },
 			UserProperty::Name(_) => PropertyDefine {
-                key: LightString::from_static(properties::NAME),
+                key: SharedString::from_static(properties::NAME),
                 value_type: PropertyType::String,
 				required: true,
             },
 			UserProperty::AvatarUrl(_) => PropertyDefine {
-                key: LightString::from_static(properties::AVATAR_URL),
+                key: SharedString::from_static(properties::AVATAR_URL),
                 value_type: PropertyType::String,
 				required: false,
             },
 			UserProperty::CreatedTime(_) => PropertyDefine {
-                key: LightString::from_static(properties::CREATED_TIME),
+                key: SharedString::from_static(properties::CREATED_TIME),
                 value_type: PropertyType::DateTime,
 				required: true,
             },
 			UserProperty::LastModifiedTime(_) => PropertyDefine {
-                key: LightString::from_static(properties::LAST_MODIFIED_TIME),
+                key: SharedString::from_static(properties::LAST_MODIFIED_TIME),
                 value_type: PropertyType::DateTime,
 				required: true,
             },

@@ -1,7 +1,7 @@
 use serde;
 use serde::{Deserialize, Serialize};
 use tihu::Api;
-use tihu::LightString;
+use tihu::SharedString;
 
 pub const LOGOUT_API: &str = "/api/auth/logout";
 
@@ -26,7 +26,7 @@ pub struct LogoutApi;
 impl Api for LogoutApi {
     type Input = LogoutReq;
     type Output = LogoutResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(LOGOUT_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(LOGOUT_API);
     }
 }

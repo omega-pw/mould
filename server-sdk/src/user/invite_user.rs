@@ -2,7 +2,7 @@ use serde;
 use serde::{Deserialize, Serialize};
 use tihu::Api;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 
 pub const INVITE_USER_API: &str = "/api/user/inviteUser";
 
@@ -16,7 +16,7 @@ pub struct InviteUserApi;
 impl Api for InviteUserApi {
     type Input = InviteUserReq;
     type Output = InviteUserResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(INVITE_USER_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(INVITE_USER_API);
     }
 }

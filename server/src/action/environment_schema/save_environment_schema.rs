@@ -13,8 +13,8 @@ use crate::service::base::EnvironmentSchemaResourceBaseService;
 use chrono::Utc;
 use sdk::environment_schema::save_environment_schema::SaveEnvironmentSchemaReq;
 use tihu::Id;
-use tihu::LightString;
 use tihu::PrimaryKey;
+use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
@@ -43,7 +43,7 @@ pub async fn save_environment_schema(
             .iter()
             .find(|extension| extension.id == schema_resource.extension_id)
             .ok_or_else(|| -> ErrNo {
-                ErrNo::CommonError(LightString::from(format!(
+                ErrNo::CommonError(SharedString::from(format!(
                     "id为\"{}\"的扩展未找到!",
                     schema_resource.extension_id,
                 )))
@@ -61,7 +61,7 @@ pub async fn save_environment_schema(
             .query_environment_schema_one(&params)
             .await?;
         let environment_schema = environment_schema_opt.ok_or_else(|| -> ErrNo {
-            ErrNo::CommonError(LightString::from_static("待更新的环境规格不存在！"))
+            ErrNo::CommonError(SharedString::from_static("待更新的环境规格不存在！"))
         })?;
 
         //查询已有的资源

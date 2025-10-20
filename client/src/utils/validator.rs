@@ -1,4 +1,4 @@
-use crate::LightString;
+use crate::SharedString;
 use std::fmt;
 use std::ops::Deref;
 use std::str::FromStr;
@@ -6,7 +6,7 @@ use std::sync::Arc;
 use yew::prelude::UseStateHandle;
 
 pub trait Validator<T: ?Sized> {
-    fn validate(&self, data: &T) -> Option<LightString>;
+    fn validate(&self, data: &T) -> Option<SharedString>;
 }
 
 impl<T: ?Sized> fmt::Debug for dyn Validator<T> {
@@ -53,13 +53,13 @@ impl<T: ?Sized> Validators<T> {
         self.validators.push(ValidatorWrapper(Arc::new(validator)));
         self
     }
-    pub fn validate_into(&self, data: &T, error: &UseStateHandle<Option<LightString>>) {
+    pub fn validate_into(&self, data: &T, error: &UseStateHandle<Option<SharedString>>) {
         error.set(self.validate(data));
     }
 }
 
 impl<T: ?Sized> Validator<T> for Validators<T> {
-    fn validate(&self, data: &T) -> Option<LightString> {
+    fn validate(&self, data: &T) -> Option<SharedString> {
         self.validators
             .iter()
             .filter_map(|validator| validator.validate(data))
@@ -68,11 +68,11 @@ impl<T: ?Sized> Validator<T> for Validators<T> {
 }
 
 pub struct RequiredValidator {
-    message: LightString,
+    message: SharedString,
 }
 
 impl RequiredValidator {
-    pub fn new(message: impl Into<LightString>) -> Self {
+    pub fn new(message: impl Into<SharedString>) -> Self {
         Self {
             message: message.into(),
         }
@@ -80,7 +80,7 @@ impl RequiredValidator {
 }
 
 impl Validator<str> for RequiredValidator {
-    fn validate(&self, data: &str) -> Option<LightString> {
+    fn validate(&self, data: &str) -> Option<SharedString> {
         if data.is_empty() {
             Some(self.message.clone())
         } else {
@@ -90,7 +90,7 @@ impl Validator<str> for RequiredValidator {
 }
 
 impl Validator<String> for RequiredValidator {
-    fn validate(&self, data: &String) -> Option<LightString> {
+    fn validate(&self, data: &String) -> Option<SharedString> {
         if data.is_empty() {
             Some(self.message.clone())
         } else {
@@ -99,8 +99,8 @@ impl Validator<String> for RequiredValidator {
     }
 }
 
-impl Validator<LightString> for RequiredValidator {
-    fn validate(&self, data: &LightString) -> Option<LightString> {
+impl Validator<SharedString> for RequiredValidator {
+    fn validate(&self, data: &SharedString) -> Option<SharedString> {
         if data.is_empty() {
             Some(self.message.clone())
         } else {
@@ -110,7 +110,7 @@ impl Validator<LightString> for RequiredValidator {
 }
 
 impl<T> Validator<Option<T>> for RequiredValidator {
-    fn validate(&self, data: &Option<T>) -> Option<LightString> {
+    fn validate(&self, data: &Option<T>) -> Option<SharedString> {
         if data.is_none() {
             Some(self.message.clone())
         } else {
@@ -120,7 +120,7 @@ impl<T> Validator<Option<T>> for RequiredValidator {
 }
 
 impl<T> Validator<Vec<T>> for RequiredValidator {
-    fn validate(&self, data: &Vec<T>) -> Option<LightString> {
+    fn validate(&self, data: &Vec<T>) -> Option<SharedString> {
         if data.is_empty() {
             Some(self.message.clone())
         } else {
@@ -130,11 +130,11 @@ impl<T> Validator<Vec<T>> for RequiredValidator {
 }
 
 pub struct F64Validator {
-    message: LightString,
+    message: SharedString,
 }
 
 impl F64Validator {
-    pub fn new(message: impl Into<LightString>) -> Self {
+    pub fn new(message: impl Into<SharedString>) -> Self {
         Self {
             message: message.into(),
         }
@@ -145,7 +145,7 @@ impl<T> Validator<T> for F64Validator
 where
     T: AsRef<str>,
 {
-    fn validate(&self, data: &T) -> Option<LightString> {
+    fn validate(&self, data: &T) -> Option<SharedString> {
         if f64::from_str(data.as_ref()).is_err() {
             Some(self.message.clone())
         } else {
@@ -155,12 +155,12 @@ where
 }
 
 pub struct PositiveF64Validator {
-    message: LightString,
+    message: SharedString,
     equal: bool,
 }
 
 impl PositiveF64Validator {
-    pub fn new(message: impl Into<LightString>, equal: bool) -> Self {
+    pub fn new(message: impl Into<SharedString>, equal: bool) -> Self {
         Self {
             message: message.into(),
             equal: equal,
@@ -172,7 +172,7 @@ impl<T> Validator<T> for PositiveF64Validator
 where
     T: AsRef<str>,
 {
-    fn validate(&self, data: &T) -> Option<LightString> {
+    fn validate(&self, data: &T) -> Option<SharedString> {
         match f64::from_str(data.as_ref()) {
             Ok(value) => {
                 if 0.0 <= value {

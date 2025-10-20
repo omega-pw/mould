@@ -4,7 +4,7 @@ use chrono::Utc;
 use tihu::datetime_format;
 use tihu::datetime_format_opt;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use native_common::model::Property;
 use native_common::model::PropertyDefine;
 use native_common::model::PropertyType;
@@ -21,7 +21,7 @@ pub mod properties {
 }
 
 pub mod enums {
-    use tihu::LightString;
+    use tihu::SharedString;
     use std::error::Error;
     use serde::{Serialize, Deserialize};
     use tokio_postgres::types::{ToSql, Type, IsNull, to_sql_checked};
@@ -32,7 +32,7 @@ pub mod enums {
         Success = 2, //成功
         Failure = 3, //失败
     }
-    pub fn try_i16_to_status(val: i16) -> Result<Status, LightString> {
+    pub fn try_i16_to_status(val: i16) -> Result<Status, SharedString> {
         match val {
             1 => Ok(Status::Running),
             2 => Ok(Status::Success),
@@ -69,37 +69,37 @@ impl Property for JobRecordProperty {
     fn property_define(&self) -> PropertyDefine {
         match self {
 			JobRecordProperty::Id(_) => PropertyDefine {
-                key: LightString::from_static(properties::ID),
+                key: SharedString::from_static(properties::ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			JobRecordProperty::OrgId(_) => PropertyDefine {
-                key: LightString::from_static(properties::ORG_ID),
+                key: SharedString::from_static(properties::ORG_ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			JobRecordProperty::JobId(_) => PropertyDefine {
-                key: LightString::from_static(properties::JOB_ID),
+                key: SharedString::from_static(properties::JOB_ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			JobRecordProperty::EnvironmentId(_) => PropertyDefine {
-                key: LightString::from_static(properties::ENVIRONMENT_ID),
+                key: SharedString::from_static(properties::ENVIRONMENT_ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			JobRecordProperty::Status(_) => PropertyDefine {
-                key: LightString::from_static(properties::STATUS),
+                key: SharedString::from_static(properties::STATUS),
                 value_type: PropertyType::Enum,
 				required: true,
             },
 			JobRecordProperty::CreatedTime(_) => PropertyDefine {
-                key: LightString::from_static(properties::CREATED_TIME),
+                key: SharedString::from_static(properties::CREATED_TIME),
                 value_type: PropertyType::DateTime,
 				required: true,
             },
 			JobRecordProperty::LastModifiedTime(_) => PropertyDefine {
-                key: LightString::from_static(properties::LAST_MODIFIED_TIME),
+                key: SharedString::from_static(properties::LAST_MODIFIED_TIME),
                 value_type: PropertyType::DateTime,
 				required: true,
             },

@@ -2,8 +2,8 @@ use serde;
 use serde::{Deserialize, Serialize};
 use tihu::Api;
 use tihu::Id;
-use tihu::LightString;
 use tihu::PrimaryKey;
+use tihu::SharedString;
 
 pub const INSERT_JOB_API: &str = "/api/job/insertJob";
 
@@ -38,7 +38,7 @@ pub struct InsertJobApi;
 impl Api for InsertJobApi {
     type Input = InsertJobReq;
     type Output = InsertJobResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(INSERT_JOB_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(INSERT_JOB_API);
     }
 }

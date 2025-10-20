@@ -28,8 +28,8 @@ use chrono::Utc;
 use sdk::job::start_job::StartJobReq;
 use sdk::job::start_job::StartJobResp;
 use tihu::Id;
-use tihu::LightString;
 use tihu::PrimaryKey;
+use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
@@ -62,7 +62,7 @@ pub async fn start_job(
     };
     let job_opt = job_base_service.query_job_one(&params).await?;
     let job =
-        job_opt.ok_or_else(|| ErrNo::CommonError(LightString::from_static("该任务不存在")))?;
+        job_opt.ok_or_else(|| ErrNo::CommonError(SharedString::from_static("该任务不存在")))?;
     let environment_opt = environment_base_service
         .query_environment_one(&EnvironmentOpt {
             org_id: Some(org_id),
@@ -71,7 +71,7 @@ pub async fn start_job(
         })
         .await?;
     let environment = environment_opt
-        .ok_or_else(|| ErrNo::CommonError(LightString::from_static("目标环境不存在")))?;
+        .ok_or_else(|| ErrNo::CommonError(SharedString::from_static("目标环境不存在")))?;
 
     //查询job的所有步骤
     let mut job_step_list = job_step_base_service

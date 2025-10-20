@@ -1,6 +1,6 @@
 use crate::sdk;
 use crate::utils::request::ApiExt;
-use crate::LightString;
+use crate::SharedString;
 use sdk::auth::get_curr_user::GetCurrUserResp;
 use sdk::auth::login_by_oauth2_code::LoginByOauth2CodeApi;
 use sdk::auth::login_by_oauth2_code::LoginByOauth2CodeReq;
@@ -30,7 +30,7 @@ pub fn Oauth2Authorize(props: &Props) -> Html {
 async fn login_by_code(
     provider: String,
     ondone: &Callback<GetCurrUserResp>,
-) -> Result<(), LightString> {
+) -> Result<(), SharedString> {
     let window = web_sys::window().unwrap();
     let mut query = window.location().search().unwrap();
     if !query.is_empty() {
@@ -42,17 +42,17 @@ async fn login_by_code(
     }
     let code = map
         .remove("code")
-        .ok_or_else(|| LightString::from("No parameter \"code\" found!"))?;
+        .ok_or_else(|| SharedString::from("No parameter \"code\" found!"))?;
     let local_storage = window.local_storage().unwrap().unwrap();
     let state = map
         .remove("state")
-        .ok_or_else(|| LightString::from("No parameter \"state\" found!"))?;
+        .ok_or_else(|| SharedString::from("No parameter \"state\" found!"))?;
     let csrf_token = local_storage
         .get(&format!("csrf_token_{}", provider))
         .unwrap();
-    let csrf_token = csrf_token.ok_or_else(|| LightString::from("No csrf_token found!"))?;
+    let csrf_token = csrf_token.ok_or_else(|| SharedString::from("No csrf_token found!"))?;
     if csrf_token != state {
-        return Err(LightString::from(
+        return Err(SharedString::from(
             "Parameter \"state\" not match, illegal access!",
         ));
     }

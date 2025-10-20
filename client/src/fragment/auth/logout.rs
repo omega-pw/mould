@@ -1,6 +1,6 @@
 use crate::sdk;
 use crate::utils::request::ApiExt;
-use crate::LightString;
+use crate::SharedString;
 use sdk::auth::logout::LogoutApi;
 use sdk::auth::logout::LogoutReq;
 use yew::prelude::*;
@@ -16,7 +16,7 @@ pub fn Logout() -> Html {
     html! {}
 }
 
-async fn logout() -> Result<(), LightString> {
+async fn logout() -> Result<(), SharedString> {
     let params = LogoutReq { redirect_uri: None };
     let resp = LogoutApi.call(&params).await?;
     let redirect_uri = resp.redirect_uri.as_deref().unwrap_or("/login");

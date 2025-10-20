@@ -25,7 +25,7 @@ use yew::prelude::*;
 
 static mut ID_GEN: Option<IdGen> = None;
 
-pub type LightString = yew::virtual_dom::AttrValue;
+pub type SharedString = yew::virtual_dom::AttrValue;
 
 #[derive(Debug, Clone, PartialEq, Default, Properties)]
 pub struct Context {
@@ -116,7 +116,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 fn init_request() {
     let error_handler = Arc::new(
-        |message: LightString| -> Pin<Box<dyn Future<Output = ()>>> {
+        |message: SharedString| -> Pin<Box<dyn Future<Output = ()>>> {
             components::popup_message::error(message);
             Box::pin(async {})
         },
@@ -124,8 +124,8 @@ fn init_request() {
     unsafe {
         utils::request::DEFAULT_HTTP_REQUESTOR =
             Some(Arc::new(
-                |(url, req): (LightString, LightString)| -> Pin<
-                    Box<dyn Future<Output = Result<LightString, LightString>>>,
+                |(url, req): (SharedString, SharedString)| -> Pin<
+                    Box<dyn Future<Output = Result<SharedString, SharedString>>>,
                 > { Box::pin(utils::default_http_requestor((url, req))) },
             ));
         utils::request::DEFAULT_LOADING_HANDLER = Some(Arc::new(
@@ -139,10 +139,10 @@ fn init_request() {
             },
         ));
         utils::request::DEFAULT_DATA_UNWRAPPER = Some(Arc::new(
-            |value: serde_json::Value| -> Pin<Box<dyn Future<Output = Result<serde_json::Value, LightString>>>> {
-                let result = serde_json::from_value::<Response<serde_json::Value>>(value).map_err(|err| -> LightString {
+            |value: serde_json::Value| -> Pin<Box<dyn Future<Output = Result<serde_json::Value, SharedString>>>> {
+                let result = serde_json::from_value::<Response<serde_json::Value>>(value).map_err(|err| -> SharedString {
                     log::error!("响应数据格式不正确：{}", err);
-                    return LightString::from("响应数据格式不正确");
+                    return SharedString::from("响应数据格式不正确");
                 });
                 Box::pin(async {
                     match result {
@@ -155,9 +155,9 @@ fn init_request() {
                                     .alert_with_message("You are already logged in another place or login timeout, please log in again.")
                                     .unwrap();
                                 window.location().assign("/login").unwrap();
-                                Err(LightString::from(resp.message.to_string()))
+                                Err(SharedString::from(resp.message.to_string()))
                             } else {
-                                Err(LightString::from(resp.message.to_string()))
+                                Err(SharedString::from(resp.message.to_string()))
                             }
                         },
                         Err(message) => {

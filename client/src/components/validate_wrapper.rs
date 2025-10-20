@@ -1,7 +1,7 @@
 use crate::utils::binding::Binding;
 use crate::utils::validator::Validator;
 use crate::utils::validator::Validators;
-use crate::LightString;
+use crate::SharedString;
 use std::ops::Deref;
 use std::sync::Arc;
 use yew::prelude::*;
@@ -38,7 +38,7 @@ impl<T: Clone> ValidateData<T> {
     }
     pub fn from_state(
         data_state: UseStateHandle<T>,
-        error_state: Option<UseStateHandle<Option<LightString>>>,
+        error_state: Option<UseStateHandle<Option<SharedString>>>,
         validators: Option<Validators<T>>,
     ) -> Self {
         Self {
@@ -72,7 +72,7 @@ impl<T: Clone> ValidateData<T> {
     pub fn clear_error(&self) {
         self.error.set(None);
     }
-    pub fn validate(&self, update_view: bool) -> Result<(), LightString>
+    pub fn validate(&self, update_view: bool) -> Result<(), SharedString>
     where
         T: Clone,
     {

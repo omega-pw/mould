@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use tihu::Api;
-use tihu::LightString;
+use tihu::SharedString;
 
 pub const GET_RSA_PUB_KEY_API: &str = "/api/auth/getRsaPubKey";
 
@@ -13,7 +13,7 @@ pub struct GetRsaPubKeyApi;
 impl Api for GetRsaPubKeyApi {
     type Input = GetRsaPubKeyReq;
     type Output = GetRsaPubKeyResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(GET_RSA_PUB_KEY_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(GET_RSA_PUB_KEY_API);
     }
 }

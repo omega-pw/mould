@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tihu::Api;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 
 pub const CONTINUE_JOB_API: &str = "/api/job/continueJob";
 
@@ -17,7 +17,7 @@ pub struct ContinueJobApi;
 impl Api for ContinueJobApi {
     type Input = ContinueJobReq;
     type Output = ContinueJobResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(CONTINUE_JOB_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(CONTINUE_JOB_API);
     }
 }

@@ -5,7 +5,7 @@ use crate::components::ArcRenderer;
 use crate::sdk;
 use crate::utils;
 use crate::utils::request::ApiExt;
-use crate::LightString;
+use crate::SharedString;
 use sdk::environment_schema::read_environment_schema::EnvironmentSchema;
 use sdk::environment_schema::read_environment_schema::ReadEnvironmentSchemaApi;
 use sdk::environment_schema::read_environment_schema::ReadEnvironmentSchemaReq;
@@ -87,7 +87,7 @@ pub fn EnvironmentSchemaDetail(props: &Props) -> Html {
 async fn read_environment_schema_detail(
     detail: &UseStateHandle<Option<EnvironmentSchema>>,
     id: Id,
-) -> Result<(), LightString> {
+) -> Result<(), SharedString> {
     let params = ReadEnvironmentSchemaReq { id: id };
     let environment_schema = ReadEnvironmentSchemaApi.call(&params).await?;
     detail.set(Some(environment_schema));

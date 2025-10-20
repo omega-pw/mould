@@ -1,4 +1,4 @@
-use crate::LightString;
+use crate::SharedString;
 
 pub enum PropertyType {
     Enum,
@@ -13,7 +13,7 @@ pub enum PropertyType {
 }
 
 pub struct PropertyDefine {
-    pub key: LightString,
+    pub key: SharedString,
     pub value_type: PropertyType,
     pub required: bool,
 }

@@ -13,7 +13,7 @@ use sdk::environment::read_environment::EnvironmentResource;
 use sdk::environment::read_environment::EnvironmentSchemaResource;
 use sdk::environment::read_environment::ReadEnvironmentReq;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
@@ -40,7 +40,7 @@ pub async fn read_environment(
         .query_environment_one(&params)
         .await?;
     let environment = environment_opt.ok_or_else(|| -> ErrNo {
-        ErrNo::CommonError(LightString::from_static("该环境不存在！"))
+        ErrNo::CommonError(SharedString::from_static("该环境不存在！"))
     })?;
     //查询环境需要哪些资源
     let environment_schema_resource_list = environment_schema_resource_base_service

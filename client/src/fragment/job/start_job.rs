@@ -4,7 +4,7 @@ use crate::components::r#if::If;
 use crate::components::selection::BindingSelection;
 use crate::sdk;
 use crate::utils::request::ApiExt;
-use crate::LightString;
+use crate::SharedString;
 use sdk::environment::query_environment::Environment;
 use sdk::environment::query_environment::QueryEnvironmentApi;
 use sdk::environment::query_environment::QueryEnvironmentReq;
@@ -107,7 +107,10 @@ pub fn StartJob(props: &Props) -> Html {
     }
 }
 
-async fn read_job_detail(detail: &UseStateHandle<Option<Job>>, id: Id) -> Result<Job, LightString> {
+async fn read_job_detail(
+    detail: &UseStateHandle<Option<Job>>,
+    id: Id,
+) -> Result<Job, SharedString> {
     let params = ReadJobReq { id: id };
     let job = ReadJobApi.call(&params).await?;
     detail.set(Some(job.clone()));
@@ -117,7 +120,7 @@ async fn read_job_detail(detail: &UseStateHandle<Option<Job>>, id: Id) -> Result
 async fn query_environment_list(
     environment_schema_id: Id,
     environment_list: &UseStateHandle<Vec<Environment>>,
-) -> Result<Vec<Environment>, LightString> {
+) -> Result<Vec<Environment>, SharedString> {
     let pagination_list = QueryEnvironmentApi
         .call(&QueryEnvironmentReq {
             environment_schema_id: Some(environment_schema_id),
@@ -129,7 +132,7 @@ async fn query_environment_list(
     return Ok(pagination_list.list);
 }
 
-async fn start_job(job_id: Id, environment_id: Id) -> Result<PrimaryKey, LightString> {
+async fn start_job(job_id: Id, environment_id: Id) -> Result<PrimaryKey, SharedString> {
     let job_record = StartJobApi
         .call(&StartJobReq {
             job_id: job_id,

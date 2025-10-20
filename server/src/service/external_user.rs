@@ -8,7 +8,7 @@ use lazy_static;
 use native_common::utils::add_conditions;
 use native_common::utils::calc_sql_pagination;
 use native_common::utils::Condition;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::extract_data_error;
 use tihu_native::errno::prepare_statement_error;
 use tihu_native::errno::query_error;
@@ -74,7 +74,7 @@ fn opt_to_conditions<'a>(
     if let Some(id) = opt.id.as_ref() {
         pairs.push((
             Condition {
-                field: LightString::from_static(properties::ID),
+                field: SharedString::from_static(properties::ID),
                 operator: None,
             },
             id,
@@ -83,7 +83,7 @@ fn opt_to_conditions<'a>(
     if let Some(provider_type) = opt.provider_type.as_ref() {
         pairs.push((
             Condition {
-                field: LightString::from_static(properties::PROVIDER_TYPE),
+                field: SharedString::from_static(properties::PROVIDER_TYPE),
                 operator: None,
             },
             provider_type,
@@ -92,7 +92,7 @@ fn opt_to_conditions<'a>(
     if let Some(provider) = opt.provider.as_ref() {
         pairs.push((
             Condition {
-                field: LightString::from_static(properties::PROVIDER),
+                field: SharedString::from_static(properties::PROVIDER),
                 operator: None,
             },
             provider,
@@ -101,7 +101,7 @@ fn opt_to_conditions<'a>(
     if let Some(openid) = opt.openid.as_ref() {
         pairs.push((
             Condition {
-                field: LightString::from_static(properties::OPENID),
+                field: SharedString::from_static(properties::OPENID),
                 operator: None,
             },
             openid,
@@ -110,7 +110,7 @@ fn opt_to_conditions<'a>(
     if let Some(detail) = opt.detail.as_ref() {
         pairs.push((
             Condition {
-                field: LightString::from_static(properties::DETAIL),
+                field: SharedString::from_static(properties::DETAIL),
                 operator: None,
             },
             detail,
@@ -119,7 +119,7 @@ fn opt_to_conditions<'a>(
     if let Some(created_time) = opt.created_time.as_ref() {
         pairs.push((
             Condition {
-                field: LightString::from_static(properties::CREATED_TIME),
+                field: SharedString::from_static(properties::CREATED_TIME),
                 operator: None,
             },
             created_time,
@@ -128,7 +128,7 @@ fn opt_to_conditions<'a>(
     if let Some(last_modified_time) = opt.last_modified_time.as_ref() {
         pairs.push((
             Condition {
-                field: LightString::from_static(properties::LAST_MODIFIED_TIME),
+                field: SharedString::from_static(properties::LAST_MODIFIED_TIME),
                 operator: None,
             },
             last_modified_time,

@@ -2,7 +2,7 @@ use super::super::user::enums::ProviderType;
 use serde::{Deserialize, Serialize};
 use tihu::Api;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 
 pub const GET_CURR_USER_API: &str = "/api/auth/getCurrUser";
 
@@ -38,7 +38,7 @@ pub struct GetCurrUserApi;
 impl Api for GetCurrUserApi {
     type Input = GetCurrUserReq;
     type Output = GetCurrUserResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(GET_CURR_USER_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(GET_CURR_USER_API);
     }
 }

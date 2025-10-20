@@ -9,7 +9,7 @@ use crate::components::ResourceMetadata;
 use crate::sdk;
 use crate::utils;
 use crate::utils::request::ApiExt;
-use crate::LightString;
+use crate::SharedString;
 use js_sys::JSON;
 use sdk::environment_schema::read_environment_schema::EnvironmentSchema;
 use sdk::environment_schema::read_environment_schema::ReadEnvironmentSchemaApi;
@@ -259,7 +259,7 @@ async fn read_job_detail(
     detail: &UseStateHandle<Option<Job>>,
     environment_schema_detail: &UseStateHandle<Option<EnvironmentSchema>>,
     id: Id,
-) -> Result<(), LightString> {
+) -> Result<(), SharedString> {
     let params = ReadJobReq { id: id };
     let mut job = ReadJobApi.call(&params).await?;
     job.job_step_list.sort_by_key(|job_step| match job_step {
@@ -273,7 +273,7 @@ async fn read_job_detail(
 
 async fn query_extension_list(
     extension_list: &UseStateHandle<Vec<Extension>>,
-) -> Result<Vec<Extension>, LightString> {
+) -> Result<Vec<Extension>, SharedString> {
     let result = QueryExtensionApi.call(&QueryExtensionReq {}).await?;
     extension_list.set(result.clone());
     return Ok(result);
@@ -282,7 +282,7 @@ async fn query_extension_list(
 async fn read_environment_schema_detail(
     detail: &UseStateHandle<Option<EnvironmentSchema>>,
     environment_schema_id: Id,
-) -> Result<EnvironmentSchema, LightString> {
+) -> Result<EnvironmentSchema, SharedString> {
     let params = ReadEnvironmentSchemaReq {
         id: environment_schema_id,
     };

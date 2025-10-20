@@ -3,7 +3,7 @@ use serde;
 use serde::{Deserialize, Serialize};
 use tihu::pagination::PaginationList;
 use tihu::Api;
-use tihu::LightString;
+use tihu::SharedString;
 
 pub const QUERY_ENVIRONMENT_SCHEMA_API: &str = "/api/environmentSchema/queryEnvironmentSchema";
 
@@ -30,7 +30,7 @@ pub struct QueryEnvironmentSchemaApi;
 impl Api for QueryEnvironmentSchemaApi {
     type Input = QueryEnvironmentSchemaReq;
     type Output = QueryEnvironmentSchemaResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(QUERY_ENVIRONMENT_SCHEMA_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(QUERY_ENVIRONMENT_SCHEMA_API);
     }
 }

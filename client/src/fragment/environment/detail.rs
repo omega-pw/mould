@@ -5,7 +5,7 @@ use crate::components::show::Show;
 use crate::sdk;
 use crate::utils;
 use crate::utils::request::ApiExt;
-use crate::LightString;
+use crate::SharedString;
 use sdk::environment::read_environment::Environment;
 use sdk::environment::read_environment::ReadEnvironmentApi;
 use sdk::environment::read_environment::ReadEnvironmentReq;
@@ -166,7 +166,7 @@ pub fn EnvironmentDetail(props: &Props) -> Html {
 
 async fn query_extension_list(
     extension_list: &UseStateHandle<Vec<Extension>>,
-) -> Result<Vec<Extension>, LightString> {
+) -> Result<Vec<Extension>, SharedString> {
     let result = QueryExtensionApi.call(&QueryExtensionReq {}).await?;
     extension_list.set(result.clone());
     return Ok(result);
@@ -175,7 +175,7 @@ async fn query_extension_list(
 async fn read_environment_detail(
     detail: &UseStateHandle<Option<Environment>>,
     id: Id,
-) -> Result<Environment, LightString> {
+) -> Result<Environment, SharedString> {
     let params = ReadEnvironmentReq { id: id };
     let environment = ReadEnvironmentApi.call(&params).await?;
     detail.set(Some(environment.clone()));
@@ -185,7 +185,7 @@ async fn read_environment_detail(
 async fn read_environment_schema_detail(
     detail: &UseStateHandle<Option<EnvironmentSchema>>,
     environment_schema_id: Id,
-) -> Result<EnvironmentSchema, LightString> {
+) -> Result<EnvironmentSchema, SharedString> {
     let params = ReadEnvironmentSchemaReq {
         id: environment_schema_id,
     };

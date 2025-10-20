@@ -8,7 +8,7 @@ use crate::sdk;
 use crate::utils;
 use crate::utils::request::ApiExt;
 use crate::utils::LoadStatus;
-use crate::LightString;
+use crate::SharedString;
 use sdk::environment_schema::delete_environment_schema::DeleteEnvironmentSchemaApi;
 use sdk::environment_schema::delete_environment_schema::DeleteEnvironmentSchemaReq;
 use sdk::environment_schema::query_environment_schema::QueryEnvironmentSchemaApi;
@@ -201,7 +201,7 @@ fn row_view(
         let list_load_status = list_load_status.clone();
         let pagination = pagination.clone();
         wasm_bindgen_futures::spawn_local(async move {
-            let ok = utils::confirm(LightString::from("确定删除该环境规格？"), None).await;
+            let ok = utils::confirm(SharedString::from("确定删除该环境规格？"), None).await;
             if ok {
                 let list = list.clone();
                 let list_load_status = list_load_status.clone();
@@ -300,11 +300,11 @@ async fn delete_environment_schema(
     list: &UseStateHandle<Vec<EnvironmentSchema>>,
     list_load_status: &UseStateHandle<LoadStatus>,
     pagination: &UseStateHandle<Pagination>,
-) -> Result<(), LightString> {
+) -> Result<(), SharedString> {
     let params = DeleteEnvironmentSchemaReq { id: id };
     DeleteEnvironmentSchemaApi.call(&params).await?;
     remove_environment_schema(id, list);
-    utils::success(LightString::from("删除成功"));
+    utils::success(SharedString::from("删除成功"));
     let list = list.clone();
     let list_load_status = list_load_status.clone();
     let pagination = pagination.clone();

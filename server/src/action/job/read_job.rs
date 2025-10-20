@@ -10,7 +10,7 @@ use sdk::job::read_job::Job;
 use sdk::job::read_job::JobStep;
 use sdk::job::read_job::ReadJobReq;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
@@ -29,7 +29,7 @@ pub async fn read_job(org_id: Id, _user: User, read_job_req: ReadJobReq) -> Resu
     };
     let job_opt = job_base_service.query_job_one(&params).await?;
     let job = job_opt.ok_or_else(|| -> ErrNo {
-        ErrNo::CommonError(LightString::from_static("该任务不存在！"))
+        ErrNo::CommonError(SharedString::from_static("该任务不存在！"))
     })?;
     let mut job_step_list = job_step_base_service
         .query_job_step_batch(&JobStepOpt {
@@ -46,7 +46,7 @@ pub async fn read_job(org_id: Id, _user: User, read_job_req: ReadJobReq) -> Resu
                 id: job_step.id.into(),
                 name: job_step.name,
                 schema_resource_id: job_step.schema_resource_id.ok_or_else(|| {
-                    ErrNo::CommonError(LightString::from(
+                    ErrNo::CommonError(SharedString::from(
                         "自动步骤的\"schema_resource_id\"字段缺失!",
                     ))
                 })?,

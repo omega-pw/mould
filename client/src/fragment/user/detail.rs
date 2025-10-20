@@ -3,7 +3,7 @@ use crate::sdk;
 use crate::utils;
 use crate::utils::format_time_local;
 use crate::utils::request::ApiExt;
-use crate::LightString;
+use crate::SharedString;
 use sdk::user::read_user::ReadUserApi;
 use sdk::user::read_user::ReadUserReq;
 use sdk::user::read_user::User;
@@ -39,7 +39,7 @@ pub fn UserDetail(props: &Props) -> Html {
                     <td class="align-right" style="width:8em;vertical-align: top;">{"头像："}</td>
                     <td>{detail.as_ref().map(|user|{user.avatar_url.as_ref().map(|avatar_url|{
                         html!{
-                            <Image src={LightString::from(avatar_url.clone())} style="max-height: 3em;"/>
+                            <Image src={SharedString::from(avatar_url.clone())} style="max-height: 3em;"/>
                         }
                     }).unwrap_or_else(utils::empty_html)}).unwrap_or_else(utils::empty_html)}</td>
                 </tr>
@@ -105,7 +105,7 @@ pub fn UserDetail(props: &Props) -> Html {
 async fn read_user_detail(
     detail: &UseStateHandle<Option<User>>,
     id: Id,
-) -> Result<(), LightString> {
+) -> Result<(), SharedString> {
     let params = ReadUserReq { id: id };
     let user = ReadUserApi.call(&params).await?;
     detail.set(user);

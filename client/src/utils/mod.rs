@@ -11,7 +11,7 @@ use crate::components::Resource;
 use crate::components::ResourceMetadata;
 use crate::js;
 use crate::sdk;
-use crate::LightString;
+use crate::SharedString;
 use base64::engine::Engine;
 use base64::prelude::BASE64_STANDARD;
 use chrono::DateTime;
@@ -72,7 +72,7 @@ pub fn format_time_local(date_time: &DateTime<Utc>) -> NaiveDateTime {
     return date_time.with_timezone(&Local).naive_local();
 }
 
-pub async fn init_time_diff() -> Result<(), LightString> {
+pub async fn init_time_diff() -> Result<(), SharedString> {
     let client_time = Utc::now().timestamp_millis();
     let params = GetSystemInfoReq {};
     let system_info = GetSystemInfoApi.call(&params).await?;
@@ -125,12 +125,12 @@ pub struct KeyPair {
     pub private: String,
 }
 
-fn get_or_init_client_key_pair() -> Result<(RsaPubKey2048, RsaPriKey2048), LightString> {
+fn get_or_init_client_key_pair() -> Result<(RsaPubKey2048, RsaPriKey2048), SharedString> {
     let local_storage = web_sys::window().unwrap().local_storage().unwrap().unwrap();
     let client_key_pair = local_storage.get_item("clientKeyPair").unwrap();
     if let Some(client_key_pair) = client_key_pair {
         let key_pair =
-            serde_json::from_str::<KeyPair>(&client_key_pair).map_err(|err| -> LightString {
+            serde_json::from_str::<KeyPair>(&client_key_pair).map_err(|err| -> SharedString {
                 log::error!("密钥对格式不正确: {}", err);
                 return "生成密钥对失败".into();
             })?;
@@ -139,7 +139,7 @@ fn get_or_init_client_key_pair() -> Result<(RsaPubKey2048, RsaPriKey2048), Light
         if is_valid_rsa_key_pair(&pub_key, &pri_key) {
             return Ok((pub_key, pri_key));
         } else {
-            return Err(LightString::from("公私钥密钥对不匹配!"));
+            return Err(SharedString::from("公私钥密钥对不匹配!"));
         }
     } else {
         let (pub_key, pri_key) = js::gen_rsa_key_pair();
@@ -153,37 +153,37 @@ fn get_or_init_client_key_pair() -> Result<(RsaPubKey2048, RsaPriKey2048), Light
     }
 }
 
-async fn ajax_inner(request: &Request) -> Result<LightString, LightString> {
-    let window = web_sys::window().ok_or_else(|| -> LightString {
+async fn ajax_inner(request: &Request) -> Result<SharedString, SharedString> {
+    let window = web_sys::window().ok_or_else(|| -> SharedString {
         log::error!("获取窗口对象失败");
-        return LightString::Static("获取窗口对象失败");
+        return SharedString::Static("获取窗口对象失败");
     })?;
     let resp_value = JsFuture::from(window.fetch_with_request(request))
         .await
-        .map_err(|err| -> LightString {
+        .map_err(|err| -> SharedString {
             log::error!("请求接口错误: {:?}", err);
-            return LightString::Static("请求接口错误");
+            return SharedString::Static("请求接口错误");
         })?;
     let response: Response = resp_value.dyn_into().unwrap();
     if !response.ok() {
         log::error!("响应状态码错误：{}", response.status());
-        return Err(LightString::Static("响应状态码错误"));
+        return Err(SharedString::Static("响应状态码错误"));
     } else {
-        let text = response.text().map_err(|err| -> LightString {
+        let text = response.text().map_err(|err| -> SharedString {
             log::error!("响应数据编码格式不正确: {:?}", err);
-            return LightString::Static("响应数据编码格式不正确");
+            return SharedString::Static("响应数据编码格式不正确");
         })?;
-        let body = JsFuture::from(text).await.map_err(|err| -> LightString {
+        let body = JsFuture::from(text).await.map_err(|err| -> SharedString {
             log::error!("响应数据编码格式不正确: {:?}", err);
-            return LightString::Static("响应数据编码格式不正确");
+            return SharedString::Static("响应数据编码格式不正确");
         })?;
         return Ok(body.as_string().unwrap().into());
     }
 }
 
 pub async fn default_http_requestor(
-    (url, req): (LightString, LightString),
-) -> Result<LightString, LightString> {
+    (url, req): (SharedString, SharedString),
+) -> Result<SharedString, SharedString> {
     let request = build_request(&url, &req).await;
     return ajax_inner(&request).await;
 }
@@ -217,7 +217,7 @@ pub async fn wait(millis: u32) {
     timeout.take();
 }
 
-pub async fn alert(content: LightString, title: Option<LightString>) {
+pub async fn alert(content: SharedString, title: Option<SharedString>) {
     let mut promise_fn = move |resolve: Function, _reject: Function| {
         components::alert::alert(
             content.clone(),
@@ -231,7 +231,7 @@ pub async fn alert(content: LightString, title: Option<LightString>) {
     JsFuture::from(promise).await.unwrap();
 }
 
-pub async fn confirm(content: LightString, title: Option<LightString>) -> bool {
+pub async fn confirm(content: SharedString, title: Option<SharedString>) -> bool {
     let mut promise_fn = move |resolve: Function, _reject: Function| {
         components::confirm::confirm(content.clone(), title.clone(), move |confirm| {
             resolve
@@ -280,10 +280,10 @@ pub async fn upload_file(
     file: web_sys::File,
     sha512_promise: Promise,
     on_upload_progress: Option<Box<dyn FnMut(f64, f64)>>,
-) -> Result<UploadResp, LightString> {
+) -> Result<UploadResp, SharedString> {
     let sha512 = JsFuture::from(sha512_promise)
         .await
-        .map_err(|err| -> LightString {
+        .map_err(|err| -> SharedString {
             log::error!("计算sha512错误: {:?}", err);
             return "计算sha512错误".into();
         })?;
@@ -296,7 +296,7 @@ pub async fn upload_file(
     let body_hash = sha512.to_vec();
     let api = UPLOAD_API;
     let client_id = calc_client_id(api.as_bytes(), &body_hash);
-    let form = FormData::new().map_err(|_err| LightString::from("Failed to create FormData."))?;
+    let form = FormData::new().map_err(|_err| SharedString::from("Failed to create FormData."))?;
     form.append_with_str("size", &file.size().to_string())
         .expect("Failed to add field \"size\".");
     form.append_with_blob("file", file.as_ref())
@@ -315,10 +315,10 @@ pub async fn upload_file(
         }),
     )
     .await
-    .map_err(|err| LightString::from(err.to_string()))?;
+    .map_err(|err| SharedString::from(err.to_string()))?;
     if 0 == resp.code {
         let data = resp.data.ok_or_else(|| {
-            return LightString::from("没有返回数据！");
+            return SharedString::from("没有返回数据！");
         })?;
         return Ok(UploadResp {
             key: format!("blob/{}", data.key),
@@ -329,16 +329,19 @@ pub async fn upload_file(
 }
 
 pub fn add_upload_tasks(
-    tasks: &mut Vec<(HashingFile, Callback<Result<ResourceMetadata, LightString>>)>,
+    tasks: &mut Vec<(
+        HashingFile,
+        Callback<Result<ResourceMetadata, SharedString>>,
+    )>,
     handle: &UseStateHandle<Vec<(Key, Resource, Option<Id>)>>,
 ) -> Result<
-    Vec<oneshot::Receiver<(Key, Result<ResourceMetadata, LightString>, Option<Id>)>>,
-    LightString,
+    Vec<oneshot::Receiver<(Key, Result<ResourceMetadata, SharedString>, Option<Id>)>>,
+    SharedString,
 > {
     let mut receivers = Vec::with_capacity(handle.len());
     for (key, resource, id) in handle.iter() {
         let (sender, receiver) =
-            oneshot::channel::<(Key, Result<ResourceMetadata, LightString>, Option<Id>)>();
+            oneshot::channel::<(Key, Result<ResourceMetadata, SharedString>, Option<Id>)>();
         match resource {
             Resource::Local(hashing_file) => {
                 let key = key.clone();
@@ -346,7 +349,7 @@ pub fn add_upload_tasks(
                 let id = id.clone();
                 tasks.push((
                     hashing_file.clone(),
-                    Callback::from(move |result: Result<ResourceMetadata, LightString>| {
+                    Callback::from(move |result: Result<ResourceMetadata, SharedString>| {
                         if let Err(err) = result.as_ref() {
                             log::error!("上传资源文件失败: {:?}", err);
                         }
@@ -368,21 +371,24 @@ pub fn add_upload_tasks(
 }
 
 pub fn add_upload_task(
-    tasks: &mut Vec<(HashingFile, Callback<Result<ResourceMetadata, LightString>>)>,
+    tasks: &mut Vec<(
+        HashingFile,
+        Callback<Result<ResourceMetadata, SharedString>>,
+    )>,
     handle: UseStateHandle<Option<Resource>>,
-) -> Result<oneshot::Receiver<Result<ResourceMetadata, LightString>>, LightString> {
-    let (sender, receiver) = oneshot::channel::<Result<ResourceMetadata, LightString>>();
+) -> Result<oneshot::Receiver<Result<ResourceMetadata, SharedString>>, SharedString> {
+    let (sender, receiver) = oneshot::channel::<Result<ResourceMetadata, SharedString>>();
     let resource = handle
         .deref()
         .as_ref()
-        .ok_or_else(|| LightString::from("没有选择资源文件"))?;
+        .ok_or_else(|| SharedString::from("没有选择资源文件"))?;
     match resource {
         Resource::Local(hashing_file) => {
             let hashing_file = hashing_file.clone();
             let sender = Mutex::new(Some(sender));
             tasks.push((
                 hashing_file,
-                Callback::from(move |result: Result<ResourceMetadata, LightString>| {
+                Callback::from(move |result: Result<ResourceMetadata, SharedString>| {
                     match result.as_ref() {
                         Ok(metadata) => {
                             handle.set(Some(Resource::Remote(metadata.clone())));

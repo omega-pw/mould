@@ -2,7 +2,7 @@ use super::get_curr_user::GetCurrUserResp;
 use serde;
 use serde::{Deserialize, Serialize};
 use tihu::Api;
-use tihu::LightString;
+use tihu::SharedString;
 
 pub const LOGIN_BY_OPENID_CODE_API: &str = "/api/auth/loginByOpenidCode";
 
@@ -18,7 +18,7 @@ pub struct LoginByOpenidCodeApi;
 impl Api for LoginByOpenidCodeApi {
     type Input = LoginByOpenidCodeReq;
     type Output = LoginByOpenidCodeResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(LOGIN_BY_OPENID_CODE_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(LOGIN_BY_OPENID_CODE_API);
     }
 }

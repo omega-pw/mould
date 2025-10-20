@@ -29,8 +29,8 @@ use tihu::encoder;
 use tihu::version_data;
 use tihu::Handler;
 use tihu::Id;
-use tihu::LightString;
 use tihu::Middleware;
+use tihu::SharedString;
 use tihu_native::http::Body;
 use tihu_native::http::FromRequest;
 use tihu_native::http::RequestData;
@@ -57,7 +57,7 @@ pub struct User {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SessionV1 {
     id: u128,
-    client_id: LightString,
+    client_id: SharedString,
     renew_time: i64, //单位：秒
     user: Option<User>,
 }
@@ -68,7 +68,7 @@ pub enum Session {
 }
 
 impl Session {
-    pub fn new(id: u128, client_id: LightString, renew_time: DateTime<Utc>) -> Session {
+    pub fn new(id: u128, client_id: SharedString, renew_time: DateTime<Utc>) -> Session {
         let renew_time = renew_time.timestamp();
         Session::V1(SessionV1 {
             id: id,
@@ -90,7 +90,7 @@ impl Session {
         }
     }
 
-    pub fn client_id(&self) -> &LightString {
+    pub fn client_id(&self) -> &SharedString {
         match self {
             Session::V1(session) => &session.client_id,
         }
@@ -128,12 +128,12 @@ impl Session {
         }
     }
 
-    pub fn encode(&self, signer: &SessionSigner) -> Result<String, LightString> {
+    pub fn encode(&self, signer: &SessionSigner) -> Result<String, SharedString> {
         match self {
             Session::V1(session) => {
                 let data = serde_json::to_vec(&session).map_err(|err| {
                     log::error!("序列化会话数据失败: {}", err);
-                    return LightString::from_static("序列化会话数据失败!");
+                    return SharedString::from_static("序列化会话数据失败!");
                 })?;
                 let signature = signer.sign(&data);
                 let chunk = encoder::encode_chunks(&[&data, &signature], None);
@@ -142,7 +142,7 @@ impl Session {
         }
     }
 
-    pub fn try_decode(session_data: &str, signer: &SessionSigner) -> Result<Session, LightString> {
+    pub fn try_decode(session_data: &str, signer: &SessionSigner) -> Result<Session, SharedString> {
         let (version, chunk) = version_data::try_decode(session_data)?;
         match version {
             1 => {
@@ -150,15 +150,15 @@ impl Session {
                 if signer.check_signature(&data, &signature) {
                     let session: SessionV1 = serde_json::from_slice(&data).map_err(|err| {
                         log::error!("反序列化会话数据失败: {}", err);
-                        return LightString::from_static("反序列化会话数据失败!");
+                        return SharedString::from_static("反序列化会话数据失败!");
                     })?;
                     return Ok(Session::V1(session));
                 } else {
-                    return Err(LightString::from_static("会话数据签名不正确!"));
+                    return Err(SharedString::from_static("会话数据签名不正确!"));
                 }
             }
             _ => {
-                return Err(LightString::from_static("未知的会话数据版本!"));
+                return Err(SharedString::from_static("未知的会话数据版本!"));
             }
         }
     }
@@ -184,7 +184,7 @@ impl SessionSigner {
 }
 
 impl SessionV1 {
-    pub fn new(id: u128, client_id: LightString, renew_time: DateTime<Utc>) -> SessionV1 {
+    pub fn new(id: u128, client_id: SharedString, renew_time: DateTime<Utc>) -> SessionV1 {
         let renew_time = renew_time.timestamp();
         SessionV1 {
             id: id,
@@ -384,12 +384,12 @@ impl FromRequest for SignatureResult {
         _request_data: &mut RequestData,
     ) -> Result<Self, anyhow::Error> {
         let client_id_data = get_header(request.headers(), "X-Client-Id").ok_or_else(|| {
-            return LightString::from_static("请求没有X-Client-Id请求头！");
+            return SharedString::from_static("请求没有X-Client-Id请求头！");
         })?;
         let request_context = get_header(request.headers(), "X-Context")
             .map(|request_context| request_context.to_string());
         let body_hash = get_header(request.headers(), "X-Hash").ok_or_else(|| {
-            return LightString::from_static("请求没有X-Hash请求头！");
+            return SharedString::from_static("请求没有X-Hash请求头！");
         })?;
         let body_hash = decrypt_by_base64(body_hash)?;
         let client_id = try_decode_client_id(
@@ -407,7 +407,7 @@ impl FromRequest for SignatureResult {
 }
 
 //设置cookie
-pub fn set_cookie(resp: &mut Response<Body>, key: &str, value: &str) -> Result<(), LightString> {
+pub fn set_cookie(resp: &mut Response<Body>, key: &str, value: &str) -> Result<(), SharedString> {
     let cookie = format_cookie(
         key,
         value,
@@ -419,7 +419,7 @@ pub fn set_cookie(resp: &mut Response<Body>, key: &str, value: &str) -> Result<(
     );
     let header_value = HeaderValue::from_str(&cookie).map_err(|err| {
         log::error!("生成响应头的值不符合规范: {:?}", err);
-        return LightString::from_static("生成响应头的值不符合规范");
+        return SharedString::from_static("生成响应头的值不符合规范");
     })?;
     resp.headers_mut().append("Set-Cookie", header_value);
     return Ok(());
@@ -448,7 +448,7 @@ fn try_decode_client_id(
     route: &[u8],
     context: &Option<String>,
     body_hash: &[u8],
-) -> Result<ClientId, LightString> {
+) -> Result<ClientId, SharedString> {
     return ClientId::try_decode(
         client_id_data,
         |rsa_pub_key: &str, client_id_data: &[u8], signature: &[u8]| {
@@ -469,7 +469,7 @@ fn try_decode_client_id(
             )
             .map_err(|err| {
                 log::error!("客户端身份数据签名不正确: {:?}", err);
-                return LightString::from_static("客户端身份数据签名不正确！");
+                return SharedString::from_static("客户端身份数据签名不正确！");
             })?;
             return Ok(true);
         },

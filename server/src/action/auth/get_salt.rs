@@ -11,7 +11,7 @@ use sdk::auth::calc_salt;
 use sdk::auth::get_salt::GetSaltReq;
 use sdk::auth::get_salt::GetSaltResp;
 use sdk::auth::RandomValue;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
@@ -34,7 +34,7 @@ pub async fn get_salt(_guest: Guest, get_salt_req: GetSaltReq) -> Result<GetSalt
         let user_random_value =
             decrypt_by_base64(&system_user.user_random_value).map_err(|err| {
                 log::error!("解码用户随机数失败: {:?}", err);
-                return ErrNo::CommonError(LightString::from_static("解码用户随机数失败！"));
+                return ErrNo::CommonError(SharedString::from_static("解码用户随机数失败！"));
             })?;
         if 32 == user_random_value.len() {
             let mut data = [0u8; 32];
@@ -45,7 +45,7 @@ pub async fn get_salt(_guest: Guest, get_salt_req: GetSaltReq) -> Result<GetSalt
             })?;
             return encrypt_by_base64(&salt).map_err(ErrNo::CommonError);
         } else {
-            return Err(ErrNo::CommonError(LightString::from_static(
+            return Err(ErrNo::CommonError(SharedString::from_static(
                 "客户端随机数位数不正确！",
             )));
         }

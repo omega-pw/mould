@@ -3,7 +3,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use tihu::datetime_format;
 use tihu::Api;
-use tihu::LightString;
+use tihu::SharedString;
 
 pub const GET_SYSTEM_INFO_API: &str = "/api/system/getSystemInfo";
 
@@ -21,7 +21,7 @@ pub struct GetSystemInfoApi;
 impl Api for GetSystemInfoApi {
     type Input = GetSystemInfoReq;
     type Output = GetSystemInfoResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(GET_SYSTEM_INFO_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(GET_SYSTEM_INFO_API);
     }
 }

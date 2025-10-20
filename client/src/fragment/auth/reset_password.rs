@@ -6,7 +6,7 @@ use crate::route::Route;
 use crate::sdk;
 use crate::utils;
 use crate::utils::request::ApiExt;
-use crate::LightString;
+use crate::SharedString;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use js::RsaPubKey2048;
@@ -23,16 +23,16 @@ use sdk::auth::reset_password::ResetPasswordResp;
 use sdk::auth::send_email_captcha::Scene;
 use sdk::auth::send_email_captcha::SendEmailCaptchaApi;
 use sdk::auth::send_email_captcha::SendEmailCaptchaReq;
-use tihu::validator::ValidateEmail;
+use validator::ValidateEmail;
 use yew::prelude::*;
 use yew_router::components::Link;
 
 #[derive(Clone)]
 struct ResetPasswordForm {
-    account: UseStateHandle<LightString>,
-    password: UseStateHandle<LightString>,
-    confirm_password: UseStateHandle<LightString>,
-    captcha: UseStateHandle<LightString>,
+    account: UseStateHandle<SharedString>,
+    password: UseStateHandle<SharedString>,
+    confirm_password: UseStateHandle<SharedString>,
+    captcha: UseStateHandle<SharedString>,
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -46,9 +46,9 @@ pub fn ResetPassword(_props: &Props) -> Html {
         confirm_password: use_state(|| "".into()),
         captcha: use_state(|| "".into()),
     };
-    let rsa_pub_key: UseStateHandle<Option<LightString>> = use_state(|| None);
+    let rsa_pub_key: UseStateHandle<Option<SharedString>> = use_state(|| None);
     let is_resetting: UseStateHandle<bool> = use_state(|| false);
-    let err_msg: UseStateHandle<Option<LightString>> = use_state(|| None);
+    let err_msg: UseStateHandle<Option<SharedString>> = use_state(|| None);
     let rsa_pub_key_clone = rsa_pub_key.clone();
     use_effect_with((), move |_| {
         wasm_bindgen_futures::spawn_local(async move {
@@ -133,16 +133,16 @@ pub fn ResetPassword(_props: &Props) -> Html {
 }
 
 async fn get_rsa_pub_key(
-    rsa_pub_key: &UseStateHandle<Option<LightString>>,
-) -> Result<(), LightString> {
+    rsa_pub_key: &UseStateHandle<Option<SharedString>>,
+) -> Result<(), SharedString> {
     let params = GetRsaPubKeyReq {};
     let pub_key = GetRsaPubKeyApi.call(&params).await?;
     rsa_pub_key.set(Some(pub_key.into()));
     return Ok(());
 }
 
-fn chk_form_err(form: &ResetPasswordForm) -> Vec<LightString> {
-    let mut err_msgs: Vec<LightString> = Vec::new();
+fn chk_form_err(form: &ResetPasswordForm) -> Vec<SharedString> {
+    let mut err_msgs: Vec<SharedString> = Vec::new();
     if form.account.is_empty() {
         err_msgs.push("请输入邮箱".into());
     }
@@ -161,21 +161,21 @@ fn chk_form_err(form: &ResetPasswordForm) -> Vec<LightString> {
     return err_msgs;
 }
 
-async fn start_send_captcha(account: String) -> Result<(), LightString> {
+async fn start_send_captcha(account: String) -> Result<(), SharedString> {
     let params = SendEmailCaptchaReq {
         scene: Scene::ResetPassword,
         email: account,
     };
     SendEmailCaptchaApi.call(&params).await?;
-    utils::success(LightString::from("发送成功"));
+    utils::success(SharedString::from("发送成功"));
     return Ok(());
 }
 
 async fn start_reset(
-    rsa_pub_key: &UseStateHandle<Option<LightString>>,
+    rsa_pub_key: &UseStateHandle<Option<SharedString>>,
     is_resetting: &UseStateHandle<bool>,
     form: &ResetPasswordForm,
-    err_msg: &UseStateHandle<Option<LightString>>,
+    err_msg: &UseStateHandle<Option<SharedString>>,
 ) {
     let mut err_msgs = chk_form_err(form);
     if !err_msgs.is_empty() {
@@ -198,7 +198,7 @@ async fn start_reset(
             }
             Ok(_) => {
                 clear_form(form);
-                utils::success(LightString::from("重置成功"));
+                utils::success(SharedString::from("重置成功"));
             }
         }
     } else {
@@ -216,7 +216,7 @@ fn clear_form(form: &ResetPasswordForm) {
 async fn reset(
     server_rsa_pub_key: &str,
     form: &ResetPasswordForm,
-) -> Result<ResetPasswordResp, LightString> {
+) -> Result<ResetPasswordResp, SharedString> {
     let salt = GetSaltApi
         .call(&GetSaltReq {
             account: form.account.to_string(),
@@ -224,7 +224,7 @@ async fn reset(
         .await?;
     let salt = BASE64_STANDARD
         .decode(&salt)
-        .map_err(|err| -> LightString {
+        .map_err(|err| -> SharedString {
             log::error!("解码盐值失败: {:?}", err);
             return "解码盐值失败！".into();
         })?;
@@ -233,13 +233,13 @@ async fn reset(
     let server_rsa_pub_key = RsaPubKey2048::try_from_string(server_rsa_pub_key);
     let cipher_account = server_rsa_pub_key
         .encrypt(&[form.account.as_bytes(), nonce.as_bytes()].concat())
-        .ok_or_else(|| LightString::from("加密账户失败！"))?;
+        .ok_or_else(|| SharedString::from("加密账户失败！"))?;
     let cipher_account = BASE64_STANDARD.encode(&cipher_account);
     let (auth_key, _encryption_key) = sdk::auth::calc_derived_key(form.password.as_bytes(), &salt);
     let auth_key = BASE64_STANDARD.encode(&auth_key);
     let cipher_auth_key = server_rsa_pub_key
         .encrypt(&[auth_key.as_bytes(), nonce.as_bytes()].concat())
-        .ok_or_else(|| LightString::from("加密授权秘钥失败！"))?;
+        .ok_or_else(|| SharedString::from("加密授权秘钥失败！"))?;
     let cipher_auth_key = BASE64_STANDARD.encode(&cipher_auth_key.to_vec());
     let params = ResetPasswordReq {
         nonce: nonce.to_string(),

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use tihu::Api;
-use tihu::LightString;
+use tihu::SharedString;
 use validator::Validate;
 
 pub const RESET_PASSWORD_API: &str = "/api/auth/resetPassword";
@@ -19,7 +19,7 @@ pub struct ResetPasswordApi;
 impl Api for ResetPasswordApi {
     type Input = ResetPasswordReq;
     type Output = ResetPasswordResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(RESET_PASSWORD_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(RESET_PASSWORD_API);
     }
 }

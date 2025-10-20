@@ -4,7 +4,7 @@ use chrono::Utc;
 use tihu::datetime_format;
 use tihu::datetime_format_opt;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use native_common::model::Property;
 use native_common::model::PropertyDefine;
 use native_common::model::PropertyType;
@@ -21,7 +21,7 @@ pub mod properties {
 }
 
 pub mod enums {
-    use tihu::LightString;
+    use tihu::SharedString;
     use std::error::Error;
     use serde::{Serialize, Deserialize};
     use tokio_postgres::types::{ToSql, Type, IsNull, to_sql_checked};
@@ -46,37 +46,37 @@ impl Property for JobProperty {
     fn property_define(&self) -> PropertyDefine {
         match self {
 			JobProperty::Id(_) => PropertyDefine {
-                key: LightString::from_static(properties::ID),
+                key: SharedString::from_static(properties::ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			JobProperty::OrgId(_) => PropertyDefine {
-                key: LightString::from_static(properties::ORG_ID),
+                key: SharedString::from_static(properties::ORG_ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			JobProperty::EnvironmentSchemaId(_) => PropertyDefine {
-                key: LightString::from_static(properties::ENVIRONMENT_SCHEMA_ID),
+                key: SharedString::from_static(properties::ENVIRONMENT_SCHEMA_ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			JobProperty::Name(_) => PropertyDefine {
-                key: LightString::from_static(properties::NAME),
+                key: SharedString::from_static(properties::NAME),
                 value_type: PropertyType::String,
 				required: true,
             },
 			JobProperty::Remark(_) => PropertyDefine {
-                key: LightString::from_static(properties::REMARK),
+                key: SharedString::from_static(properties::REMARK),
                 value_type: PropertyType::String,
 				required: false,
             },
 			JobProperty::CreatedTime(_) => PropertyDefine {
-                key: LightString::from_static(properties::CREATED_TIME),
+                key: SharedString::from_static(properties::CREATED_TIME),
                 value_type: PropertyType::DateTime,
 				required: true,
             },
 			JobProperty::LastModifiedTime(_) => PropertyDefine {
-                key: LightString::from_static(properties::LAST_MODIFIED_TIME),
+                key: SharedString::from_static(properties::LAST_MODIFIED_TIME),
                 value_type: PropertyType::DateTime,
 				required: true,
             },

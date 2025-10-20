@@ -20,7 +20,7 @@ use std::net::IpAddr;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
 use tihu::base62;
-use tihu::LightString;
+use tihu::SharedString;
 use tokio::fs;
 
 #[derive(Debug)]
@@ -38,11 +38,11 @@ pub struct DataSource {
 impl DataSource {
     pub async fn try_from_origin(
         origin_data_source: OriginDataSource,
-    ) -> Result<Self, LightString> {
+    ) -> Result<Self, SharedString> {
         let root_cert: Option<Bytes> = if let Some(root_cert) = origin_data_source.root_cert {
             let root_cert = fs::read(root_cert).await.map_err(|err| {
                 log::error!("Read root cert of data source failed: {}", err);
-                return LightString::from_static("Read root cert of data source failed");
+                return SharedString::from_static("Read root cert of data source failed");
             })?;
             Some(root_cert.into())
         } else {
@@ -65,7 +65,7 @@ impl DataSource {
 pub struct Config {
     pub host: IpAddr,
     pub port: u16,
-    pub log_cfg_path: Option<LightString>,
+    pub log_cfg_path: Option<SharedString>,
     pub extension_dir: String,
     pub job_log_dir: String,
     // pub worker_id: u16,
@@ -73,7 +73,7 @@ pub struct Config {
     // pub session_timeout: u8,
     pub rsa_pub_key: RsaPublicKey,
     pub rsa_pri_key: RsaPrivateKey,
-    pub rsa_pub_key_content: LightString,
+    pub rsa_pub_key_content: SharedString,
     pub server_random_value: [u8; 32],
     pub cache_server: CacheServer,
     pub data_source: DataSource,
@@ -86,7 +86,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub async fn try_load_from_file(file_path: &str) -> Result<Self, LightString> {
+    pub async fn try_load_from_file(file_path: &str) -> Result<Self, SharedString> {
         let config = origin::Config::try_load_from_file(file_path)?;
         let mut job_log_dir = config.job_log_dir;
         if job_log_dir.ends_with(&['/', '\\']) {
@@ -98,26 +98,26 @@ impl Config {
         let data_source = DataSource::try_from_origin(config.data_source).await?;
         let rsa_pub_key_content = read_to_string(&config.rsa_pub_key).map_err(|err| {
             log::error!("read server public key failed: {}", err);
-            return LightString::from_static("read server public key failed");
+            return SharedString::from_static("read server public key failed");
         })?;
         let rsa_pub_key = new_rsa_pub_key(&rsa_pub_key_content)?;
         let rsa_pri_key = read_to_string(&config.rsa_pri_key).map_err(|err| {
             log::error!("read server private key failed: {}", err);
-            return LightString::from_static("read server private key failed");
+            return SharedString::from_static("read server private key failed");
         })?;
         let rsa_pri_key = new_rsa_pri_key(&rsa_pri_key)?;
         let server_random_value = try_decode_bytes(&config.server_random_value, "服务端随机数")?;
         let register_captcha_template = read_to_string(&config.email_template.register_captcha)
             .map_err(|err| {
                 log::error!("读取注册邮件模板文件失败: {}", err);
-                return LightString::from_static(
+                return SharedString::from_static(
                     "Failed to read the registration email template file",
                 );
             })?;
         let reset_password_captcha_template =
             read_to_string(&config.email_template.reset_password_captcha).map_err(|err| {
                 log::error!("读取重置密码邮件模板文件失败: {}", err);
-                return LightString::from_static("Failed to read the reset email template file");
+                return SharedString::from_static("Failed to read the reset email template file");
             })?;
         let email_template = EmailTemplate {
             register_captcha: register_captcha_template,
@@ -148,14 +148,14 @@ impl Config {
     }
 }
 
-fn try_decode_bytes<const N: usize>(value: &str, name: &str) -> Result<[u8; N], LightString> {
+fn try_decode_bytes<const N: usize>(value: &str, name: &str) -> Result<[u8; N], SharedString> {
     let bytes = base62::decode(value).map_err(|err| {
         log::error!("{}不是base62编码: {:?}", name, err);
-        LightString::from(format!("{}不是base62编码", name))
+        SharedString::from(format!("{}不是base62编码", name))
     })?;
     if N != bytes.len() {
         log::error!("{}位数不正确!", name);
-        return Err(LightString::from(format!("{}位数不正确!", name)));
+        return Err(SharedString::from(format!("{}位数不正确!", name)));
     }
     let mut data = [0u8; N];
     data.copy_from_slice(&bytes);

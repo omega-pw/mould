@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::net::IpAddr;
-use tihu::LightString;
+use tihu::SharedString;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CacheServer {
@@ -33,6 +33,7 @@ pub struct DataSource {
 pub struct EmailAccount {
     pub mail_host: String,
     pub mail_port: u16,
+    pub starttls: bool,
     pub username: String,
     pub password: String,
     pub name: String,
@@ -91,14 +92,14 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn try_load_from_file(file_path: &str) -> Result<Self, LightString> {
+    pub fn try_load_from_file(file_path: &str) -> Result<Self, SharedString> {
         let content = read_to_string(&file_path).map_err(|err| {
             log::error!("read file to string error: {}", err);
-            return LightString::from_static("read file to string error");
+            return SharedString::from_static("read file to string error");
         })?;
         let config: Config = json5::from_str(&content).map_err(|err| {
             log::error!("Invalid configuration file, {:?}", err);
-            return LightString::from(format!("Invalid configuration file, {:?}", err));
+            return SharedString::from(format!("Invalid configuration file, {:?}", err));
         })?;
         return Ok(config);
     }

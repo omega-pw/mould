@@ -4,7 +4,7 @@ use chrono::Utc;
 use tihu::datetime_format;
 use tihu::datetime_format_opt;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use native_common::model::Property;
 use native_common::model::PropertyDefine;
 use native_common::model::PropertyType;
@@ -38,32 +38,32 @@ impl Property for SystemUserProperty {
     fn property_define(&self) -> PropertyDefine {
         match self {
 			SystemUserProperty::Id(_) => PropertyDefine {
-                key: LightString::from_static(properties::ID),
+                key: SharedString::from_static(properties::ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			SystemUserProperty::Email(_) => PropertyDefine {
-                key: LightString::from_static(properties::EMAIL),
+                key: SharedString::from_static(properties::EMAIL),
                 value_type: PropertyType::String,
 				required: true,
             },
 			SystemUserProperty::UserRandomValue(_) => PropertyDefine {
-                key: LightString::from_static(properties::USER_RANDOM_VALUE),
+                key: SharedString::from_static(properties::USER_RANDOM_VALUE),
                 value_type: PropertyType::String,
 				required: true,
             },
 			SystemUserProperty::HashedAuthKey(_) => PropertyDefine {
-                key: LightString::from_static(properties::HASHED_AUTH_KEY),
+                key: SharedString::from_static(properties::HASHED_AUTH_KEY),
                 value_type: PropertyType::String,
 				required: true,
             },
 			SystemUserProperty::CreatedTime(_) => PropertyDefine {
-                key: LightString::from_static(properties::CREATED_TIME),
+                key: SharedString::from_static(properties::CREATED_TIME),
                 value_type: PropertyType::DateTime,
 				required: true,
             },
 			SystemUserProperty::LastModifiedTime(_) => PropertyDefine {
-                key: LightString::from_static(properties::LAST_MODIFIED_TIME),
+                key: SharedString::from_static(properties::LAST_MODIFIED_TIME),
                 value_type: PropertyType::DateTime,
 				required: true,
             },

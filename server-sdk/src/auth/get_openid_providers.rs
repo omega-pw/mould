@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use tihu::Api;
-use tihu::LightString;
+use tihu::SharedString;
 
 pub const GET_OPENID_PROVIDERS_API: &str = "/api/auth/getOpenidProviders";
 
@@ -19,7 +19,7 @@ pub struct GetOpenidProvidersApi;
 impl Api for GetOpenidProvidersApi {
     type Input = GetOpenidProvidersReq;
     type Output = GetOpenidProvidersResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(GET_OPENID_PROVIDERS_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(GET_OPENID_PROVIDERS_API);
     }
 }

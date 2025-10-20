@@ -29,7 +29,7 @@ use crate::utils::gen_id;
 use crate::utils::request::ApiExt;
 use crate::utils::validator::RequiredValidator;
 use crate::utils::validator::Validators;
-use crate::LightString;
+use crate::SharedString;
 use js_sys::JSON;
 use sdk::environment_schema::query_environment_schema::QueryEnvironmentSchemaApi;
 use sdk::environment_schema::query_environment_schema::QueryEnvironmentSchemaReq;
@@ -112,7 +112,7 @@ pub struct AutoStep {
 pub struct JobStep {
     step_type: Binding<StepType>,
     id: Binding<Option<Id>>,
-    name: ValidateData<LightString>,                //步骤名称
+    name: ValidateData<SharedString>,               //步骤名称
     remark: Binding<JsValue>,                       //备注
     attachments: Binding<Vec<(Key, Resource, ())>>, //附件
     auto_step: AutoStep,
@@ -122,8 +122,8 @@ pub struct JobStep {
 struct EditForm {
     active_job_step_key: UseStateHandle<Option<Key>>,
     environment_schema_id: ValidateData<Option<Id>>,
-    name: ValidateData<LightString>,
-    remark: UseStateHandle<LightString>,
+    name: ValidateData<SharedString>,
+    remark: UseStateHandle<SharedString>,
     job_step_list: UseStateHandle<Vec<(Key, JobStep)>>,
 }
 
@@ -138,7 +138,7 @@ pub struct Props {
 #[derive(Clone)]
 struct JobEditState {
     is_saving: UseStateHandle<bool>,
-    err_msg: UseStateHandle<Option<LightString>>,
+    err_msg: UseStateHandle<Option<SharedString>>,
     environment_schema_list: UseStateHandle<Vec<EnvironmentSchema>>,
     environment_schema_detail: UseStateHandle<Option<EnvironmentSchemaDetail>>,
     extension_list: UseStateHandle<Vec<Extension>>,
@@ -148,7 +148,7 @@ struct JobEditState {
 #[function_component]
 pub fn JobEdit(props: &Props) -> Html {
     let is_saving: UseStateHandle<bool> = use_state(|| false);
-    let err_msg: UseStateHandle<Option<LightString>> = use_state(|| None);
+    let err_msg: UseStateHandle<Option<SharedString>> = use_state(|| None);
     let environment_schema_list: UseStateHandle<Vec<EnvironmentSchema>> = use_state(|| Vec::new());
     let environment_schema_detail: UseStateHandle<Option<EnvironmentSchemaDetail>> =
         use_state(|| None);
@@ -196,7 +196,7 @@ pub fn JobEdit(props: &Props) -> Html {
                             .await
                             .ok();
                         } else {
-                            utils::error(LightString::from("请先添加环境规格"));
+                            utils::error(SharedString::from("请先添加环境规格"));
                         }
                     }
                 }
@@ -287,7 +287,7 @@ pub fn JobEdit(props: &Props) -> Html {
                     <td class="align-right" style="width:8em;vertical-align: top;"><Required/>{"任务名称："}</td>
                     <td>
                         {
-                            edit_form.name.view(move |name: UseStateHandle<LightString>, validator| {
+                            edit_form.name.view(move |name: UseStateHandle<SharedString>, validator| {
                                 html! {
                                     <BindingInput value={name} onupdate={validator}/>
                                 }
@@ -400,7 +400,7 @@ pub fn JobEdit(props: &Props) -> Html {
                                                                                 })} style="flex-grow: 1;flex-shrink: 1;padding: 0.5em 0;">
                                                                                     {
                                                                                         if name.is_empty() {
-                                                                                            LightString::from("(缺少步骤名称)")
+                                                                                            SharedString::from("(缺少步骤名称)")
                                                                                         } else {
                                                                                             name.deref().clone()
                                                                                         }
@@ -482,9 +482,9 @@ impl JobEditState {
     fn job_step_edit_view(
         &self,
         job_step: &JobStep,
-        name: UseStateHandle<LightString>,
-        error: UseStateHandle<Option<LightString>>,
-        name_validators: Validators<LightString>,
+        name: UseStateHandle<SharedString>,
+        error: UseStateHandle<Option<SharedString>>,
+        name_validators: Validators<SharedString>,
     ) -> Html {
         let extension_list = self.extension_list.clone();
         let environment_schema_detail = self.environment_schema_detail.clone();
@@ -678,7 +678,7 @@ impl JobEditState {
     }
 }
 
-fn init_step_name(value: LightString) -> ValidateData<LightString> {
+fn init_step_name(value: SharedString) -> ValidateData<SharedString> {
     ValidateData::new(
         value,
         Some(Validators::new().add(RequiredValidator::new("请输入步骤名称"))),
@@ -701,7 +701,7 @@ fn init_operation_id(value: Option<String>) -> ValidateData<Option<String>> {
 
 async fn query_extension_list(
     extension_list: &UseStateHandle<Vec<Extension>>,
-) -> Result<Vec<Extension>, LightString> {
+) -> Result<Vec<Extension>, SharedString> {
     let result = QueryExtensionApi.call(&QueryExtensionReq {}).await?;
     extension_list.set(result.clone());
     return Ok(result);
@@ -709,7 +709,7 @@ async fn query_extension_list(
 
 async fn query_environment_schema_list(
     list: &UseStateHandle<Vec<EnvironmentSchema>>,
-) -> Result<Vec<EnvironmentSchema>, LightString> {
+) -> Result<Vec<EnvironmentSchema>, SharedString> {
     let pagination_list = QueryEnvironmentSchemaApi
         .call(&QueryEnvironmentSchemaReq {
             page_no: Some(1),
@@ -725,7 +725,7 @@ async fn read_job_detail(
     extension_list: &[Extension],
     environment_schema_detail: &UseStateHandle<Option<EnvironmentSchemaDetail>>,
     id: Id,
-) -> Result<Job, LightString> {
+) -> Result<Job, SharedString> {
     let params = ReadJobReq { id: id };
     let mut job = ReadJobApi.call(&params).await?;
     job.job_step_list.sort_by_key(|job_step| match job_step {
@@ -911,7 +911,7 @@ async fn read_job_detail(
 async fn read_environment_schema_detail(
     detail: &UseStateHandle<Option<EnvironmentSchemaDetail>>,
     environment_schema_id: Id,
-) -> Result<EnvironmentSchemaDetail, LightString> {
+) -> Result<EnvironmentSchemaDetail, SharedString> {
     let params = ReadEnvironmentSchemaReq {
         id: environment_schema_id,
     };
@@ -953,8 +953,8 @@ fn get_extension_id(
         .flatten();
 }
 
-async fn chk_form_err(id: Option<Id>, edit_form: &EditForm) -> Vec<LightString> {
-    let mut err_msgs: Vec<LightString> = Vec::new();
+async fn chk_form_err(id: Option<Id>, edit_form: &EditForm) -> Vec<SharedString> {
+    let mut err_msgs: Vec<SharedString> = Vec::new();
     if id.is_none() {
         if let Err(error) = edit_form.environment_schema_id.validate(true) {
             err_msgs.push(error);
@@ -1003,13 +1003,13 @@ async fn chk_form_err(id: Option<Id>, edit_form: &EditForm) -> Vec<LightString> 
     return err_msgs;
 }
 
-async fn try_upload_files(edit_form: &EditForm) -> Result<(), LightString> {
+async fn try_upload_files(edit_form: &EditForm) -> Result<(), SharedString> {
     let mut files = Vec::new();
     for (_, job_step) in edit_form.job_step_list.deref().iter() {
         let remark = job_step.remark.get();
         upload_resource(&remark).await.map_err(|err| {
             log::error!("上传富文本资源失败: {:?}", err);
-            return LightString::from("上传文件失败");
+            return SharedString::from("上传文件失败");
         })?;
         let step_type = job_step.step_type.get();
         match step_type {
@@ -1021,7 +1021,7 @@ async fn try_upload_files(edit_form: &EditForm) -> Result<(), LightString> {
                         //     let value = value.get();
                         //     upload_resource(&value).await.map_err(|err| {
                         //         log::error!("上传富文本资源失败: {:?}", err);
-                        //         return LightString::from("上传文件失败");
+                        //         return SharedString::from("上传文件失败");
                         //     })?;
                         // }
                         AttributeValue::File(file_value) => {
@@ -1202,9 +1202,9 @@ async fn save_job(
     id: Option<Id>,
     edit_form: &EditForm,
     is_saving: UseStateHandle<bool>,
-    err_msg: &UseStateHandle<Option<LightString>>,
+    err_msg: &UseStateHandle<Option<SharedString>>,
     onsave: &Option<Callback<PrimaryKey>>,
-) -> Result<(), LightString> {
+) -> Result<(), SharedString> {
     let err_msgs = chk_form_err(id, edit_form).await;
     if let Some(first) = err_msgs.first() {
         err_msg.set(Some(first.clone()));
@@ -1266,7 +1266,7 @@ async fn save_job(
                     }
                     None => (),
                 }
-                utils::success(LightString::from("保存成功"));
+                utils::success(SharedString::from("保存成功"));
             }
         }
     } else {
@@ -1312,7 +1312,7 @@ async fn save_job(
                     }
                     None => (),
                 }
-                utils::success(LightString::from("保存成功"));
+                utils::success(SharedString::from("保存成功"));
             }
         }
     }

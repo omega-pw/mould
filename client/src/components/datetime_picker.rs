@@ -1,6 +1,6 @@
 use crate::ArcFn;
 use crate::Lazyable;
-use crate::LightString;
+use crate::SharedString;
 use chrono::Datelike;
 use chrono::Duration;
 use chrono::NaiveDate;
@@ -25,7 +25,7 @@ struct State {
     tm_hours: u32,
     tm_minutes: u32,
     tm_seconds: u32,
-    style: LightString,
+    style: SharedString,
 }
 
 pub enum Msg {
@@ -54,8 +54,8 @@ pub struct Config {
     min_date: Option<Lazyable<NaiveDate>>,
     max_date: Option<Lazyable<NaiveDate>>,
     date_selectable: Option<ArcFn<NaiveDate, bool>>,
-    check_date_time: Option<ArcFn<NaiveDateTime, Result<(), LightString>>>,
-    decorate_date: Option<ArcFn<NaiveDate, Option<LightString>>>,
+    check_date_time: Option<ArcFn<NaiveDateTime, Result<(), SharedString>>>,
+    decorate_date: Option<ArcFn<NaiveDate, Option<SharedString>>>,
 }
 
 impl Config {
@@ -83,8 +83,8 @@ pub struct Props {
     pub value: Option<NaiveDateTime>,
     pub config: Option<Config>,
     pub ondone: Option<Callback<Option<NaiveDateTime>>>,
-    #[prop_or(LightString::Static(""))]
-    pub style: LightString,
+    #[prop_or(SharedString::Static(""))]
+    pub style: SharedString,
 }
 
 pub struct DateTimePicker {
@@ -221,7 +221,7 @@ impl Component for DateTimePicker {
         let on_save = link.callback(|_evt: MouseEvent| Msg::Save);
         let weekdays = self.weekdays();
         let calendar_dates = self.calendar_dates();
-        let selected_date_time_ret: Result<NaiveDateTime, LightString> =
+        let selected_date_time_ret: Result<NaiveDateTime, SharedString> =
             self.check_selected_date_time();
         let prev_year_btn_style = if self.prev_year_selectable() {
             "visibility:visible;"
@@ -414,20 +414,20 @@ impl DateTimePicker {
         return Some(datetime);
     }
 
-    fn check_selected_date_time(&self) -> Result<NaiveDateTime, LightString> {
+    fn check_selected_date_time(&self) -> Result<NaiveDateTime, SharedString> {
         if let Some(date_time) = self.get_selected_date_time() {
             if !self.date_selectable(date_time.date()) {
-                return Err(LightString::Static("选中日期被禁用！"));
+                return Err(SharedString::Static("选中日期被禁用！"));
             } else {
                 self.check_date_time(date_time)?;
                 return Ok(date_time);
             }
         } else {
-            return Err(LightString::Static("时间格式错误！"));
+            return Err(SharedString::Static("时间格式错误！"));
         }
     }
 
-    fn check_date_time(&self, date_time: NaiveDateTime) -> Result<(), LightString> {
+    fn check_date_time(&self, date_time: NaiveDateTime) -> Result<(), SharedString> {
         if let Some(check_date_time) = self.config.check_date_time.as_ref() {
             return (check_date_time.0)(date_time);
         } else {
@@ -606,7 +606,7 @@ impl DateTimePicker {
         }));
     }
 
-    fn decorate_date(&self, date: NaiveDate) -> Option<LightString> {
+    fn decorate_date(&self, date: NaiveDate) -> Option<SharedString> {
         return self
             .config
             .decorate_date

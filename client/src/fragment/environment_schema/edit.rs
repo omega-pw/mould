@@ -13,7 +13,7 @@ use crate::utils::binding::Binding;
 use crate::utils::request::ApiExt;
 use crate::utils::validator::RequiredValidator;
 use crate::utils::validator::Validators;
-use crate::LightString;
+use crate::SharedString;
 use sdk::environment_schema::read_environment_schema::ReadEnvironmentSchemaApi;
 use sdk::environment_schema::read_environment_schema::ReadEnvironmentSchemaReq;
 use sdk::environment_schema::save_environment_schema::SaveEnvironmentSchemaApi;
@@ -27,18 +27,18 @@ use tihu::PrimaryKey;
 use yew::prelude::*;
 use yew::virtual_dom::Key;
 
-type ExtensionSelection = BindingSelection<(LightString, String)>;
+type ExtensionSelection = BindingSelection<(SharedString, String)>;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct SchemaResource {
     id: Option<Id>,
-    name: ValidateData<LightString>,
-    extension_id: ValidateData<Option<LightString>>,
+    name: ValidateData<SharedString>,
+    extension_id: ValidateData<Option<SharedString>>,
 }
 
 #[derive(Clone)]
 struct EditForm {
-    name: ValidateData<LightString>,
+    name: ValidateData<SharedString>,
     resource_list: UseStateHandle<Vec<(Key, Binding<SchemaResource>)>>,
 }
 
@@ -53,7 +53,7 @@ pub struct Props {
 #[function_component]
 pub fn EnvironmentSchemaEdit(props: &Props) -> Html {
     let is_saving: UseStateHandle<bool> = use_state(|| false);
-    let err_msg: UseStateHandle<Option<LightString>> = use_state(|| None);
+    let err_msg: UseStateHandle<Option<SharedString>> = use_state(|| None);
     let extension_list: UseStateHandle<Vec<Extension>> = use_state(|| Default::default());
     let edit_form = EditForm {
         name: ValidateData::new(
@@ -112,7 +112,7 @@ pub fn EnvironmentSchemaEdit(props: &Props) -> Html {
                 html! {
                     item.view(move |item: UseStateHandle<SchemaResource>| {
                         let clear_err_msg = clear_err_msg.clone();
-                        item.name.view(move |name: UseStateHandle<LightString>, validator: Callback<LightString>| {
+                        item.name.view(move |name: UseStateHandle<SharedString>, validator: Callback<SharedString>| {
                             html! {
                                 <BindingInput value={name} placeholder={"规格名称"} onupdate={validator} onfocus={clear_err_msg.clone()}/>
                             }
@@ -133,9 +133,9 @@ pub fn EnvironmentSchemaEdit(props: &Props) -> Html {
                 html! {
                     item.view(move |item: UseStateHandle<SchemaResource>| {
                         let extension_list = extension_list.clone();
-                        item.extension_id.view(move |extension_id: UseStateHandle<Option<LightString>>, validator: Callback<Option<LightString>>| {
+                        item.extension_id.view(move |extension_id: UseStateHandle<Option<SharedString>>, validator: Callback<Option<SharedString>>| {
                             let extension_list: Vec<_> = extension_list.iter().map(|item|(item.id.clone().into(), item.name.clone())).collect();
-                            let onchange = validator.reform(|option: Option<(LightString, String)>| {
+                            let onchange = validator.reform(|option: Option<(SharedString, String)>| {
                                 option.map(|option| option.0)
                             });
                             html! {
@@ -175,7 +175,7 @@ pub fn EnvironmentSchemaEdit(props: &Props) -> Html {
                     <td class="align-right" style="width:8em;vertical-align: top;"><Required/>{"环境规格名称："}</td>
                     <td>
                         {
-                            edit_form.name.view(move |name: UseStateHandle<LightString>, validator: Callback<LightString>| {
+                            edit_form.name.view(move |name: UseStateHandle<SharedString>, validator: Callback<SharedString>| {
                                 html! {
                                     <BindingInput value={name} onupdate={validator}/>
                                 }
@@ -235,27 +235,27 @@ pub fn EnvironmentSchemaEdit(props: &Props) -> Html {
 
 async fn query_extension_list(
     extension_list: &UseStateHandle<Vec<Extension>>,
-) -> Result<(), LightString> {
+) -> Result<(), SharedString> {
     let result = QueryExtensionApi.call(&QueryExtensionReq {}).await?;
     extension_list.set(result);
     return Ok(());
 }
 
-fn init_resource_name(value: LightString) -> ValidateData<LightString> {
+fn init_resource_name(value: SharedString) -> ValidateData<SharedString> {
     ValidateData::new(
         value,
         Some(Validators::new().add(RequiredValidator::new("请输入资源名称"))),
     )
 }
 
-fn init_extension_id(value: Option<LightString>) -> ValidateData<Option<LightString>> {
+fn init_extension_id(value: Option<SharedString>) -> ValidateData<Option<SharedString>> {
     ValidateData::new(
         value,
         Some(Validators::new().add(RequiredValidator::new("请选择扩展"))),
     )
 }
 
-async fn read_environment_schema_detail(edit_form: &EditForm, id: Id) -> Result<(), LightString> {
+async fn read_environment_schema_detail(edit_form: &EditForm, id: Id) -> Result<(), SharedString> {
     let params = ReadEnvironmentSchemaReq { id: id };
     let environment_schema = ReadEnvironmentSchemaApi.call(&params).await?;
     edit_form.name.set(environment_schema.name.into());
@@ -278,8 +278,8 @@ async fn read_environment_schema_detail(edit_form: &EditForm, id: Id) -> Result<
     return Ok(());
 }
 
-fn chk_form_err(edit_form: &EditForm) -> Vec<LightString> {
-    let mut err_msgs: Vec<LightString> = Vec::new();
+fn chk_form_err(edit_form: &EditForm) -> Vec<SharedString> {
+    let mut err_msgs: Vec<SharedString> = Vec::new();
     if let Err(error) = edit_form.name.validate(true) {
         err_msgs.push(error);
     }
@@ -319,9 +319,9 @@ async fn save_environment_schema(
     id: Option<Id>,
     edit_form: &EditForm,
     is_saving: UseStateHandle<bool>,
-    err_msg: &UseStateHandle<Option<LightString>>,
+    err_msg: &UseStateHandle<Option<SharedString>>,
     onsave: &Option<Callback<PrimaryKey>>,
-) -> Result<(), LightString> {
+) -> Result<(), SharedString> {
     let err_msgs = chk_form_err(edit_form);
     if let Some(first) = err_msgs.first() {
         err_msg.set(Some(first.clone()));
@@ -349,7 +349,7 @@ async fn save_environment_schema(
                 }
                 None => (),
             }
-            utils::success(LightString::from("保存成功"));
+            utils::success(SharedString::from("保存成功"));
         }
     }
     return Ok(());

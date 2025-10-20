@@ -22,7 +22,7 @@ use crate::utils::gen_id;
 use crate::utils::request::ApiExt;
 use crate::utils::validator::RequiredValidator;
 use crate::utils::validator::Validators;
-use crate::LightString;
+use crate::SharedString;
 use sdk::environment::insert_environment::InsertEnvironmentApi;
 use sdk::environment::insert_environment::InsertEnvironmentReq;
 use sdk::environment::read_environment::Environment;
@@ -55,9 +55,9 @@ type EnvironmentSchemaSelection = BindingSelection<(Id, String)>;
 #[derive(Clone, PartialEq, Debug)]
 pub struct EnvironmentResource {
     id: Option<Id>,
-    name: ValidateData<LightString>,
+    name: ValidateData<SharedString>,
     extension_configuration: Vec<(Key, Attribute, AttributeValue)>, //扩展配置
-    test_error: Binding<Option<Result<(), LightString>>>,
+    test_error: Binding<Option<Result<(), SharedString>>>,
 }
 
 /**
@@ -76,7 +76,7 @@ struct EditForm {
     active_schema_resource_id: UseStateHandle<Option<Id>>,
     active_resource_key: UseStateHandle<Option<Key>>,
     environment_schema_id: ValidateData<Option<Id>>,
-    name: ValidateData<LightString>,
+    name: ValidateData<SharedString>,
     schema_resource_list: UseStateHandle<Vec<(Key, EnvironmentSchemaResource)>>,
 }
 
@@ -91,7 +91,7 @@ pub struct Props {
 #[derive(Clone)]
 struct EnvironmentEditState {
     is_saving: UseStateHandle<bool>,
-    err_msg: UseStateHandle<Option<LightString>>,
+    err_msg: UseStateHandle<Option<SharedString>>,
     environment_schema_list: UseStateHandle<Vec<EnvironmentSchema>>,
     environment_schema_detail: UseStateHandle<Option<EnvironmentSchemaDetail>>,
     extension_list: UseStateHandle<Vec<Extension>>,
@@ -101,7 +101,7 @@ struct EnvironmentEditState {
 #[function_component]
 pub fn EnvironmentEdit(props: &Props) -> Html {
     let is_saving: UseStateHandle<bool> = use_state(|| false);
-    let err_msg: UseStateHandle<Option<LightString>> = use_state(|| None);
+    let err_msg: UseStateHandle<Option<SharedString>> = use_state(|| None);
     let environment_schema_list: UseStateHandle<Vec<EnvironmentSchema>> = use_state(|| Vec::new());
     let environment_schema_detail: UseStateHandle<Option<EnvironmentSchemaDetail>> =
         use_state(|| None);
@@ -153,7 +153,7 @@ pub fn EnvironmentEdit(props: &Props) -> Html {
                                 environment_schema_id.set(Some(environment_schema.id));
                             }
                         } else {
-                            utils::error(LightString::from("请先添加环境规格"));
+                            utils::error(SharedString::from("请先添加环境规格"));
                         }
                     }
                 }
@@ -216,7 +216,7 @@ pub fn EnvironmentEdit(props: &Props) -> Html {
                     <td class="align-right" style="width:8em;vertical-align: top;"><Required/>{"环境名称："}</td>
                     <td>
                         {
-                            edit_form.name.view(move |name: UseStateHandle<LightString>, validator| {
+                            edit_form.name.view(move |name: UseStateHandle<SharedString>, validator| {
                                 html! {
                                     <BindingInput value={name} onupdate={validator}/>
                                 }
@@ -367,7 +367,7 @@ pub fn EnvironmentEdit(props: &Props) -> Html {
                                                                                                             })} style="flex-grow: 1;flex-shrink: 1;padding: 0.5em 0;">
                                                                                                                 {
                                                                                                                     if name.is_empty() {
-                                                                                                                        LightString::from("(缺少资源名称)")
+                                                                                                                        SharedString::from("(缺少资源名称)")
                                                                                                                     } else {
                                                                                                                         name.deref().clone()
                                                                                                                     }
@@ -441,9 +441,9 @@ impl EnvironmentEditState {
         &self,
         extension_id: String,
         resource: &EnvironmentResource,
-        name: UseStateHandle<LightString>,
-        error: UseStateHandle<Option<LightString>>,
-        name_validators: Validators<LightString>,
+        name: UseStateHandle<SharedString>,
+        error: UseStateHandle<Option<SharedString>>,
+        name_validators: Validators<SharedString>,
     ) -> Html {
         let extension_configuration = resource.extension_configuration.clone();
         html! {
@@ -469,7 +469,7 @@ impl EnvironmentEditState {
                         <td class="align-right" style="vertical-align: top;">{"测试配置"}</td>
                         <td>
                             {
-                                resource.test_error.view(move |test_error: UseStateHandle<Option<Result<(), LightString>>>| {
+                                resource.test_error.view(move |test_error: UseStateHandle<Option<Result<(), SharedString>>>| {
                                     let extension_id = extension_id.clone();
                                     let extension_configuration = extension_configuration.clone();
                                     let on_test = {
@@ -514,7 +514,7 @@ impl EnvironmentEditState {
 
 async fn query_environment_schema_list(
     list: &UseStateHandle<Vec<EnvironmentSchema>>,
-) -> Result<Vec<EnvironmentSchema>, LightString> {
+) -> Result<Vec<EnvironmentSchema>, SharedString> {
     let pagination_list = QueryEnvironmentSchemaApi
         .call(&QueryEnvironmentSchemaReq {
             page_no: Some(1),
@@ -527,7 +527,7 @@ async fn query_environment_schema_list(
 
 async fn query_extension_list(
     extension_list: &UseStateHandle<Vec<Extension>>,
-) -> Result<Vec<Extension>, LightString> {
+) -> Result<Vec<Extension>, SharedString> {
     let result = QueryExtensionApi.call(&QueryExtensionReq {}).await?;
     extension_list.set(result.clone());
     return Ok(result);
@@ -536,7 +536,7 @@ async fn query_extension_list(
 async fn read_environment_schema_detail(
     detail: &UseStateHandle<Option<EnvironmentSchemaDetail>>,
     environment_schema_id: Id,
-) -> Result<EnvironmentSchemaDetail, LightString> {
+) -> Result<EnvironmentSchemaDetail, SharedString> {
     let params = ReadEnvironmentSchemaReq {
         id: environment_schema_id,
     };
@@ -545,7 +545,7 @@ async fn read_environment_schema_detail(
     return Ok(environment_schema);
 }
 
-fn init_resource_name(value: LightString) -> ValidateData<LightString> {
+fn init_resource_name(value: SharedString) -> ValidateData<SharedString> {
     ValidateData::new(
         value,
         Some(Validators::new().add(RequiredValidator::new("请输入资源名称"))),
@@ -556,7 +556,7 @@ async fn handle_environment_schema_change(
     environment_schema_id: Id,
     detail: &UseStateHandle<Option<EnvironmentSchemaDetail>>,
     schema_resource_list: &UseStateHandle<Vec<(Key, EnvironmentSchemaResource)>>,
-) -> Result<(), LightString> {
+) -> Result<(), SharedString> {
     let environment_schema_detail =
         read_environment_schema_detail(detail, environment_schema_id).await?;
     schema_resource_list.set(
@@ -583,7 +583,7 @@ async fn read_environment_detail(
     edit_form: &EditForm,
     extension_list: &[Extension],
     id: Id,
-) -> Result<Environment, LightString> {
+) -> Result<Environment, SharedString> {
     let params = ReadEnvironmentReq { id: id };
     let environment = ReadEnvironmentApi.call(&params).await?;
     edit_form
@@ -637,7 +637,7 @@ async fn read_environment_detail(
 fn test_configuration(
     extension_id: String,
     extension_configuration: Vec<(Key, Attribute, AttributeValue)>,
-    test_error: UseStateHandle<Option<Result<(), LightString>>>,
+    test_error: UseStateHandle<Option<Result<(), SharedString>>>,
 ) {
     wasm_bindgen_futures::spawn_local(async move {
         try_test_configuration(extension_id, &extension_configuration, &test_error)
@@ -649,8 +649,8 @@ fn test_configuration(
 async fn try_test_configuration(
     extension_id: String,
     extension_configuration: &[(Key, Attribute, AttributeValue)],
-    test_error: &UseStateHandle<Option<Result<(), LightString>>>,
-) -> Result<(), LightString> {
+    test_error: &UseStateHandle<Option<Result<(), SharedString>>>,
+) -> Result<(), SharedString> {
     let err_msgs = chk_single_err(extension_configuration).await;
     if let Some(first) = err_msgs.first() {
         return Err(first.clone());
@@ -669,8 +669,8 @@ async fn try_test_configuration(
 
 async fn chk_single_err(
     extension_configuration: &[(Key, Attribute, AttributeValue)],
-) -> Vec<LightString> {
-    let mut err_msgs: Vec<LightString> = Vec::new();
+) -> Vec<SharedString> {
+    let mut err_msgs: Vec<SharedString> = Vec::new();
     for (_, _, value) in extension_configuration.iter() {
         if let Err(error) = value.validate(true) {
             err_msgs.push(error);
@@ -681,7 +681,7 @@ async fn chk_single_err(
 
 async fn upload_single_files(
     extension_configuration: &[(Key, Attribute, AttributeValue)],
-) -> Result<(), LightString> {
+) -> Result<(), SharedString> {
     let mut files = Vec::new();
     for (_, _, attr_value) in extension_configuration {
         match attr_value {
@@ -689,7 +689,7 @@ async fn upload_single_files(
             //     let value = value.get();
             //     upload_resource(&value).await.map_err(|err| {
             //         log::error!("上传富文本资源失败: {:?}", err);
-            //         return LightString::from("上传文件失败");
+            //         return SharedString::from("上传文件失败");
             //     })?;
             // }
             AttributeValue::File(file_value) => {
@@ -757,8 +757,8 @@ async fn upload_single_files(
     return Ok(());
 }
 
-async fn chk_form_err(id: Option<Id>, edit_form: &EditForm) -> Vec<LightString> {
-    let mut err_msgs: Vec<LightString> = Vec::new();
+async fn chk_form_err(id: Option<Id>, edit_form: &EditForm) -> Vec<SharedString> {
+    let mut err_msgs: Vec<SharedString> = Vec::new();
     if id.is_none() {
         if let Err(error) = edit_form.environment_schema_id.validate(true) {
             err_msgs.push(error);
@@ -772,7 +772,7 @@ async fn chk_form_err(id: Option<Id>, edit_form: &EditForm) -> Vec<LightString> 
     for (_key, schema_resource) in edit_form.schema_resource_list.iter() {
         let schema_resource_list = schema_resource.resource_list.get();
         if schema_resource_list.is_empty() {
-            err_msgs.push(LightString::from(format!(
+            err_msgs.push(SharedString::from(format!(
                 "没有添加\"{}\"对应的资源",
                 schema_resource.name
             )));
@@ -814,7 +814,7 @@ async fn chk_form_err(id: Option<Id>, edit_form: &EditForm) -> Vec<LightString> 
     return err_msgs;
 }
 
-async fn try_upload_files(edit_form: &EditForm) -> Result<(), LightString> {
+async fn try_upload_files(edit_form: &EditForm) -> Result<(), SharedString> {
     let mut files = Vec::new();
     for (_key, schema_resource) in edit_form.schema_resource_list.iter() {
         let resource_list = schema_resource.resource_list.get();
@@ -825,7 +825,7 @@ async fn try_upload_files(edit_form: &EditForm) -> Result<(), LightString> {
                     //     let value = value.get();
                     //     upload_resource(&value).await.map_err(|err| {
                     //         log::error!("上传富文本资源失败: {:?}", err);
-                    //         return LightString::from("上传文件失败");
+                    //         return SharedString::from("上传文件失败");
                     //     })?;
                     // }
                     AttributeValue::File(file_value) => {
@@ -926,9 +926,9 @@ async fn save_environment(
     id: Option<Id>,
     edit_form: &EditForm,
     is_saving: UseStateHandle<bool>,
-    err_msg: &UseStateHandle<Option<LightString>>,
+    err_msg: &UseStateHandle<Option<SharedString>>,
     onsave: &Option<Callback<PrimaryKey>>,
-) -> Result<(), LightString> {
+) -> Result<(), SharedString> {
     let err_msgs = chk_form_err(id, edit_form).await;
     if let Some(first) = err_msgs.first() {
         err_msg.set(Some(first.clone()));
@@ -978,7 +978,7 @@ async fn save_environment(
                     }
                     None => (),
                 }
-                utils::success(LightString::from("保存成功"));
+                utils::success(SharedString::from("保存成功"));
             }
         }
     } else {
@@ -1019,7 +1019,7 @@ async fn save_environment(
                     }
                     None => (),
                 }
-                utils::success(LightString::from("保存成功"));
+                utils::success(SharedString::from("保存成功"));
             }
         }
     }

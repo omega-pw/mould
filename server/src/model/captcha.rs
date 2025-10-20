@@ -4,7 +4,7 @@ use chrono::Utc;
 use tihu::datetime_format;
 use tihu::datetime_format_opt;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu::Uint32;
 use tihu::Uint63;
 use native_common::model::Property;
@@ -23,7 +23,7 @@ pub mod properties {
 }
 
 pub mod enums {
-    use tihu::LightString;
+    use tihu::SharedString;
     use std::error::Error;
     use serde::{Serialize, Deserialize};
     use tokio_postgres::types::{ToSql, Type, IsNull, to_sql_checked};
@@ -33,7 +33,7 @@ pub mod enums {
         Email = 1, //邮箱
         Phone = 2, //电话
     }
-    pub fn try_i16_to_receiver_type(val: i16) -> Result<ReceiverType, LightString> {
+    pub fn try_i16_to_receiver_type(val: i16) -> Result<ReceiverType, SharedString> {
         match val {
             1 => Ok(ReceiverType::Email),
             2 => Ok(ReceiverType::Phone),
@@ -54,7 +54,7 @@ pub mod enums {
         Register = 1, //注册
         ResetPassword = 2, //重置密码
     }
-    pub fn try_i16_to_scene(val: i16) -> Result<Scene, LightString> {
+    pub fn try_i16_to_scene(val: i16) -> Result<Scene, SharedString> {
         match val {
             1 => Ok(Scene::Register),
             2 => Ok(Scene::ResetPassword),
@@ -90,37 +90,37 @@ impl Property for CaptchaProperty {
     fn property_define(&self) -> PropertyDefine {
         match self {
 			CaptchaProperty::Id(_) => PropertyDefine {
-                key: LightString::from_static(properties::ID),
+                key: SharedString::from_static(properties::ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			CaptchaProperty::ReceiverType(_) => PropertyDefine {
-                key: LightString::from_static(properties::RECEIVER_TYPE),
+                key: SharedString::from_static(properties::RECEIVER_TYPE),
                 value_type: PropertyType::Enum,
 				required: true,
             },
 			CaptchaProperty::Receiver(_) => PropertyDefine {
-                key: LightString::from_static(properties::RECEIVER),
+                key: SharedString::from_static(properties::RECEIVER),
                 value_type: PropertyType::String,
 				required: true,
             },
 			CaptchaProperty::Scene(_) => PropertyDefine {
-                key: LightString::from_static(properties::SCENE),
+                key: SharedString::from_static(properties::SCENE),
                 value_type: PropertyType::Enum,
 				required: true,
             },
 			CaptchaProperty::Captcha(_) => PropertyDefine {
-                key: LightString::from_static(properties::CAPTCHA),
+                key: SharedString::from_static(properties::CAPTCHA),
                 value_type: PropertyType::String,
 				required: true,
             },
 			CaptchaProperty::CreatedTime(_) => PropertyDefine {
-                key: LightString::from_static(properties::CREATED_TIME),
+                key: SharedString::from_static(properties::CREATED_TIME),
                 value_type: PropertyType::DateTime,
 				required: true,
             },
 			CaptchaProperty::LastModifiedTime(_) => PropertyDefine {
-                key: LightString::from_static(properties::LAST_MODIFIED_TIME),
+                key: SharedString::from_static(properties::LAST_MODIFIED_TIME),
                 value_type: PropertyType::DateTime,
 				required: true,
             },

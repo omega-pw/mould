@@ -17,7 +17,7 @@ use chrono::Utc;
 use sdk::job::continue_job::ContinueJobReq;
 use sdk::job::continue_job::ContinueJobResp;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
@@ -83,7 +83,7 @@ pub async fn continue_job(
                                 break;
                             }
                         } else {
-                            return Err(ErrNo::CommonError(LightString::from_static(
+                            return Err(ErrNo::CommonError(SharedString::from_static(
                                 "不是进行中的步骤",
                             )));
                         }

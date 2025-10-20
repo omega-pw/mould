@@ -4,7 +4,7 @@ use chrono::Utc;
 use tihu::datetime_format;
 use tihu::datetime_format_opt;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use native_common::model::Property;
 use native_common::model::PropertyDefine;
 use native_common::model::PropertyType;
@@ -24,7 +24,7 @@ pub mod properties {
 }
 
 pub mod enums {
-    use tihu::LightString;
+    use tihu::SharedString;
     use std::error::Error;
     use serde::{Serialize, Deserialize};
     use tokio_postgres::types::{ToSql, Type, IsNull, to_sql_checked};
@@ -52,52 +52,52 @@ impl Property for EnvironmentResourceProperty {
     fn property_define(&self) -> PropertyDefine {
         match self {
 			EnvironmentResourceProperty::Id(_) => PropertyDefine {
-                key: LightString::from_static(properties::ID),
+                key: SharedString::from_static(properties::ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			EnvironmentResourceProperty::OrgId(_) => PropertyDefine {
-                key: LightString::from_static(properties::ORG_ID),
+                key: SharedString::from_static(properties::ORG_ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			EnvironmentResourceProperty::EnvironmentId(_) => PropertyDefine {
-                key: LightString::from_static(properties::ENVIRONMENT_ID),
+                key: SharedString::from_static(properties::ENVIRONMENT_ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			EnvironmentResourceProperty::SchemaResourceId(_) => PropertyDefine {
-                key: LightString::from_static(properties::SCHEMA_RESOURCE_ID),
+                key: SharedString::from_static(properties::SCHEMA_RESOURCE_ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			EnvironmentResourceProperty::Name(_) => PropertyDefine {
-                key: LightString::from_static(properties::NAME),
+                key: SharedString::from_static(properties::NAME),
                 value_type: PropertyType::String,
 				required: true,
             },
 			EnvironmentResourceProperty::ExtensionId(_) => PropertyDefine {
-                key: LightString::from_static(properties::EXTENSION_ID),
+                key: SharedString::from_static(properties::EXTENSION_ID),
                 value_type: PropertyType::String,
 				required: true,
             },
 			EnvironmentResourceProperty::ExtensionName(_) => PropertyDefine {
-                key: LightString::from_static(properties::EXTENSION_NAME),
+                key: SharedString::from_static(properties::EXTENSION_NAME),
                 value_type: PropertyType::String,
 				required: true,
             },
 			EnvironmentResourceProperty::ExtensionConfiguration(_) => PropertyDefine {
-                key: LightString::from_static(properties::EXTENSION_CONFIGURATION),
+                key: SharedString::from_static(properties::EXTENSION_CONFIGURATION),
                 value_type: PropertyType::String,
 				required: true,
             },
 			EnvironmentResourceProperty::CreatedTime(_) => PropertyDefine {
-                key: LightString::from_static(properties::CREATED_TIME),
+                key: SharedString::from_static(properties::CREATED_TIME),
                 value_type: PropertyType::DateTime,
 				required: true,
             },
 			EnvironmentResourceProperty::LastModifiedTime(_) => PropertyDefine {
-                key: LightString::from_static(properties::LAST_MODIFIED_TIME),
+                key: SharedString::from_static(properties::LAST_MODIFIED_TIME),
                 value_type: PropertyType::DateTime,
 				required: true,
             },

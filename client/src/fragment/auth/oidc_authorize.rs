@@ -1,6 +1,6 @@
 use crate::sdk;
 use crate::utils::request::ApiExt;
-use crate::LightString;
+use crate::SharedString;
 use sdk::auth::get_curr_user::GetCurrUserResp;
 use sdk::auth::login_by_openid_code::LoginByOpenidCodeApi;
 use sdk::auth::login_by_openid_code::LoginByOpenidCodeReq;
@@ -30,7 +30,7 @@ pub fn OidcAuthorize(props: &Props) -> Html {
 async fn login_by_code(
     provider: String,
     ondone: &Callback<GetCurrUserResp>,
-) -> Result<(), LightString> {
+) -> Result<(), SharedString> {
     let window = web_sys::window().unwrap();
     let mut query = window.location().search().unwrap();
     if !query.is_empty() {
@@ -42,7 +42,7 @@ async fn login_by_code(
     }
     let code = map
         .remove("code")
-        .ok_or_else(|| LightString::from("No parameter \"code\" found!"))?;
+        .ok_or_else(|| SharedString::from("No parameter \"code\" found!"))?;
     let params = LoginByOpenidCodeReq {
         provider: provider,
         code: code,

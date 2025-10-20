@@ -1,5 +1,5 @@
 use super::SelectOption;
-use crate::LightString;
+use crate::SharedString;
 use js_sys::Function;
 use std::ops::Deref;
 use wasm_bindgen::prelude::*;
@@ -10,8 +10,8 @@ use yew::{html, Component, Context, Html};
 struct State<O: SelectOption> {
     value: Option<O::Value>,
     options: Vec<O>,
-    placeholder: LightString,
-    search_placeholder: LightString,
+    placeholder: SharedString,
+    search_placeholder: SharedString,
     searchable: bool,
     panel_active: bool,
     is_clear: bool,
@@ -35,15 +35,15 @@ where
     pub options: Vec<O>,
     #[prop_or_default]
     pub clearable: bool,
-    #[prop_or_else(||LightString::from("请选择"))]
-    pub placeholder: LightString,
+    #[prop_or_else(||SharedString::from("请选择"))]
+    pub placeholder: SharedString,
     #[prop_or_default]
     pub searchable: bool,
-    #[prop_or_else(||LightString::from("搜索"))]
-    pub search_placeholder: LightString,
+    #[prop_or_else(||SharedString::from("搜索"))]
+    pub search_placeholder: SharedString,
     pub onchange: Callback<Option<O>>,
     #[prop_or_default]
-    pub onsearch: Option<Callback<Option<LightString>>>,
+    pub onsearch: Option<Callback<Option<SharedString>>>,
 }
 
 pub struct MockSelect<O: SelectOption>
@@ -109,7 +109,7 @@ where
                     onsearch.emit(if word.is_empty() {
                         None
                     } else {
-                        Some(LightString::from(word.to_string()))
+                        Some(SharedString::from(word.to_string()))
                     });
                 }
             }
@@ -251,16 +251,16 @@ where
     pub options: Vec<O>,
     #[prop_or_default]
     pub clearable: bool,
-    #[prop_or_else(||LightString::from("请选择"))]
-    pub placeholder: LightString,
+    #[prop_or_else(||SharedString::from("请选择"))]
+    pub placeholder: SharedString,
     #[prop_or_default]
     pub searchable: bool,
-    #[prop_or_else(||LightString::from("搜索"))]
-    pub search_placeholder: LightString,
+    #[prop_or_else(||SharedString::from("搜索"))]
+    pub search_placeholder: SharedString,
     #[prop_or_default]
     pub onchange: Option<Callback<Option<O>>>,
     #[prop_or_default]
-    pub onsearch: Option<Callback<Option<LightString>>>,
+    pub onsearch: Option<Callback<Option<SharedString>>>,
 }
 
 #[function_component]

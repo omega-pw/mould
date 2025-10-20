@@ -23,7 +23,7 @@ use sdk::job_record::read_job_record::ReadJobRecordReq;
 use sdk::job_record::read_job_record::ReadJobRecordResp;
 use sdk::job_record::read_job_record::StepRecord;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
@@ -94,7 +94,7 @@ pub async fn read_job_record(
         .query_job_record_one(&params)
         .await?;
     let job_record = job_record_opt
-        .ok_or_else(|| ErrNo::CommonError(LightString::from_static("该任务执行记录不存在")))?;
+        .ok_or_else(|| ErrNo::CommonError(SharedString::from_static("该任务执行记录不存在")))?;
 
     //查询任务生成的执行记录
     let job_step_record_list = job_step_record_base_service

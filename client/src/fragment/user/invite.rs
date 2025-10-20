@@ -6,7 +6,7 @@ use crate::utils;
 use crate::utils::request::ApiExt;
 use crate::utils::validator::RequiredValidator;
 use crate::utils::validator::Validators;
-use crate::LightString;
+use crate::SharedString;
 use sdk::user::invite_user::InviteUserApi;
 use sdk::user::invite_user::InviteUserReq;
 use tihu::PrimaryKey;
@@ -15,7 +15,7 @@ use yew::prelude::*;
 
 #[derive(Clone)]
 struct InviteForm {
-    user_id: ValidateData<LightString>,
+    user_id: ValidateData<SharedString>,
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -27,7 +27,7 @@ pub struct Props {
 #[function_component]
 pub fn InviteEdit(props: &Props) -> Html {
     let is_saving: UseStateHandle<bool> = use_state(|| false);
-    let err_msg: UseStateHandle<Option<LightString>> = use_state(|| None);
+    let err_msg: UseStateHandle<Option<SharedString>> = use_state(|| None);
     let invite_form = InviteForm {
         user_id: ValidateData::new(
             Default::default(),
@@ -56,7 +56,7 @@ pub fn InviteEdit(props: &Props) -> Html {
                     <td class="align-right" style="width:8em;vertical-align: top;"><span style="color:red;margin-right: 0.25em;">{"*"}</span>{"用户id："}</td>
                     <td>
                         {
-                            invite_form.user_id.view(move |user_id: UseStateHandle<LightString>, validator| {
+                            invite_form.user_id.view(move |user_id: UseStateHandle<SharedString>, validator| {
                                 html! {
                                     <BindingInput value={user_id} onupdate={validator}/>
                                 }
@@ -85,13 +85,13 @@ pub fn InviteEdit(props: &Props) -> Html {
     }
 }
 
-fn chk_form_err(invite_form: &InviteForm) -> Vec<LightString> {
-    let mut err_msgs: Vec<LightString> = Vec::new();
+fn chk_form_err(invite_form: &InviteForm) -> Vec<SharedString> {
+    let mut err_msgs: Vec<SharedString> = Vec::new();
     if let Err(error) = invite_form.user_id.validate(true) {
         err_msgs.push(error);
     }
     if let Err(_err) = Uuid::parse_str(invite_form.user_id.get().as_ref()) {
-        err_msgs.push(LightString::from("请填写正确的用户id"));
+        err_msgs.push(SharedString::from("请填写正确的用户id"));
     }
     return err_msgs;
 }
@@ -99,9 +99,9 @@ fn chk_form_err(invite_form: &InviteForm) -> Vec<LightString> {
 async fn save_user(
     invite_form: &InviteForm,
     is_saving: UseStateHandle<bool>,
-    err_msg: &UseStateHandle<Option<LightString>>,
+    err_msg: &UseStateHandle<Option<SharedString>>,
     onsave: &Option<Callback<PrimaryKey>>,
-) -> Result<(), LightString> {
+) -> Result<(), SharedString> {
     let err_msgs = chk_form_err(invite_form);
     if let Some(first) = err_msgs.first() {
         err_msg.set(Some(first.clone()));
@@ -119,7 +119,7 @@ async fn save_user(
             if let Some(onsave) = onsave {
                 onsave.emit(PrimaryKey { id: user_id });
             }
-            utils::success(LightString::from("保存成功"));
+            utils::success(SharedString::from("保存成功"));
         }
     }
     return Ok(());

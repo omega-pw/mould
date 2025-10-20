@@ -20,7 +20,7 @@ use crate::utils::binding::Binding;
 use crate::utils::gen_id;
 use crate::utils::validator::RequiredValidator;
 use crate::utils::validator::Validators;
-use crate::LightString;
+use crate::SharedString;
 // use js_sys::JSON;
 use sdk::extension::Attribute;
 use sdk::extension::AttributeType;
@@ -33,26 +33,26 @@ use web_sys::DocumentFragment;
 use yew::prelude::*;
 use yew::virtual_dom::Key;
 
-type EnumRadioGroup = BindingRadioGroup<(LightString, String)>;
-type EnumCheckboxGroup = BindingCheckboxGroup<(LightString, String)>;
+type EnumRadioGroup = BindingRadioGroup<(SharedString, String)>;
+type EnumCheckboxGroup = BindingCheckboxGroup<(SharedString, String)>;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum AttributeValue {
-    String(ValidateData<LightString>),
-    StringList(ValidateData<Vec<(Key, LightString)>>),
-    LongString(ValidateData<LightString>),
+    String(ValidateData<SharedString>),
+    StringList(ValidateData<Vec<(Key, SharedString)>>),
+    LongString(ValidateData<SharedString>),
     // RichText(ValidateData<JsValue>),
-    Code(ValidateData<LightString>),
-    Password(ValidateData<LightString>),
-    Enum(ValidateData<LightString>),
-    EnumList(ValidateData<Vec<LightString>>),
+    Code(ValidateData<SharedString>),
+    Password(ValidateData<SharedString>),
+    Enum(ValidateData<SharedString>),
+    EnumList(ValidateData<Vec<SharedString>>),
     Bool(Binding<bool>),
     File(ValidateData<Option<Resource>>),
     FileList(ValidateData<Vec<(Key, Resource, ())>>),
 }
 
 impl AttributeValue {
-    pub fn validate(&self, update_view: bool) -> Result<(), LightString> {
+    pub fn validate(&self, update_view: bool) -> Result<(), SharedString> {
         match self {
             AttributeValue::String(value) => value.validate(update_view),
             AttributeValue::StringList(value) => value.validate(update_view),
@@ -118,7 +118,7 @@ pub fn config_view(attributes: &[(Key, Attribute, AttributeValue)]) -> Html {
                                 {
                                     match value {
                                         AttributeValue::StringList(value_list) => {
-                                            value_list.view(move |value_list: UseStateHandle<Vec<(Key, LightString)>>, validator: Callback<Vec<(Key, LightString)>>| {
+                                            value_list.view(move |value_list: UseStateHandle<Vec<(Key, SharedString)>>, validator: Callback<Vec<(Key, SharedString)>>| {
                                                 let value_list_clone = value_list.clone();
                                                 let validator_clone = validator.clone();
                                                 html! {
@@ -151,7 +151,7 @@ pub fn config_view(attributes: &[(Key, Attribute, AttributeValue)]) -> Html {
                                                         }
                                                         <Button onclick={Callback::from(move |_| {
                                                             let mut new_items = value_list_clone.deref().clone();
-                                                            new_items.push((gen_id().into(), LightString::from("")));
+                                                            new_items.push((gen_id().into(), SharedString::from("")));
                                                             value_list_clone.set(new_items.clone());
                                                             validator_clone.emit(new_items);
                                                         })}>{"Add"}</Button>
@@ -241,8 +241,8 @@ pub fn config_view(attributes: &[(Key, Attribute, AttributeValue)]) -> Html {
                                     match value {
                                         AttributeValue::Code(value) => {
                                             let language = language.clone();
-                                            value.view(move |value, validator: Callback<LightString>| {
-                                                let language = LightString::from(language.clone());
+                                            value.view(move |value, validator: Callback<SharedString>| {
+                                                let language = SharedString::from(language.clone());
                                                 html! {
                                                     <BindingMonacoEditor value={value} language={language} width="100%" height="16em" onchange={validator}/>
                                                 }
@@ -301,11 +301,11 @@ pub fn config_view(attributes: &[(Key, Attribute, AttributeValue)]) -> Html {
                                     match value {
                                         AttributeValue::Enum(value) => {
                                             let options = options.clone();
-                                            value.view(move |value, validator: Callback<LightString>| {
+                                            value.view(move |value, validator: Callback<SharedString>| {
                                                 let options: Vec<_> = options.iter().map(|option| {
                                                     (option.value.clone().into(), option.label.clone())
                                                 }).collect();
-                                                let onchange = validator.reform(|(value, _label): (LightString, String)| {
+                                                let onchange = validator.reform(|(value, _label): (SharedString, String)| {
                                                     value
                                                 });
                                                 html! {
@@ -337,7 +337,7 @@ pub fn config_view(attributes: &[(Key, Attribute, AttributeValue)]) -> Html {
                                     match value {
                                         AttributeValue::EnumList(values) => {
                                             let options = options.clone();
-                                            values.view(move |values, validator: Callback<Vec<LightString>>| {
+                                            values.view(move |values, validator: Callback<Vec<SharedString>>| {
                                                 let options: Vec<_> = options.iter().map(|option| {
                                                     (option.value.clone().into(), option.label.clone())
                                                 }).collect();
@@ -460,7 +460,7 @@ pub fn config_detail_view(attributes: &[(Key, Attribute, AttributeValue)]) -> Ht
                                 {
                                     match value {
                                         AttributeValue::String(value) => {
-                                            value.view(move |value: UseStateHandle<LightString>, _validator| {
+                                            value.view(move |value: UseStateHandle<SharedString>, _validator| {
                                                 html! { value.deref().clone() }
                                             })
                                         },
@@ -484,7 +484,7 @@ pub fn config_detail_view(attributes: &[(Key, Attribute, AttributeValue)]) -> Ht
                                 {
                                     match value {
                                         AttributeValue::StringList(value) => {
-                                            value.view(move |value_list: UseStateHandle<Vec<(Key, LightString)>>, _validator| {
+                                            value.view(move |value_list: UseStateHandle<Vec<(Key, SharedString)>>, _validator| {
                                                 html! {
                                                     for value_list.iter().map(|(key, value)| {
                                                         html! {
@@ -514,7 +514,7 @@ pub fn config_detail_view(attributes: &[(Key, Attribute, AttributeValue)]) -> Ht
                                 {
                                     match value {
                                         AttributeValue::LongString(value) => {
-                                            value.view(move |value: UseStateHandle<LightString>, _validator| {
+                                            value.view(move |value: UseStateHandle<SharedString>, _validator| {
                                                 html! { value.deref().clone() }
                                             })
                                         },
@@ -564,8 +564,8 @@ pub fn config_detail_view(attributes: &[(Key, Attribute, AttributeValue)]) -> Ht
                                     match value {
                                         AttributeValue::Code(value) => {
                                             let language = language.clone();
-                                            value.view(move |value, validator: Callback<LightString>| {
-                                                let language = LightString::from(language.clone());
+                                            value.view(move |value, validator: Callback<SharedString>| {
+                                                let language = SharedString::from(language.clone());
                                                 html! {
                                                     <BindingMonacoEditor value={value} language={language} readonly={true} width="100%" height="16em" onchange={validator}/>
                                                 }
@@ -591,7 +591,7 @@ pub fn config_detail_view(attributes: &[(Key, Attribute, AttributeValue)]) -> Ht
                                 {
                                     match value {
                                         AttributeValue::Password(value) => {
-                                            value.view(move |value: UseStateHandle<LightString>, _validator| {
+                                            value.view(move |value: UseStateHandle<SharedString>, _validator| {
                                                 let len = value.deref().chars().count();
                                                 Html::from("*".repeat(len))
                                             })
@@ -617,7 +617,7 @@ pub fn config_detail_view(attributes: &[(Key, Attribute, AttributeValue)]) -> Ht
                                     match value {
                                         AttributeValue::Enum(value) => {
                                             let options = options.clone();
-                                            value.view(move |value: UseStateHandle<LightString>, _validator: Callback<LightString>| {
+                                            value.view(move |value: UseStateHandle<SharedString>, _validator: Callback<SharedString>| {
                                                 let label = options.iter().find(|option| {
                                                     value.deref() == &option.value
                                                 }).map(|option| option.label.clone()).unwrap_or_default();
@@ -645,7 +645,7 @@ pub fn config_detail_view(attributes: &[(Key, Attribute, AttributeValue)]) -> Ht
                                     match value {
                                         AttributeValue::EnumList(values) => {
                                             let options = options.clone();
-                                            values.view(move |values: UseStateHandle<Vec<LightString>>, _validator: Callback<Vec<LightString>>| {
+                                            values.view(move |values: UseStateHandle<Vec<SharedString>>, _validator: Callback<Vec<SharedString>>| {
                                                 let labels: Vec<&str> = options.iter().filter(|option| {
                                                     values.iter().any(|value| value == &option.value)
                                                 }).map(|option| option.label.as_ref()).collect();
@@ -890,7 +890,7 @@ pub fn serialize_config(attributes: &[(Key, Attribute, AttributeValue)]) -> Stri
         .unwrap();
 }
 
-fn get_string_validators(attribute: &Attribute) -> Option<Validators<LightString>> {
+fn get_string_validators(attribute: &Attribute) -> Option<Validators<SharedString>> {
     return if attribute.required && AttributeType::Bool != attribute.r#type {
         Some(Validators::new().add(RequiredValidator::new(format!("请输入{}", attribute.name))))
     } else {
@@ -900,7 +900,7 @@ fn get_string_validators(attribute: &Attribute) -> Option<Validators<LightString
 
 fn get_string_list_validators(
     attribute: &Attribute,
-) -> Option<Validators<Vec<(Key, LightString)>>> {
+) -> Option<Validators<Vec<(Key, SharedString)>>> {
     return if attribute.required && AttributeType::Bool != attribute.r#type {
         Some(Validators::new().add(RequiredValidator::new(format!("请输入{}", attribute.name))))
     } else {
@@ -1006,7 +1006,7 @@ fn get_value(attribute: &Attribute, value: Value) -> AttributeValue {
             AttributeValue::String(ValidateData::new(value.into(), validators))
         }
         AttributeType::StringList => {
-            let value: Vec<(Key, LightString)> = value
+            let value: Vec<(Key, SharedString)> = value
                 .as_array()
                 .map(|value| {
                     value
@@ -1091,7 +1091,7 @@ fn get_value(attribute: &Attribute, value: Value) -> AttributeValue {
                         .map(|value| {
                             value
                                 .as_str()
-                                .map(|value| LightString::from(value.to_string()))
+                                .map(|value| SharedString::from(value.to_string()))
                         })
                         .filter_map(|v| v)
                         .collect::<Vec<_>>()

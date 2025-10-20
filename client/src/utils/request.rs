@@ -1,4 +1,4 @@
-use crate::LightString;
+use crate::SharedString;
 use futures::lock::Mutex;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -37,25 +37,26 @@ pub enum Method {
 
 enum CacheMethod {
     Url,
-    UrlAndKey(LightString),
+    UrlAndKey(SharedString),
 }
 
-pub type HttpRequestor = dyn Handler<(LightString, LightString), Result<LightString, LightString>>;
+pub type HttpRequestor =
+    dyn Handler<(SharedString, SharedString), Result<SharedString, SharedString>>;
 //请求校验器
-pub type RequestValidator<T> = dyn Fn(&T) -> Result<(), LightString>;
+pub type RequestValidator<T> = dyn Fn(&T) -> Result<(), SharedString>;
 //loading展示器
 pub type LoadingHandler = dyn Handler<bool, ()>;
 //锁处理器，lock参数为true表示加锁，lock参数为false表示解锁，返回true表示执行成功，返回false表示执行失败
 pub type LockHandler = dyn Handler<bool, bool>;
 //数据解包器，输入请求器返回的结果，输出Result<成功结果，业务错误>
-pub type DataUnwrapper = dyn Handler<serde_json::Value, Result<serde_json::Value, LightString>>;
+pub type DataUnwrapper = dyn Handler<serde_json::Value, Result<serde_json::Value, SharedString>>;
 //错误处理器
-pub type ErrorHandler = dyn Handler<LightString, ()>;
+pub type ErrorHandler = dyn Handler<SharedString, ()>;
 //加锁错误处理器
 pub type LockErrorHandler = dyn Handler<(), ()>;
 
 pub struct Request<Req, Resp> {
-    url: LightString,
+    url: SharedString,
     method: Method,
     http_requestor: Option<Arc<HttpRequestor>>,
     show_loading: bool,
@@ -77,7 +78,7 @@ where
     Req: Serialize + 'static,
     Resp: DeserializeOwned + 'static,
 {
-    pub fn new(url: LightString) -> Self {
+    pub fn new(url: SharedString) -> Self {
         Self {
             url: url,
             method: Method::Post,
@@ -98,14 +99,14 @@ where
     }
     pub fn http_requestor(
         &mut self,
-        http_requestor: impl Handler<(LightString, LightString), Result<LightString, LightString>>,
+        http_requestor: impl Handler<(SharedString, SharedString), Result<SharedString, SharedString>>,
     ) -> &mut Self {
         self.http_requestor = Some(Arc::new(http_requestor));
         return self;
     }
     pub fn data_unwrapper(
         &mut self,
-        data_unwrapper: impl Handler<serde_json::Value, Result<serde_json::Value, LightString>>,
+        data_unwrapper: impl Handler<serde_json::Value, Result<serde_json::Value, SharedString>>,
     ) -> &mut Self {
         self.data_unwrapper = Some(Arc::new(data_unwrapper));
         return self;
@@ -116,7 +117,7 @@ where
     }
     pub fn request_validator(
         &mut self,
-        request_validator: impl Fn(&Req) -> Result<(), LightString> + 'static,
+        request_validator: impl Fn(&Req) -> Result<(), SharedString> + 'static,
     ) -> &mut Self {
         self.request_validator = Some(Arc::new(request_validator));
         return self;
@@ -135,14 +136,14 @@ where
     }
     pub fn req_error_handler(
         &mut self,
-        req_error_handler: impl Handler<LightString, ()>,
+        req_error_handler: impl Handler<SharedString, ()>,
     ) -> &mut Self {
         self.req_error_handler = Some(Arc::new(req_error_handler));
         return self;
     }
     pub fn unwrap_error_handler(
         &mut self,
-        unwrap_error_handler: impl Handler<LightString, ()>,
+        unwrap_error_handler: impl Handler<SharedString, ()>,
     ) -> &mut Self {
         self.unwrap_error_handler = Some(Arc::new(unwrap_error_handler));
         return self;
@@ -151,11 +152,11 @@ where
         self.use_cache.replace(CacheMethod::Url);
         return self;
     }
-    pub fn cache_by_url_and_key(&mut self, key: LightString) -> &mut Self {
+    pub fn cache_by_url_and_key(&mut self, key: SharedString) -> &mut Self {
         self.use_cache.replace(CacheMethod::UrlAndKey(key));
         return self;
     }
-    pub async fn call(&self, req: &Req) -> Result<Resp, LightString> {
+    pub async fn call(&self, req: &Req) -> Result<Resp, SharedString> {
         if let Some(request_validator) = self.request_validator.as_ref() {
             if let Err(err_msg) = request_validator(req) {
                 if let Some(validate_error_handler) = self
@@ -192,7 +193,7 @@ where
         return self.call_with_lock(req).await;
     }
 
-    async fn call_with_lock(&self, req: &Req) -> Result<Resp, LightString> {
+    async fn call_with_lock(&self, req: &Req) -> Result<Resp, SharedString> {
         if let Some(lock_handler) = self.lock_handler.as_ref() {
             let ret = lock_handler.handle(true).await;
             if !ret {
@@ -200,7 +201,7 @@ where
                 if let Some(lock_error_handler) = self.lock_error_handler.as_ref() {
                     lock_error_handler.handle(()).await;
                 }
-                return Err(LightString::from("lock failed before requesting"));
+                return Err(SharedString::from("lock failed before requesting"));
             }
             let result = self.call_with_loading(req).await;
             lock_handler.handle(false).await;
@@ -210,7 +211,7 @@ where
         }
     }
 
-    async fn call_with_loading(&self, req: &Req) -> Result<Resp, LightString> {
+    async fn call_with_loading(&self, req: &Req) -> Result<Resp, SharedString> {
         if self.show_loading {
             if let Some(loading_handler) = self
                 .loading_handler
@@ -229,10 +230,10 @@ where
         }
     }
 
-    async fn try_call(&self, req: &Req) -> Result<Resp, LightString> {
+    async fn try_call(&self, req: &Req) -> Result<Resp, SharedString> {
         let req = serde_json::to_string(&req).map_err(|err| {
             log::error!("Failed to serialize request: {}", err);
-            LightString::from("Failed to serialize request.")
+            SharedString::from("Failed to serialize request.")
         })?;
         let http_requestor = if let Some(http_requestor) = self
             .http_requestor
@@ -241,14 +242,14 @@ where
         {
             http_requestor.clone()
         } else {
-            return Err(LightString::from("http requestor unimplemented"));
+            return Err(SharedString::from("http requestor unimplemented"));
         };
         match http_requestor.handle((self.url.clone(), req.into())).await {
             Ok(resp) => {
                 let full_resp = serde_json::from_str::<serde_json::Value>(&resp).map_err(
-                    |err| -> LightString {
+                    |err| -> SharedString {
                         log::error!("响应数据格式不正确：{}", err);
-                        return LightString::Static("响应数据格式不正确");
+                        return SharedString::Static("响应数据格式不正确");
                     },
                 )?;
                 if let Some(data_unwrapper) = self
@@ -281,7 +282,7 @@ where
                                 }
                                 Err(err) => {
                                     let err_msg =
-                                        LightString::from(format!("响应数据格式不正确：{}", err));
+                                        SharedString::from(format!("响应数据格式不正确：{}", err));
                                     if let Some(unwrap_error_handler) =
                                         self.unwrap_error_handler.as_ref().or_else(|| unsafe {
                                             DEFAULT_UNWRAP_ERROR_HANDLER.as_ref()
@@ -323,9 +324,9 @@ where
                         }
                     }
                     return serde_json::from_value::<Resp>(full_resp).map_err(
-                        |err| -> LightString {
+                        |err| -> SharedString {
                             log::error!("响应数据格式不正确：{}", err);
-                            return LightString::Static("响应数据格式不正确");
+                            return SharedString::Static("响应数据格式不正确");
                         },
                     );
                 }
@@ -349,11 +350,11 @@ pub trait ApiExt {
     type Output;
     fn http_requestor(
         &self,
-        http_requestor: impl Handler<(LightString, LightString), Result<LightString, LightString>>,
+        http_requestor: impl Handler<(SharedString, SharedString), Result<SharedString, SharedString>>,
     ) -> Request<Self::Input, Self::Output>;
     fn data_unwrapper(
         &self,
-        data_unwrapper: impl Handler<serde_json::Value, Result<serde_json::Value, LightString>>,
+        data_unwrapper: impl Handler<serde_json::Value, Result<serde_json::Value, SharedString>>,
     ) -> Request<Self::Input, Self::Output>;
     fn lock_handler(
         &self,
@@ -366,7 +367,7 @@ pub trait ApiExt {
     fn disable_loading(&self) -> Request<Self::Input, Self::Output>;
     fn validate_error_handler(
         &self,
-        validate_error_handler: impl Handler<LightString, ()>,
+        validate_error_handler: impl Handler<SharedString, ()>,
     ) -> Request<Self::Input, Self::Output>;
     fn lock_error_handler(
         &self,
@@ -374,15 +375,15 @@ pub trait ApiExt {
     ) -> Request<Self::Input, Self::Output>;
     fn req_error_handler(
         &self,
-        req_error_handler: impl Handler<LightString, ()>,
+        req_error_handler: impl Handler<SharedString, ()>,
     ) -> Request<Self::Input, Self::Output>;
     fn unwrap_error_handler(
         &self,
-        unwrap_error_handler: impl Handler<LightString, ()>,
+        unwrap_error_handler: impl Handler<SharedString, ()>,
     ) -> Request<Self::Input, Self::Output>;
     fn cache_by_url(&self) -> Request<Self::Input, Self::Output>;
-    fn cache_by_url_and_key(&self, key: LightString) -> Request<Self::Input, Self::Output>;
-    async fn call(&self, req: &Self::Input) -> Result<Self::Output, LightString>;
+    fn cache_by_url_and_key(&self, key: SharedString) -> Request<Self::Input, Self::Output>;
+    async fn call(&self, req: &Self::Input) -> Result<Self::Output, SharedString>;
 }
 
 impl<T> ApiExt for T
@@ -396,23 +397,23 @@ where
 
     fn http_requestor(
         &self,
-        http_requestor: impl Handler<(LightString, LightString), Result<LightString, LightString>>,
+        http_requestor: impl Handler<(SharedString, SharedString), Result<SharedString, SharedString>>,
     ) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.http_requestor = Some(Arc::new(http_requestor));
         request.request_validator(|req: &T::Input| {
-            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+            T::validate_input(req).map_err(|error| SharedString::from(error.to_string()))
         });
         request
     }
     fn data_unwrapper(
         &self,
-        data_unwrapper: impl Handler<serde_json::Value, Result<serde_json::Value, LightString>>,
+        data_unwrapper: impl Handler<serde_json::Value, Result<serde_json::Value, SharedString>>,
     ) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.data_unwrapper = Some(Arc::new(data_unwrapper));
         request.request_validator(|req: &T::Input| {
-            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+            T::validate_input(req).map_err(|error| SharedString::from(error.to_string()))
         });
         request
     }
@@ -420,7 +421,7 @@ where
         let mut request = Request::new(Self::namespace().to_string().into());
         request.lock_handler = Some(Arc::new(lock_handler));
         request.request_validator(|req: &T::Input| {
-            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+            T::validate_input(req).map_err(|error| SharedString::from(error.to_string()))
         });
         request
     }
@@ -431,7 +432,7 @@ where
         let mut request = Request::new(Self::namespace().to_string().into());
         request.loading_handler = Some(Arc::new(loading_handler));
         request.request_validator(|req: &T::Input| {
-            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+            T::validate_input(req).map_err(|error| SharedString::from(error.to_string()))
         });
         request
     }
@@ -439,18 +440,18 @@ where
         let mut request = Request::new(Self::namespace().to_string().into());
         request.show_loading = false;
         request.request_validator(|req: &T::Input| {
-            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+            T::validate_input(req).map_err(|error| SharedString::from(error.to_string()))
         });
         request
     }
     fn validate_error_handler(
         &self,
-        validate_error_handler: impl Handler<LightString, ()>,
+        validate_error_handler: impl Handler<SharedString, ()>,
     ) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.validate_error_handler = Some(Arc::new(validate_error_handler));
         request.request_validator(|req: &T::Input| {
-            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+            T::validate_input(req).map_err(|error| SharedString::from(error.to_string()))
         });
         request
     }
@@ -461,29 +462,29 @@ where
         let mut request = Request::new(Self::namespace().to_string().into());
         request.lock_error_handler = Some(Arc::new(lock_error_handler));
         request.request_validator(|req: &T::Input| {
-            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+            T::validate_input(req).map_err(|error| SharedString::from(error.to_string()))
         });
         request
     }
     fn req_error_handler(
         &self,
-        req_error_handler: impl Handler<LightString, ()>,
+        req_error_handler: impl Handler<SharedString, ()>,
     ) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.req_error_handler = Some(Arc::new(req_error_handler));
         request.request_validator(|req: &T::Input| {
-            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+            T::validate_input(req).map_err(|error| SharedString::from(error.to_string()))
         });
         request
     }
     fn unwrap_error_handler(
         &self,
-        unwrap_error_handler: impl Handler<LightString, ()>,
+        unwrap_error_handler: impl Handler<SharedString, ()>,
     ) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.unwrap_error_handler = Some(Arc::new(unwrap_error_handler));
         request.request_validator(|req: &T::Input| {
-            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+            T::validate_input(req).map_err(|error| SharedString::from(error.to_string()))
         });
         request
     }
@@ -492,24 +493,24 @@ where
         let mut request = Request::new(Self::namespace().to_string().into());
         request.use_cache.replace(CacheMethod::Url);
         request.request_validator(|req: &T::Input| {
-            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+            T::validate_input(req).map_err(|error| SharedString::from(error.to_string()))
         });
         request
     }
 
-    fn cache_by_url_and_key(&self, key: LightString) -> Request<T::Input, T::Output> {
+    fn cache_by_url_and_key(&self, key: SharedString) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.use_cache.replace(CacheMethod::UrlAndKey(key));
         request.request_validator(|req: &T::Input| {
-            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+            T::validate_input(req).map_err(|error| SharedString::from(error.to_string()))
         });
         request
     }
 
-    async fn call(&self, req: &Self::Input) -> Result<Self::Output, LightString> {
+    async fn call(&self, req: &Self::Input) -> Result<Self::Output, SharedString> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.request_validator(|req: &T::Input| {
-            T::validate_input(req).map_err(|error| LightString::from(error.to_string()))
+            T::validate_input(req).map_err(|error| SharedString::from(error.to_string()))
         });
         request.call(req).await
     }

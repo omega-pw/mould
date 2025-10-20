@@ -14,7 +14,7 @@ use crate::service::base::JobStepRecordBaseService;
 use crate::service::base::JobStepResourceRecordBaseService;
 use sdk::job::delete_job::DeleteJobReq;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
@@ -41,7 +41,7 @@ pub async fn delete_job(
     };
     let job_opt = job_base_service.query_job_one(&params).await?;
     job_opt.ok_or_else(|| -> ErrNo {
-        ErrNo::CommonError(LightString::from_static("待删除的任务不存在！"))
+        ErrNo::CommonError(SharedString::from_static("待删除的任务不存在！"))
     })?;
     let running_job_count = job_record_base_service
         .query_job_record_count(&JobRecordOpt {
@@ -52,7 +52,7 @@ pub async fn delete_job(
         })
         .await?;
     if 0 < running_job_count {
-        return Err(ErrNo::CommonError(LightString::from_static(
+        return Err(ErrNo::CommonError(SharedString::from_static(
             "该任务正在执行，不能删除！",
         )));
     }

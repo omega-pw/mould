@@ -17,10 +17,10 @@ use sdk::auth::get_curr_user::AuthSource;
 use sdk::auth::get_curr_user::User as SdkUser;
 use sdk::auth::login::LoginReq;
 use sdk::auth::login::LoginResp;
-use tihu::validator::ValidateEmail;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
+use validator::ValidateEmail;
 
 pub async fn login(guest: Guest, login_req: LoginReq) -> Result<LoginResp, ErrNo> {
     let nonce_ok = check_nonce(&login_req.nonce).await?;
@@ -54,7 +54,7 @@ pub async fn login(guest: Guest, login_req: LoginReq) -> Result<LoginResp, ErrNo
     .into_owned();
     let auth_key = decrypt_by_base64(&auth_key).map_err(|err| {
         log::error!("解码授权key失败: {:?}", err);
-        return ErrNo::CommonError(LightString::from_static("解码授权key失败！"));
+        return ErrNo::CommonError(SharedString::from_static("解码授权key失败！"));
     })?;
     let hashed_auth_key = encrypt_by_base64(&sha512(&auth_key)).map_err(ErrNo::CommonError)?;
     let mut client = context.get_db_client().await?;
@@ -74,7 +74,7 @@ pub async fn login(guest: Guest, login_req: LoginReq) -> Result<LoginResp, ErrNo
     if let Some(system_user) = list.pop() {
         if !list.is_empty() {
             log::warn!("数据异常：根据一个账号查到多条用户数据，邮箱: {:?}", email);
-            return Err(ErrNo::CommonError(LightString::from_static(
+            return Err(ErrNo::CommonError(SharedString::from_static(
                 "用户名或密码错误！",
             )));
         }
@@ -82,7 +82,7 @@ pub async fn login(guest: Guest, login_req: LoginReq) -> Result<LoginResp, ErrNo
         let user_base_service = UserBaseService::new(&transaction);
         let user_opt = user_base_service.read_user(user_id).await?;
         let user = user_opt.ok_or_else(|| -> ErrNo {
-            ErrNo::CommonError(LightString::from_static("不存在此用户！"))
+            ErrNo::CommonError(SharedString::from_static("不存在此用户！"))
         })?;
         let session_info = SessionInfo {
             auth_method: AuthMethod::System,
@@ -101,7 +101,7 @@ pub async fn login(guest: Guest, login_req: LoginReq) -> Result<LoginResp, ErrNo
             },
         }));
     } else {
-        return Err(ErrNo::CommonError(LightString::from_static(
+        return Err(ErrNo::CommonError(SharedString::from_static(
             "用户名或密码错误！",
         )));
     }

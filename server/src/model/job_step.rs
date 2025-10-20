@@ -4,7 +4,7 @@ use chrono::Utc;
 use tihu::datetime_format;
 use tihu::datetime_format_opt;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use native_common::model::Property;
 use native_common::model::PropertyDefine;
 use native_common::model::PropertyType;
@@ -28,7 +28,7 @@ pub mod properties {
 }
 
 pub mod enums {
-    use tihu::LightString;
+    use tihu::SharedString;
     use std::error::Error;
     use serde::{Serialize, Deserialize};
     use tokio_postgres::types::{ToSql, Type, IsNull, to_sql_checked};
@@ -38,7 +38,7 @@ pub mod enums {
         Auto = 1, //自动
         Manual = 2, //手动
     }
-    pub fn try_i16_to_step_type(val: i16) -> Result<StepType, LightString> {
+    pub fn try_i16_to_step_type(val: i16) -> Result<StepType, SharedString> {
         match val {
             1 => Ok(StepType::Auto),
             2 => Ok(StepType::Manual),
@@ -81,72 +81,72 @@ impl Property for JobStepProperty {
     fn property_define(&self) -> PropertyDefine {
         match self {
 			JobStepProperty::Id(_) => PropertyDefine {
-                key: LightString::from_static(properties::ID),
+                key: SharedString::from_static(properties::ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			JobStepProperty::OrgId(_) => PropertyDefine {
-                key: LightString::from_static(properties::ORG_ID),
+                key: SharedString::from_static(properties::ORG_ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			JobStepProperty::JobId(_) => PropertyDefine {
-                key: LightString::from_static(properties::JOB_ID),
+                key: SharedString::from_static(properties::JOB_ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			JobStepProperty::Name(_) => PropertyDefine {
-                key: LightString::from_static(properties::NAME),
+                key: SharedString::from_static(properties::NAME),
                 value_type: PropertyType::String,
 				required: true,
             },
 			JobStepProperty::StepType(_) => PropertyDefine {
-                key: LightString::from_static(properties::STEP_TYPE),
+                key: SharedString::from_static(properties::STEP_TYPE),
                 value_type: PropertyType::Enum,
 				required: true,
             },
 			JobStepProperty::SchemaResourceId(_) => PropertyDefine {
-                key: LightString::from_static(properties::SCHEMA_RESOURCE_ID),
+                key: SharedString::from_static(properties::SCHEMA_RESOURCE_ID),
                 value_type: PropertyType::Id,
 				required: false,
             },
 			JobStepProperty::OperationId(_) => PropertyDefine {
-                key: LightString::from_static(properties::OPERATION_ID),
+                key: SharedString::from_static(properties::OPERATION_ID),
                 value_type: PropertyType::String,
 				required: true,
             },
 			JobStepProperty::OperationName(_) => PropertyDefine {
-                key: LightString::from_static(properties::OPERATION_NAME),
+                key: SharedString::from_static(properties::OPERATION_NAME),
                 value_type: PropertyType::String,
 				required: true,
             },
 			JobStepProperty::OperationParameter(_) => PropertyDefine {
-                key: LightString::from_static(properties::OPERATION_PARAMETER),
+                key: SharedString::from_static(properties::OPERATION_PARAMETER),
                 value_type: PropertyType::String,
 				required: true,
             },
 			JobStepProperty::Attachments(_) => PropertyDefine {
-                key: LightString::from_static(properties::ATTACHMENTS),
+                key: SharedString::from_static(properties::ATTACHMENTS),
                 value_type: PropertyType::String,
 				required: false,
             },
 			JobStepProperty::Remark(_) => PropertyDefine {
-                key: LightString::from_static(properties::REMARK),
+                key: SharedString::from_static(properties::REMARK),
                 value_type: PropertyType::String,
 				required: false,
             },
 			JobStepProperty::Seq(_) => PropertyDefine {
-                key: LightString::from_static(properties::SEQ),
+                key: SharedString::from_static(properties::SEQ),
                 value_type: PropertyType::Integer,
 				required: true,
             },
 			JobStepProperty::CreatedTime(_) => PropertyDefine {
-                key: LightString::from_static(properties::CREATED_TIME),
+                key: SharedString::from_static(properties::CREATED_TIME),
                 value_type: PropertyType::DateTime,
 				required: true,
             },
 			JobStepProperty::LastModifiedTime(_) => PropertyDefine {
-                key: LightString::from_static(properties::LAST_MODIFIED_TIME),
+                key: SharedString::from_static(properties::LAST_MODIFIED_TIME),
                 value_type: PropertyType::DateTime,
 				required: true,
             },

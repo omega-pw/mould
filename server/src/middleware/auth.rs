@@ -21,8 +21,8 @@ use std::sync::Arc;
 use tihu::Api;
 use tihu::Handler;
 use tihu::Id;
-use tihu::LightString;
 use tihu::Middleware;
+use tihu::SharedString;
 use tihu_native::http::Body;
 use tihu_native::http::FromRequest;
 use tihu_native::http::RequestData;
@@ -177,7 +177,7 @@ impl FromRequest for User {
             .await?;
         match auth_level {
             AuthLevel::Guest(_) => {
-                return Err(LightString::from("用户未登录").into());
+                return Err(SharedString::from("用户未登录").into());
             }
             AuthLevel::User(user) => {
                 return Ok(user.clone());
@@ -208,7 +208,7 @@ pub type Out = Result<Response<Body>, anyhow::Error>;
 pub struct AuthHandler<E> {
     inner: E,
     context: Arc<Context>,
-    white_list_namespace: Vec<LightString>,
+    white_list_namespace: Vec<SharedString>,
 }
 
 #[async_trait]
@@ -249,7 +249,7 @@ where
 
 pub struct AuthMiddleware {
     context: Arc<Context>,
-    white_list_namespace: Vec<LightString>,
+    white_list_namespace: Vec<SharedString>,
 }
 
 impl<E> Middleware<In, E> for AuthMiddleware
@@ -268,7 +268,7 @@ where
 }
 
 impl AuthMiddleware {
-    pub fn new(context: Arc<Context>, white_list_namespace: Vec<LightString>) -> AuthMiddleware {
+    pub fn new(context: Arc<Context>, white_list_namespace: Vec<SharedString>) -> AuthMiddleware {
         AuthMiddleware {
             context: context,
             white_list_namespace: white_list_namespace,

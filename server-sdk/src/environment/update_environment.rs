@@ -2,7 +2,7 @@ use serde;
 use serde::{Deserialize, Serialize};
 use tihu::Api;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 
 pub const UPDATE_ENVIRONMENT_API: &str = "/api/environment/updateEnvironment";
 
@@ -36,7 +36,7 @@ pub struct UpdateEnvironmentApi;
 impl Api for UpdateEnvironmentApi {
     type Input = UpdateEnvironmentReq;
     type Output = UpdateEnvironmentResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(UPDATE_ENVIRONMENT_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(UPDATE_ENVIRONMENT_API);
     }
 }

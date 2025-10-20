@@ -5,7 +5,7 @@ use super::uploading_file::UploadingFile;
 use super::HashingFile;
 use super::ResourceMetadata;
 use crate::utils::gen_id;
-use crate::LightString;
+use crate::SharedString;
 use js_sys::Function;
 use js_sys::Promise;
 use std::cell::Cell;
@@ -23,17 +23,17 @@ pub struct Props {
     pub files: Vec<(
         Key,
         HashingFile,
-        Callback<Result<ResourceMetadata, LightString>>,
+        Callback<Result<ResourceMetadata, SharedString>>,
     )>,
     #[prop_or(999)]
     pub z_index: u64,
     #[prop_or_default]
-    pub ondone: Callback<Result<(), LightString>>,
+    pub ondone: Callback<Result<(), SharedString>>,
 }
 
 #[function_component]
 pub fn UploadingFiles(props: &Props) -> Html {
-    let first_error_result: UseStateHandle<Result<(), LightString>> = use_state(|| Ok(()));
+    let first_error_result: UseStateHandle<Result<(), SharedString>> = use_state(|| Ok(()));
     let done_count: UseStateHandle<AtomicUsize> = use_state(Default::default);
     let count = props.files.len();
     html! {
@@ -46,7 +46,7 @@ pub fn UploadingFiles(props: &Props) -> Html {
                             let done_count = done_count.clone();
                             let onsingledone = onsingledone.clone();
                             let first_error_result = first_error_result.clone();
-                            let ondone = Callback::from(move |result: Result<ResourceMetadata, LightString>| {
+                            let ondone = Callback::from(move |result: Result<ResourceMetadata, SharedString>| {
                                 let has_error = first_error_result.is_err();
                                 if let Err(error) = result.as_ref() {
                                     if !has_error {
@@ -74,8 +74,11 @@ pub fn UploadingFiles(props: &Props) -> Html {
 }
 
 pub async fn upload_files(
-    files: Vec<(HashingFile, Callback<Result<ResourceMetadata, LightString>>)>,
-) -> Result<(), LightString> {
+    files: Vec<(
+        HashingFile,
+        Callback<Result<ResourceMetadata, SharedString>>,
+    )>,
+) -> Result<(), SharedString> {
     if files.is_empty() {
         return Ok(());
     }
@@ -96,7 +99,7 @@ pub async fn upload_files(
                 .map(|(hashing_file, ondone)| (gen_id().into(), hashing_file, ondone))
                 .collect(),
             z_index: 999,
-            ondone: Callback::from(move |result: Result<(), LightString>| match result {
+            ondone: Callback::from(move |result: Result<(), SharedString>| match result {
                 Ok(_) => {
                     if let Err(err) = resolve.call0(&wasm_bindgen::JsValue::UNDEFINED) {
                         log::error!("调用Promise的resolve失败: {:?}", err);
@@ -120,7 +123,7 @@ pub async fn upload_files(
     let result = JsFuture::from(promise)
         .await
         .map(|_| ())
-        .map_err(|err| -> LightString {
+        .map_err(|err| -> SharedString {
             log::error!("上传文件失败: {:?}", err);
             return "上传文件失败".into();
         });

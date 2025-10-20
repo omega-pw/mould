@@ -14,7 +14,7 @@ use crate::service::base::JobStepRecordBaseService;
 use crate::service::base::JobStepResourceRecordBaseService;
 use sdk::environment::delete_environment::DeleteEnvironmentReq;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
@@ -43,7 +43,7 @@ pub async fn delete_environment(
         .query_environment_one(&params)
         .await?;
     environment_opt.ok_or_else(|| -> ErrNo {
-        ErrNo::CommonError(LightString::from_static("待删除的环境不存在！"))
+        ErrNo::CommonError(SharedString::from_static("待删除的环境不存在！"))
     })?;
     let running_job_count = job_record_base_service
         .query_job_record_count(&JobRecordOpt {
@@ -54,7 +54,7 @@ pub async fn delete_environment(
         })
         .await?;
     if 0 < running_job_count {
-        return Err(ErrNo::CommonError(LightString::from_static(
+        return Err(ErrNo::CommonError(SharedString::from_static(
             "该环境正在执行更新任务，不能删除！",
         )));
     }

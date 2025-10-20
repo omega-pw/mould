@@ -1,12 +1,12 @@
-use crate::LightString;
+use crate::SharedString;
 use yew::prelude::*;
 use yew::{html, Component, Context, Html};
 
 struct State {
     length: u32,
     maxlength: u32,
-    style: LightString,
-    limit_style: LightString,
+    style: SharedString,
+    limit_style: SharedString,
 }
 
 pub enum Msg {}
@@ -15,10 +15,10 @@ pub enum Msg {}
 pub struct Props {
     pub length: u32,
     pub maxlength: u32,
-    #[prop_or(LightString::Static(""))]
-    pub style: LightString,
-    #[prop_or(LightString::Static(""))]
-    pub limit_style: LightString,
+    #[prop_or(SharedString::Static(""))]
+    pub style: SharedString,
+    #[prop_or(SharedString::Static(""))]
+    pub limit_style: SharedString,
     pub children: Children,
 }
 

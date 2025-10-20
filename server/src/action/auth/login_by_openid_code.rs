@@ -24,7 +24,7 @@ use sdk::auth::get_curr_user::User as SdkUser;
 use sdk::auth::login_by_openid_code::LoginByOpenidCodeReq;
 use sdk::auth::login_by_openid_code::LoginByOpenidCodeResp;
 use serde::{Deserialize, Serialize};
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
@@ -72,7 +72,7 @@ pub async fn login_by_openid_code(
             ErrNo::ApiError(err.into())
         })?;
     let openid = userinfo.sub.clone().ok_or_else(|| {
-        ErrNo::CommonError(LightString::from(
+        ErrNo::CommonError(SharedString::from(
             "No property \"sub\" found in user infomation!",
         ))
     })?;

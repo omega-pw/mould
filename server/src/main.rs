@@ -37,8 +37,8 @@ pub use server_sdk as sdk;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tihu::Handler;
-use tihu::LightString;
 use tihu::Middleware;
+use tihu::SharedString;
 use tihu_native::http::Body;
 use tihu_native::http::HttpHandler;
 use tihu_native::http::RequestData;
@@ -57,21 +57,21 @@ tokio::task_local! {
 pub fn get_context() -> Result<Arc<Context>, ErrNo> {
     return CONTEXT
         .try_with(|context| context.clone())
-        .map_err(|_err| ErrNo::CommonError(LightString::from_static("获取应用程序上下文失败！")));
+        .map_err(|_err| ErrNo::CommonError(SharedString::from_static("获取应用程序上下文失败！")));
 }
 
 // pub struct Request {
 //     pub client_id: ClientId,
-//     pub route: LightString,
-//     pub session: Option<LightString>,
+//     pub route: SharedString,
+//     pub session: Option<SharedString>,
 //     pub service_version: Option<HashMap<String, String>>,
-//     pub context: Option<LightString>,
+//     pub context: Option<SharedString>,
 //     pub body: Bytes,
 //     pub request_ip: Bytes,
 // }
 
 // pub struct Response {
-//     pub session: Option<LightString>,
+//     pub session: Option<SharedString>,
 //     pub body: Bytes,
 // }
 
@@ -201,7 +201,7 @@ pub async fn get_handler(
     let api_handler = Arc::new(TimeStatMiddleware::new().transform(dispatch_api));
     let white_list_namespace = WHITE_LIST_NAMESPACE
         .iter()
-        .map(|namespace| LightString::from_static(*namespace))
+        .map(|namespace| SharedString::from_static(*namespace))
         .collect::<Vec<_>>();
     let handler = ContextMiddleware::new(context.clone())
         .chain(CountStatMiddleware::new())

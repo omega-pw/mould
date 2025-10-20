@@ -14,7 +14,7 @@ use native_common::utils::sha512;
 use sdk::auth::change_password::ChangePasswordReq;
 use sdk::auth::change_password::ChangePasswordResp;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
@@ -57,13 +57,13 @@ pub async fn change_password(
     .into_owned();
     let old_auth_key = decrypt_by_base64(&old_auth_key).map_err(|err| {
         log::error!("解码授权key失败: {:?}", err);
-        return ErrNo::CommonError(LightString::from_static("解码授权key失败！"));
+        return ErrNo::CommonError(SharedString::from_static("解码授权key失败！"));
     })?;
     let old_hashed_auth_key =
         encrypt_by_base64(&sha512(&old_auth_key)).map_err(ErrNo::CommonError)?;
     let new_auth_key = decrypt_by_base64(&new_auth_key).map_err(|err| {
         log::error!("解码授权key失败: {:?}", err);
-        return ErrNo::CommonError(LightString::from_static("解码授权key失败！"));
+        return ErrNo::CommonError(SharedString::from_static("解码授权key失败！"));
     })?;
     let new_hashed_auth_key =
         encrypt_by_base64(&sha512(&new_auth_key)).map_err(ErrNo::CommonError)?;
@@ -75,14 +75,16 @@ pub async fn change_password(
         .read_system_user(user.user_id)
         .await?;
     let system_user = system_user_opt
-        .ok_or_else(|| ErrNo::CommonError(LightString::from_static("数据异常，当前用户不存在")))?;
+        .ok_or_else(|| ErrNo::CommonError(SharedString::from_static("数据异常，当前用户不存在")))?;
     let SystemUser {
         id,
         hashed_auth_key,
         ..
     } = system_user;
     if old_hashed_auth_key != hashed_auth_key {
-        return Err(ErrNo::CommonError(LightString::from_static("旧密码不正确")));
+        return Err(ErrNo::CommonError(SharedString::from_static(
+            "旧密码不正确",
+        )));
     }
     let curr_time = Utc::now();
     system_user_base_service

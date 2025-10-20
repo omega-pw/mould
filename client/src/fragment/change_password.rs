@@ -5,7 +5,7 @@ use crate::sdk;
 use crate::utils;
 use crate::utils::request::ApiExt;
 use crate::AppContext;
-use crate::LightString;
+use crate::SharedString;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use js::sha512;
@@ -24,9 +24,9 @@ use yew::prelude::*;
 
 #[derive(Clone)]
 struct ChangeForm {
-    old_password: UseStateHandle<LightString>,
-    new_password: UseStateHandle<LightString>,
-    confirm_new_password: UseStateHandle<LightString>,
+    old_password: UseStateHandle<SharedString>,
+    new_password: UseStateHandle<SharedString>,
+    confirm_new_password: UseStateHandle<SharedString>,
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -42,9 +42,9 @@ pub fn ChangePassword(props: &Props) -> Html {
         new_password: use_state(|| "".into()),
         confirm_new_password: use_state(|| "".into()),
     };
-    let rsa_pub_key: UseStateHandle<Option<LightString>> = use_state(|| None);
+    let rsa_pub_key: UseStateHandle<Option<SharedString>> = use_state(|| None);
     let is_saving: UseStateHandle<bool> = use_state(|| false);
-    let err_msg: UseStateHandle<Option<LightString>> = use_state(|| None);
+    let err_msg: UseStateHandle<Option<SharedString>> = use_state(|| None);
 
     let rsa_pub_key_clone = rsa_pub_key.clone();
     use_effect_with((), move |_| {
@@ -139,40 +139,40 @@ pub fn ChangePassword(props: &Props) -> Html {
 }
 
 async fn get_rsa_pub_key(
-    rsa_pub_key: &UseStateHandle<Option<LightString>>,
-) -> Result<(), LightString> {
+    rsa_pub_key: &UseStateHandle<Option<SharedString>>,
+) -> Result<(), SharedString> {
     let params = GetRsaPubKeyReq {};
     let pub_key = GetRsaPubKeyApi.call(&params).await?;
     rsa_pub_key.set(Some(pub_key.into()));
     return Ok(());
 }
 
-fn chk_form_err(form: &ChangeForm) -> Vec<LightString> {
-    let mut err_msgs: Vec<LightString> = Vec::new();
+fn chk_form_err(form: &ChangeForm) -> Vec<SharedString> {
+    let mut err_msgs: Vec<SharedString> = Vec::new();
     if form.old_password.is_empty() {
-        err_msgs.push(LightString::Static("请输入旧密码"));
+        err_msgs.push(SharedString::Static("请输入旧密码"));
     }
     if form.new_password.is_empty() {
-        err_msgs.push(LightString::Static("请输入新密码"));
+        err_msgs.push(SharedString::Static("请输入新密码"));
     }
     if form.confirm_new_password.is_empty() {
-        err_msgs.push(LightString::Static("请输入确认新密码"));
+        err_msgs.push(SharedString::Static("请输入确认新密码"));
     }
     if form.confirm_new_password != form.new_password {
-        err_msgs.push(LightString::Static("新密码不一致"));
+        err_msgs.push(SharedString::Static("新密码不一致"));
     }
     if form.old_password == form.new_password {
-        err_msgs.push(LightString::Static("新旧密码不能相同"));
+        err_msgs.push(SharedString::Static("新旧密码不能相同"));
     }
     return err_msgs;
 }
 
 async fn save_change(
-    rsa_pub_key: &UseStateHandle<Option<LightString>>,
+    rsa_pub_key: &UseStateHandle<Option<SharedString>>,
     user_random_value: &str,
     is_saving: &UseStateHandle<bool>,
     form: &ChangeForm,
-    err_msg: &UseStateHandle<Option<LightString>>,
+    err_msg: &UseStateHandle<Option<SharedString>>,
     ondone: &Callback<()>,
 ) {
     let mut err_msgs = chk_form_err(form);
@@ -196,7 +196,7 @@ async fn save_change(
                 err_msg.set(Some(err));
             }
             Ok(_) => {
-                utils::success(LightString::from("修改成功"));
+                utils::success(SharedString::from("修改成功"));
                 ondone.emit(());
             }
         }
@@ -209,21 +209,21 @@ async fn change_password(
     rsa_pub_key: String,
     user_random_value: &str,
     form: ChangeForm,
-) -> Result<(), LightString> {
+) -> Result<(), SharedString> {
     let user_random_value =
         BASE64_STANDARD
             .decode(user_random_value)
-            .map_err(|err| -> LightString {
+            .map_err(|err| -> SharedString {
                 log::error!("解码客户端随机数失败: {:?}", err);
-                return LightString::Static("解码客户端随机数失败！");
+                return SharedString::Static("解码客户端随机数失败！");
             })?;
     if 32 != user_random_value.len() {
-        return Err(LightString::Static("客户端随机数位数不正确！"));
+        return Err(SharedString::Static("客户端随机数位数不正确！"));
     }
     let mut data = [0u8; 32];
     data.copy_from_slice(&user_random_value);
     let salt = calc_salt(RandomValue::Client(data), sha512)
-        .map_err(|error| LightString::from(error.to_string()))?;
+        .map_err(|error| SharedString::from(error.to_string()))?;
     let (old_auth_key, _old_encryption_key) =
         sdk::auth::calc_derived_key(form.old_password.as_bytes(), &salt);
     let (new_auth_key, _new_encryption_key) =
@@ -235,11 +235,11 @@ async fn change_password(
     let rsa_pub_key = RsaPubKey2048::try_from_string(&rsa_pub_key);
     let cipher_old_auth_key = rsa_pub_key
         .encrypt(&[old_auth_key.as_bytes(), nonce.as_bytes()].concat())
-        .ok_or_else(|| LightString::from("加密旧授权秘钥失败！"))?;
+        .ok_or_else(|| SharedString::from("加密旧授权秘钥失败！"))?;
     let cipher_old_auth_key = BASE64_STANDARD.encode(&cipher_old_auth_key.to_vec());
     let cipher_new_auth_key = rsa_pub_key
         .encrypt(&[new_auth_key.as_bytes(), nonce.as_bytes()].concat())
-        .ok_or_else(|| LightString::from("加密新授权秘钥失败！"))?;
+        .ok_or_else(|| SharedString::from("加密新授权秘钥失败！"))?;
     let cipher_new_auth_key = BASE64_STANDARD.encode(&cipher_new_auth_key.to_vec());
     let params = ChangePasswordReq {
         nonce: nonce.to_string(),

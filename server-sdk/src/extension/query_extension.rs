@@ -1,7 +1,7 @@
 use super::Extension;
 use serde::{Deserialize, Serialize};
 use tihu::Api;
-use tihu::LightString;
+use tihu::SharedString;
 
 pub const QUERY_EXTENSION_API: &str = "/api/extension/queryExtension";
 
@@ -14,7 +14,7 @@ pub struct QueryExtensionApi;
 impl Api for QueryExtensionApi {
     type Input = QueryExtensionReq;
     type Output = QueryExtensionResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(QUERY_EXTENSION_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(QUERY_EXTENSION_API);
     }
 }

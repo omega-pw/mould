@@ -2,7 +2,7 @@ use super::get_curr_user::GetCurrUserResp;
 use serde;
 use serde::{Deserialize, Serialize};
 use tihu::Api;
-use tihu::LightString;
+use tihu::SharedString;
 
 pub const LOGIN_BY_OAUTH2_CODE_API: &str = "/api/auth/loginByOauth2Code";
 
@@ -19,7 +19,7 @@ pub struct LoginByOauth2CodeApi;
 impl Api for LoginByOauth2CodeApi {
     type Input = LoginByOauth2CodeReq;
     type Output = LoginByOauth2CodeResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(LOGIN_BY_OAUTH2_CODE_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(LOGIN_BY_OAUTH2_CODE_API);
     }
 }

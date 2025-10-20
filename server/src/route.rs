@@ -7,11 +7,11 @@ use crate::native_common;
 use crate::sdk;
 use bytes::Bytes;
 use native_common::errno::gen_no_such_api;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::ErrNo;
 
 pub async fn dispatch_user_api(
-    (route, req, user): (LightString, Bytes, User),
+    (route, req, user): (SharedString, Bytes, User),
 ) -> Result<Bytes, ErrNo> {
     let resp = match route.as_str() {
         //修改密码
@@ -260,7 +260,7 @@ pub async fn dispatch_user_api(
 }
 
 pub async fn dispatch_guest_api(
-    (route, req, guest): (LightString, Bytes, Guest),
+    (route, req, guest): (SharedString, Bytes, Guest),
 ) -> Result<Bytes, ErrNo> {
     let resp = match route.as_str() {
         //获取盐值接口

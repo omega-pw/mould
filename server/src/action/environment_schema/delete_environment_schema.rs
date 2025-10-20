@@ -9,7 +9,7 @@ use crate::service::base::EnvironmentSchemaBaseService;
 use crate::service::base::EnvironmentSchemaResourceBaseService;
 use sdk::environment_schema::delete_environment_schema::DeleteEnvironmentSchemaReq;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
@@ -37,7 +37,7 @@ pub async fn delete_environment_schema(
         .query_environment_schema_one(&params)
         .await?;
     environment_schema_opt.ok_or_else(|| -> ErrNo {
-        ErrNo::CommonError(LightString::from_static("待删除的环境规格不存在！"))
+        ErrNo::CommonError(SharedString::from_static("待删除的环境规格不存在！"))
     })?;
     let env_count = environment_base_service
         .query_environment_count(&EnvironmentOpt {
@@ -47,7 +47,7 @@ pub async fn delete_environment_schema(
         })
         .await?;
     if 0 < env_count {
-        return Err(ErrNo::CommonError(LightString::from_static(
+        return Err(ErrNo::CommonError(SharedString::from_static(
             "该环境规格已经存在相应的环境，不能删除！",
         )));
     }

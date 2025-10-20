@@ -1,7 +1,7 @@
 use super::get_curr_user::GetCurrUserResp;
 use serde::{Deserialize, Serialize};
 use tihu::Api;
-use tihu::LightString;
+use tihu::SharedString;
 use validator::Validate;
 
 pub const REGISTER_API: &str = "/api/auth/register";
@@ -21,7 +21,7 @@ pub struct RegisterApi;
 impl Api for RegisterApi {
     type Input = RegisterReq;
     type Output = RegisterResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(REGISTER_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(REGISTER_API);
     }
 }

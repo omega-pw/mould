@@ -5,7 +5,7 @@ use tihu_native::errno::query_error;
 use tihu_native::errno::undefined_enum_value;
 use tihu_native::ErrNo;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use lazy_static;
 use format_xml;
 use std::borrow::Cow;
@@ -52,25 +52,25 @@ fn extract_external_user(row: &Row) -> Result<ExternalUser, ErrNo> {
 fn opt_to_conditions<'a>(opt: &'a ExternalUserOpt) -> Vec::<(Condition, &'a (dyn ToSql + std::marker::Sync))> {
     let mut pairs = Vec::<(Condition,&(dyn ToSql + std::marker::Sync))>::new();
     if let Some(id) = opt.id.as_ref() {
-        pairs.push((Condition {field: LightString::from_static(properties::ID), operator: None}, id));
+        pairs.push((Condition {field: SharedString::from_static(properties::ID), operator: None}, id));
     }
     if let Some(provider_type) = opt.provider_type.as_ref() {
-        pairs.push((Condition {field: LightString::from_static(properties::PROVIDER_TYPE), operator: None}, provider_type));
+        pairs.push((Condition {field: SharedString::from_static(properties::PROVIDER_TYPE), operator: None}, provider_type));
     }
     if let Some(provider) = opt.provider.as_ref() {
-        pairs.push((Condition {field: LightString::from_static(properties::PROVIDER), operator: None}, provider));
+        pairs.push((Condition {field: SharedString::from_static(properties::PROVIDER), operator: None}, provider));
     }
     if let Some(openid) = opt.openid.as_ref() {
-        pairs.push((Condition {field: LightString::from_static(properties::OPENID), operator: None}, openid));
+        pairs.push((Condition {field: SharedString::from_static(properties::OPENID), operator: None}, openid));
     }
     if let Some(detail) = opt.detail.as_ref() {
-        pairs.push((Condition {field: LightString::from_static(properties::DETAIL), operator: None}, detail));
+        pairs.push((Condition {field: SharedString::from_static(properties::DETAIL), operator: None}, detail));
     }
     if let Some(created_time) = opt.created_time.as_ref() {
-        pairs.push((Condition {field: LightString::from_static(properties::CREATED_TIME), operator: None}, created_time));
+        pairs.push((Condition {field: SharedString::from_static(properties::CREATED_TIME), operator: None}, created_time));
     }
     if let Some(last_modified_time) = opt.last_modified_time.as_ref() {
-        pairs.push((Condition {field: LightString::from_static(properties::LAST_MODIFIED_TIME), operator: None}, last_modified_time));
+        pairs.push((Condition {field: SharedString::from_static(properties::LAST_MODIFIED_TIME), operator: None}, last_modified_time));
     }
     return pairs;
 }

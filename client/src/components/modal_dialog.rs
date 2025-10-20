@@ -1,17 +1,17 @@
 use super::center_middle::CenterMiddle;
 use super::dialog::Dialog;
 use super::page::Page;
-use crate::LightString;
+use crate::SharedString;
 use yew::prelude::*;
 use yew::{html, Component, Context, Html};
 
 struct State {
-    title: LightString,
+    title: SharedString,
     closable: bool,
     z_index: u64,
-    center_style: LightString,
-    dialog_style: LightString,
-    content_style: LightString,
+    center_style: SharedString,
+    dialog_style: SharedString,
+    content_style: SharedString,
 }
 
 pub enum Msg {
@@ -20,16 +20,16 @@ pub enum Msg {
 
 #[derive(Clone, PartialEq, Properties)]
 pub struct Props {
-    pub title: LightString,
+    pub title: SharedString,
     pub closable: bool,
     #[prop_or(1)]
     pub z_index: u64,
-    #[prop_or(LightString::Static(""))]
-    pub center_style: LightString,
-    #[prop_or(LightString::Static(""))]
-    pub dialog_style: LightString,
-    #[prop_or(LightString::Static(""))]
-    pub content_style: LightString,
+    #[prop_or(SharedString::Static(""))]
+    pub center_style: SharedString,
+    #[prop_or(SharedString::Static(""))]
+    pub dialog_style: SharedString,
+    #[prop_or(SharedString::Static(""))]
+    pub content_style: SharedString,
     #[prop_or_default]
     pub onclose: Option<Callback<()>>,
     pub children: Children,

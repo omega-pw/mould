@@ -81,7 +81,7 @@ pub struct Environment {
 // impl Api for ReadTaskApi {
 //     type Input = ReadTaskReq;
 //     type Output = ReadTaskResp;
-//     fn namespace() -> LightString {
-//         return LightString::from_static(READ_ENVIRONMENT_API);
+//     fn namespace() -> SharedString {
+//         return SharedString::from_static(READ_ENVIRONMENT_API);
 //     }
 // }

@@ -8,7 +8,7 @@ use tihu::datetime_format;
 use tihu::pagination::PaginationList;
 use tihu::Api;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 
 pub const QUERY_JOB_RECORD_API: &str = "/api/job/queryJobRecord";
 
@@ -53,7 +53,7 @@ pub struct QueryJobRecordApi;
 impl Api for QueryJobRecordApi {
     type Input = QueryJobRecordReq;
     type Output = QueryJobRecordResp;
-    fn namespace() -> LightString {
-        return LightString::from_static(QUERY_JOB_RECORD_API);
+    fn namespace() -> SharedString {
+        return SharedString::from_static(QUERY_JOB_RECORD_API);
     }
 }

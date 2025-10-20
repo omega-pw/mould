@@ -15,12 +15,12 @@ use native_common::utils::sha512;
 use sdk::auth::reset_password::ResetPasswordApi;
 use sdk::auth::reset_password::ResetPasswordReq;
 use sdk::auth::reset_password::ResetPasswordResp;
-use tihu::validator::ValidateEmail;
 use tihu::Api;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
+use validator::ValidateEmail;
 
 pub async fn reset_password(
     guest: Guest,
@@ -34,7 +34,7 @@ pub async fn reset_password(
         return Err(ErrNo::NotAllowed);
     }
     if reset_password_req.captcha.is_empty() {
-        return Err(ErrNo::CommonError(LightString::from_static(
+        return Err(ErrNo::CommonError(SharedString::from_static(
             "验证码不能为空!",
         )));
     }
@@ -49,12 +49,12 @@ pub async fn reset_password(
             &(String::from("reset-password-captcha-") + &guest.session_id.to_string()).into_bytes(),
         )
         .await?
-        .ok_or_else(|| ErrNo::CommonError(LightString::from_static("验证码不存在或已过期!")))?;
+        .ok_or_else(|| ErrNo::CommonError(SharedString::from_static("验证码不存在或已过期!")))?;
     for item in &mut captcha2 {
         item.make_ascii_lowercase();
     }
     if captcha != captcha2 {
-        return Err(ErrNo::CommonError(LightString::from_static(
+        return Err(ErrNo::CommonError(SharedString::from_static(
             "验证码不正确!",
         )));
     }
@@ -84,7 +84,7 @@ pub async fn reset_password(
     .into_owned();
     let auth_key = decrypt_by_base64(&auth_key).map_err(|err| {
         log::error!("解码授权key失败: {:?}", err);
-        return ErrNo::CommonError(LightString::from_static("解码授权key失败！"));
+        return ErrNo::CommonError(SharedString::from_static("解码授权key失败！"));
     })?;
     let hashed_auth_key = encrypt_by_base64(&sha512(&auth_key)).map_err(ErrNo::CommonError)?;
 
@@ -98,7 +98,7 @@ pub async fn reset_password(
         })
         .await?;
     let system_user =
-        system_user_opt.ok_or_else(|| ErrNo::CommonError(LightString::from("用户不存在！")))?;
+        system_user_opt.ok_or_else(|| ErrNo::CommonError(SharedString::from("用户不存在！")))?;
     let user_id = system_user.id;
     let curr_time = Utc::now();
     let changes: Vec<SystemUserProperty> = vec![

@@ -11,7 +11,7 @@ use crate::sdk;
 use crate::utils;
 use crate::utils::request::ApiExt;
 use crate::utils::LoadStatus;
-use crate::LightString;
+use crate::SharedString;
 use sdk::job::delete_job::DeleteJobApi;
 use sdk::job::delete_job::DeleteJobReq;
 use sdk::job::query_job::Job;
@@ -259,7 +259,7 @@ fn row_view(
         let list_load_status = list_load_status.clone();
         let pagination = pagination.clone();
         wasm_bindgen_futures::spawn_local(async move {
-            let ok = utils::confirm(LightString::from("确定删除该任务？"), None).await;
+            let ok = utils::confirm(SharedString::from("确定删除该任务？"), None).await;
             if ok {
                 let list = list.clone();
                 let list_load_status = list_load_status.clone();
@@ -358,11 +358,11 @@ async fn delete_job(
     list: &UseStateHandle<Vec<Job>>,
     list_load_status: &UseStateHandle<LoadStatus>,
     pagination: &UseStateHandle<Pagination>,
-) -> Result<(), LightString> {
+) -> Result<(), SharedString> {
     let params = DeleteJobReq { id: id };
     DeleteJobApi.call(&params).await?;
     remove_job(id, list);
-    utils::success(LightString::from("删除成功"));
+    utils::success(SharedString::from("删除成功"));
     let list = list.clone();
     let list_load_status = list_load_status.clone();
     let pagination = pagination.clone();

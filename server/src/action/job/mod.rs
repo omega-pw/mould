@@ -33,7 +33,7 @@ use std::io::Write;
 use std::sync::Arc;
 use std::sync::Mutex;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
@@ -65,9 +65,9 @@ async fn try_start_run(
                 update_step_record(context.clone(), job_step_record.id, StepStatus::Running)
                     .await?;
                 let context = context.clone();
-                let extension_id: LightString = job_step_record.extension_id.into();
-                let operation_id: LightString = job_step_record.operation_id.into();
-                let operation_parameter: LightString = job_step_record.operation_parameter.into();
+                let extension_id: SharedString = job_step_record.extension_id.into();
+                let operation_id: SharedString = job_step_record.operation_id.into();
+                let operation_parameter: SharedString = job_step_record.operation_parameter.into();
                 let results = join_all(step_resource_record_list.into_iter().enumerate().map(
                     |(resource_index, step_resource_record)| {
                         call_extension(
@@ -187,20 +187,20 @@ async fn start_run(
 
 async fn try_call_extension(
     context: Arc<Context>,
-    extension_id: LightString,
-    extension_configuration: LightString,
-    operation_id: LightString,
-    operation_parameter: LightString,
+    extension_id: SharedString,
+    extension_configuration: SharedString,
+    operation_id: SharedString,
+    operation_parameter: SharedString,
     resource_index: u32,
     append_log: AppendLog,
-) -> Result<(), LightString> {
+) -> Result<(), SharedString> {
     let extension_configuration =
         serde_json::from_str(&extension_configuration).map_err(|err| err.to_string())?;
     let operation_parameter =
         serde_json::from_str(&operation_parameter).map_err(|err| err.to_string())?;
     let extension = context
         .get_extension(&extension_id)
-        .ok_or_else(|| LightString::from(format!("没有找到id为{}的扩展!", extension_id)))?;
+        .ok_or_else(|| SharedString::from(format!("没有找到id为{}的扩展!", extension_id)))?;
     return extension
         .handle(
             extension_configuration,
@@ -211,7 +211,7 @@ async fn try_call_extension(
             resource_index,
         )
         .await
-        .map_err(LightString::from);
+        .map_err(SharedString::from);
 }
 
 fn try_write_log(log_file: &Mutex<File>, log: &StepResLog) -> Result<(), anyhow::Error> {
@@ -225,17 +225,17 @@ fn try_write_log(log_file: &Mutex<File>, log: &StepResLog) -> Result<(), anyhow:
 
 async fn call_extension(
     context: Arc<Context>,
-    extension_id: LightString,
-    extension_configuration: LightString,
-    operation_id: LightString,
-    operation_parameter: LightString,
+    extension_id: SharedString,
+    extension_configuration: SharedString,
+    operation_id: SharedString,
+    operation_parameter: SharedString,
     step_resource_record_id: Id,
     resource_index: u32,
 ) -> Result<(), ErrNo> {
     let log_file_name = format!("{}.log", Uuid::new_v4().to_string());
     let log_file_path = format!("{}/{}", context.config.job_log_dir, log_file_name);
     let log_file = File::create(&log_file_path).map_err(|err| {
-        ErrNo::CommonError(LightString::from(format!("创建任务日志文件报错：{}", err)))
+        ErrNo::CommonError(SharedString::from(format!("创建任务日志文件报错：{}", err)))
     })?;
     let log_file = Mutex::new(log_file);
     update_step_resource_record(
@@ -274,7 +274,7 @@ async fn call_extension(
     )
     .await;
     let output = read_to_string(&log_file_path).await.map_err(|err| {
-        ErrNo::CommonError(LightString::from(format!("读取任务日志内容失败：{}", err)))
+        ErrNo::CommonError(SharedString::from(format!("读取任务日志内容失败：{}", err)))
     })?;
     let mut output = format!("[{}", output);
     let status = match result.as_ref() {
@@ -333,7 +333,7 @@ fn merge_step_and_resource(
                     .iter()
                     .find(|schema_resource| job_step.schema_resource_id == Some(schema_resource.id))
                     .ok_or_else(|| {
-                        ErrNo::CommonError(LightString::from(format!(
+                        ErrNo::CommonError(SharedString::from(format!(
                             "步骤\"{}\"未找到对应资源定义",
                             job_step.name
                         )))
@@ -342,7 +342,7 @@ fn merge_step_and_resource(
                 let (extension_info, extension) = context
                     .get_extension_info(&extension_id)
                     .ok_or_else(|| -> ErrNo {
-                        ErrNo::CommonError(LightString::from(format!(
+                        ErrNo::CommonError(SharedString::from(format!(
                             "扩展\"{}\"未找到!",
                             schema_resource.extension_name,
                         )))
@@ -356,7 +356,7 @@ fn merge_step_and_resource(
                         serde_json::from_str::<serde_json::Value>(&job_step.operation_parameter)
                             .map_err(|err| -> ErrNo {
                                 log::error!("操作参数格式不正确：{}", err);
-                                return ErrNo::CommonError(LightString::Static(
+                                return ErrNo::CommonError(SharedString::Static(
                                     "操作参数格式不正确",
                                 ));
                             })?;
@@ -364,7 +364,7 @@ fn merge_step_and_resource(
                         .validate_operation_parameter(&job_step.operation_id, operation_parameter)
                         .map_err(|err| ErrNo::CommonError(err.into()))?;
                 } else {
-                    return Err(ErrNo::CommonError(LightString::from(format!(
+                    return Err(ErrNo::CommonError(SharedString::from(format!(
                         "扩展\"{}\"没有名为\"{}\"的操作!",
                         extension_info.name, job_step.operation_name
                     ))));
@@ -383,14 +383,14 @@ fn merge_step_and_resource(
                     })
                     .collect();
                 if resource_list.is_empty() {
-                    return Err(ErrNo::CommonError(LightString::from(format!(
+                    return Err(ErrNo::CommonError(SharedString::from(format!(
                         "步骤\"{}\"没有匹配到任何资源",
                         job_step.name
                     ))));
                 } else {
                     for resource in &resource_list {
                         if extension_id != resource.extension_id {
-                            return Err(ErrNo::CommonError(LightString::from(format!(
+                            return Err(ErrNo::CommonError(SharedString::from(format!(
                                 "环境资源\"{}\"对应的扩展\"{}\"和\"{}\"不匹配",
                                 resource.name, resource.extension_name, extension_info.name
                             ))));

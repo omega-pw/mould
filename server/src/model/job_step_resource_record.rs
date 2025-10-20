@@ -4,7 +4,7 @@ use chrono::Utc;
 use tihu::datetime_format;
 use tihu::datetime_format_opt;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use native_common::model::Property;
 use native_common::model::PropertyDefine;
 use native_common::model::PropertyType;
@@ -28,7 +28,7 @@ pub mod properties {
 }
 
 pub mod enums {
-    use tihu::LightString;
+    use tihu::SharedString;
     use std::error::Error;
     use serde::{Serialize, Deserialize};
     use tokio_postgres::types::{ToSql, Type, IsNull, to_sql_checked};
@@ -40,7 +40,7 @@ pub mod enums {
         Success = 3, //成功
         Failure = 4, //失败
     }
-    pub fn try_i16_to_status(val: i16) -> Result<Status, LightString> {
+    pub fn try_i16_to_status(val: i16) -> Result<Status, SharedString> {
         match val {
             1 => Ok(Status::Pending),
             2 => Ok(Status::Running),
@@ -85,72 +85,72 @@ impl Property for JobStepResourceRecordProperty {
     fn property_define(&self) -> PropertyDefine {
         match self {
 			JobStepResourceRecordProperty::Id(_) => PropertyDefine {
-                key: LightString::from_static(properties::ID),
+                key: SharedString::from_static(properties::ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			JobStepResourceRecordProperty::OrgId(_) => PropertyDefine {
-                key: LightString::from_static(properties::ORG_ID),
+                key: SharedString::from_static(properties::ORG_ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			JobStepResourceRecordProperty::JobId(_) => PropertyDefine {
-                key: LightString::from_static(properties::JOB_ID),
+                key: SharedString::from_static(properties::JOB_ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			JobStepResourceRecordProperty::EnvironmentId(_) => PropertyDefine {
-                key: LightString::from_static(properties::ENVIRONMENT_ID),
+                key: SharedString::from_static(properties::ENVIRONMENT_ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			JobStepResourceRecordProperty::RecordId(_) => PropertyDefine {
-                key: LightString::from_static(properties::RECORD_ID),
+                key: SharedString::from_static(properties::RECORD_ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			JobStepResourceRecordProperty::JobStepRecordId(_) => PropertyDefine {
-                key: LightString::from_static(properties::JOB_STEP_RECORD_ID),
+                key: SharedString::from_static(properties::JOB_STEP_RECORD_ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			JobStepResourceRecordProperty::EnvironmentResourceId(_) => PropertyDefine {
-                key: LightString::from_static(properties::ENVIRONMENT_RESOURCE_ID),
+                key: SharedString::from_static(properties::ENVIRONMENT_RESOURCE_ID),
                 value_type: PropertyType::Id,
 				required: true,
             },
 			JobStepResourceRecordProperty::ResourceName(_) => PropertyDefine {
-                key: LightString::from_static(properties::RESOURCE_NAME),
+                key: SharedString::from_static(properties::RESOURCE_NAME),
                 value_type: PropertyType::String,
 				required: true,
             },
 			JobStepResourceRecordProperty::ExtensionConfiguration(_) => PropertyDefine {
-                key: LightString::from_static(properties::EXTENSION_CONFIGURATION),
+                key: SharedString::from_static(properties::EXTENSION_CONFIGURATION),
                 value_type: PropertyType::String,
 				required: true,
             },
 			JobStepResourceRecordProperty::OutputFile(_) => PropertyDefine {
-                key: LightString::from_static(properties::OUTPUT_FILE),
+                key: SharedString::from_static(properties::OUTPUT_FILE),
                 value_type: PropertyType::String,
 				required: false,
             },
 			JobStepResourceRecordProperty::OutputContent(_) => PropertyDefine {
-                key: LightString::from_static(properties::OUTPUT_CONTENT),
+                key: SharedString::from_static(properties::OUTPUT_CONTENT),
                 value_type: PropertyType::String,
 				required: false,
             },
 			JobStepResourceRecordProperty::Status(_) => PropertyDefine {
-                key: LightString::from_static(properties::STATUS),
+                key: SharedString::from_static(properties::STATUS),
                 value_type: PropertyType::Enum,
 				required: true,
             },
 			JobStepResourceRecordProperty::CreatedTime(_) => PropertyDefine {
-                key: LightString::from_static(properties::CREATED_TIME),
+                key: SharedString::from_static(properties::CREATED_TIME),
                 value_type: PropertyType::DateTime,
 				required: true,
             },
 			JobStepResourceRecordProperty::LastModifiedTime(_) => PropertyDefine {
-                key: LightString::from_static(properties::LAST_MODIFIED_TIME),
+                key: SharedString::from_static(properties::LAST_MODIFIED_TIME),
                 value_type: PropertyType::DateTime,
 				required: true,
             },

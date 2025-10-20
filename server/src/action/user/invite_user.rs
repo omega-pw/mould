@@ -6,7 +6,7 @@ use crate::service::base::UserBaseService;
 use chrono::Utc;
 use sdk::user::invite_user::InviteUserReq;
 use tihu::Id;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
@@ -23,13 +23,13 @@ pub async fn invite_user(
     let user_base_service = UserBaseService::new(&transaction);
     let user_opt = user_base_service.read_user(user_id).await?;
     let user = user_opt.ok_or_else(|| -> ErrNo {
-        ErrNo::CommonError(LightString::from_static("不存在此用户！"))
+        ErrNo::CommonError(SharedString::from_static("不存在此用户！"))
     })?;
     if let Some(existed_org_id) = user.org_id {
         if existed_org_id == org_id {
             return Ok(());
         } else {
-            return Err(ErrNo::CommonError(LightString::from_static(
+            return Err(ErrNo::CommonError(SharedString::from_static(
                 "该用户已有归属组织！",
             )));
         }

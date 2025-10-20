@@ -9,7 +9,7 @@ use crate::components::ResourceMetadata;
 use crate::sdk;
 use crate::utils;
 use crate::utils::request::ApiExt;
-use crate::LightString;
+use crate::SharedString;
 use js_sys::JSON;
 use sdk::job::continue_job::ContinueJobApi;
 use sdk::job::continue_job::ContinueJobReq;
@@ -465,7 +465,7 @@ async fn read_job_record_detail(
     detail: &UseStateHandle<Option<JobRecord>>,
     id: Id,
     first_time: bool,
-) -> Result<JobRecord, LightString> {
+) -> Result<JobRecord, SharedString> {
     let params = ReadJobRecordReq { id: id };
     let job_record = if first_time {
         ReadJobRecordApi.call(&params).await?
@@ -520,7 +520,7 @@ async fn continue_job(
     step_record_id: Id,
     success: bool,
     is_saving: UseStateHandle<bool>,
-) -> Result<(), LightString> {
+) -> Result<(), SharedString> {
     ContinueJobApi
         .lock_handler(is_saving)
         .call(&ContinueJobReq {
@@ -529,6 +529,6 @@ async fn continue_job(
             success: success,
         })
         .await?;
-    utils::success(LightString::from("操作成功"));
+    utils::success(SharedString::from("操作成功"));
     return Ok(());
 }

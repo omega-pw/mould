@@ -11,7 +11,7 @@ use native_common::cache::AsyncCache;
 use sdk::auth::logout::LogoutReq;
 use sdk::auth::logout::LogoutResp;
 use std::sync::Arc;
-use tihu::LightString;
+use tihu::SharedString;
 use tihu_native::ErrNo;
 
 async fn get_session_data(
@@ -53,7 +53,7 @@ pub async fn get_logout_url(
                         .as_ref()
                         .map(|end_session_endpoint| end_session_endpoint.to_string())
                         .ok_or_else(|| {
-                            ErrNo::CommonError(LightString::from_static(
+                            ErrNo::CommonError(SharedString::from_static(
                                 "No end_session_endpoint found!",
                             ))
                         })?;

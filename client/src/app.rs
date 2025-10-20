@@ -24,7 +24,7 @@ use crate::utils;
 use crate::AppContext;
 use crate::Context;
 use crate::ContextAction;
-use crate::LightString;
+use crate::SharedString;
 use sdk::auth::get_curr_user::AuthSource;
 use sdk::auth::get_curr_user::GetCurrUserApi;
 use sdk::auth::get_curr_user::GetCurrUserReq;
@@ -105,7 +105,7 @@ pub fn RootApp(props: &RootProps) -> Html {
                                     <div>{"Mould"}</div>
                                     <div style="display: flex; align-items: center;">
                                         if let Some(avatar_url) = curr_user.avatar_url.as_ref() {
-                                            <Image src={LightString::from(avatar_url.clone())} style="max-height: 2em;margin-right:0.5em;"/>
+                                            <Image src={SharedString::from(avatar_url.clone())} style="max-height: 2em;margin-right:0.5em;"/>
                                         }
                                         {curr_user.name.clone()}
                                         {
