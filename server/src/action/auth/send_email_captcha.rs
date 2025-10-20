@@ -18,6 +18,7 @@ use native_common::utils::DEFAULT_SEED;
 use sdk::auth::send_email_captcha::Scene as SdkScene;
 use sdk::auth::send_email_captcha::SendEmailCaptchaReq;
 use sdk::auth::send_email_captcha::SendEmailCaptchaResp;
+use std::time::Duration;
 use tera::Tera;
 use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
@@ -37,7 +38,7 @@ pub async fn send_email_captcha(
 ) -> Result<SendEmailCaptchaResp, ErrNo> {
     let mut captcha = vec!['0'; 8];
     fill_random(&mut captcha, DEFAULT_SEED);
-    let captcha: String = captcha.into_iter().collect();
+    let mut captcha: String = captcha.into_iter().collect();
     let context = get_context()?;
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
@@ -50,8 +51,18 @@ pub async fn send_email_captcha(
             ..CaptchaOpt::empty()
         })
         .await?;
+    let curr_time = Utc::now();
     if let Some(existed) = existed {
-        let curr_time = Utc::now();
+        if curr_time < existed.last_modified_time + Duration::from_secs(100) {
+            //如果100秒以内重新给该账户发邮件，则报太频繁的错误
+            return Err(ErrNo::CommonError(SharedString::from_static(
+                "发送太频繁，请稍后再试！",
+            )));
+        }
+        if curr_time < existed.last_modified_time + Duration::from_secs(5 * 60) {
+            //如果5分钟内发送过该邮件了，则验证码保持不变
+            captcha = existed.captcha;
+        }
         let changes: Vec<CaptchaProperty> = vec![
             CaptchaProperty::Captcha(captcha.clone()),
             CaptchaProperty::LastModifiedTime(curr_time),
@@ -60,7 +71,6 @@ pub async fn send_email_captcha(
             .update_captcha(existed.id, &changes)
             .await?;
     } else {
-        let curr_time = Utc::now();
         let id = context.new_id();
         let captcha = Captcha {
             id: id,
