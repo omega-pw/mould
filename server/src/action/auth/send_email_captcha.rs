@@ -6,9 +6,11 @@ use crate::model::captcha::enums::Scene;
 use crate::model::captcha::Captcha;
 use crate::model::captcha::CaptchaOpt;
 use crate::model::captcha::CaptchaProperty;
+use crate::model::system_user::SystemUserOpt;
 use crate::native_common;
 use crate::sdk;
 use crate::service::base::CaptchaBaseService;
+use crate::service::base::SystemUserBaseService;
 use chrono::Utc;
 use native_common::cache::AsyncCache;
 use native_common::cache::EliminateType;
@@ -24,12 +26,27 @@ use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
+use tokio_postgres::Transaction;
 
 fn from_sdk_scene(val: SdkScene) -> Scene {
     match val {
         SdkScene::Register => Scene::Register,
         SdkScene::ResetPassword => Scene::ResetPassword,
     }
+}
+
+pub async fn check_email_existed(
+    transaction: &Transaction<'_>,
+    email: String,
+) -> Result<bool, ErrNo> {
+    let system_user_base_service = SystemUserBaseService::new(transaction);
+    let system_user_opt = system_user_base_service
+        .query_system_user_one(&SystemUserOpt {
+            email: Some(email),
+            ..SystemUserOpt::empty()
+        })
+        .await?;
+    return Ok(system_user_opt.is_some());
 }
 
 pub async fn send_email_captcha(
@@ -42,6 +59,24 @@ pub async fn send_email_captcha(
     let context = get_context()?;
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
+    let email_existed =
+        check_email_existed(&transaction, send_email_captcha_req.email.clone()).await?;
+    match send_email_captcha_req.scene {
+        SdkScene::Register => {
+            if email_existed {
+                return Err(ErrNo::CommonError(SharedString::from_static(
+                    "该邮箱已注册！",
+                )));
+            }
+        }
+        SdkScene::ResetPassword => {
+            if !email_existed {
+                return Err(ErrNo::CommonError(SharedString::from_static(
+                    "不存在此用户！",
+                )));
+            }
+        }
+    }
     let captcha_base_service = CaptchaBaseService::new(&transaction);
     let existed = captcha_base_service
         .query_captcha_one(&CaptchaOpt {

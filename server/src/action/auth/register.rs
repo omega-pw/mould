@@ -98,15 +98,15 @@ pub async fn register(guest: Guest, register_req: RegisterReq) -> Result<Registe
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
     let user_base_service = UserBaseService::new(&transaction);
     let system_user_base_service = SystemUserBaseService::new(&transaction);
-    let count = system_user_base_service
-        .query_system_user_count(&SystemUserOpt {
+    let system_user_opt = system_user_base_service
+        .query_system_user_one(&SystemUserOpt {
             email: Some(email.clone()),
             ..SystemUserOpt::empty()
         })
         .await?;
-    if 0 < count {
+    if system_user_opt.is_some() {
         return Err(ErrNo::CommonError(SharedString::from_static(
-            "该邮箱已注册",
+            "该邮箱已注册！",
         )));
     }
     let user_opt = user_base_service.query_user_one(&UserOpt::empty()).await?;
