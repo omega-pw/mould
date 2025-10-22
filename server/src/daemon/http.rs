@@ -181,7 +181,9 @@ async fn try_dispatch(
     let route = req.uri().path();
     let oss_handler = context.get_oss_handler();
     if Method::GET == req.method() {
-        if route.starts_with("/oauth2/login/") {
+        if "/version.txt" == route {
+            return Ok(text_response(crate::VERSION_INFO));
+        } else if route.starts_with("/oauth2/login/") {
             let (_, provider) = route.split_at("/oauth2/login/".len());
             match context.get_oauth2_client(provider) {
                 Ok((oauth2_client, oauth2_server)) => {
