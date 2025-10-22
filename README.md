@@ -88,6 +88,7 @@ chmod +x ./build-extensions.sh
     "email_account": {
         "mail_host": "smtp.163.com",
         "mail_port": 25,
+        "starttls": true,
         "username": "testuser@163.com",
         "password": "xxx",
         "name": "testuser",
