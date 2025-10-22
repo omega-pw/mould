@@ -121,10 +121,9 @@ fn text_response<T: Into<Body>>(body: T) -> Response<Body> {
 
 fn json_response<T: Into<Body>>(body: T) -> Response<Body> {
     let mut response = Response::new(body.into());
-    response.headers_mut().insert(
-        "Content-Type",
-        HeaderValue::from_str("application/json; charset=utf-8").unwrap(),
-    );
+    response
+        .headers_mut()
+        .typed_insert(ContentType::json());
     return response;
 }
 

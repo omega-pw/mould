@@ -108,7 +108,7 @@ async fn build_request(api: &str, body: &str) -> Request {
     let mut headers: HashMap<&str, String> = HashMap::new();
     headers.insert(
         "Content-Type",
-        "application/json; charset=utf-8".to_string(),
+        "application/json".to_string(),
     );
     headers.insert("X-Client-Id", client_id);
     let body_hash: String = BASE64_STANDARD.encode(&body_hash);
