@@ -47,6 +47,7 @@ chmod +x ./build-extensions.sh
         "user": null,
         "password": null,
         "max_size": 2,
+        "tls": false
     },
     "data_source": {
         "host": "127.0.0.1",
@@ -55,7 +56,7 @@ chmod +x ./build-extensions.sh
         "user": "postgres",
         "password": "******",
         "max_size": 2,
-        "ssl": null
+        "tls": false
     },
     "public_path": "http://localhost:8080",
     "oauth2_servers": {
