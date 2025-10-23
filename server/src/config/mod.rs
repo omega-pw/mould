@@ -31,7 +31,7 @@ pub struct DataSource {
     pub user: String,
     pub password: String,
     pub max_size: Option<usize>,
-    pub ssl: bool,
+    pub tls: bool,
     pub root_cert: Option<Bytes>,
 }
 
@@ -55,7 +55,7 @@ impl DataSource {
             user: origin_data_source.user,
             password: origin_data_source.password,
             max_size: origin_data_source.max_size,
-            ssl: origin_data_source.ssl,
+            tls: origin_data_source.tls,
             root_cert: root_cert,
         });
     }

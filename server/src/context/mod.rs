@@ -455,9 +455,18 @@ fn init_console_log() -> Result<(), anyhow::Error> {
     return Ok(());
 }
 
-fn init_cache_pool(cache_server: &CacheServer) -> Result<deadpool_redis::Pool, RedisError> {
+pub fn init_cache_pool(cache_server: &CacheServer) -> Result<deadpool_redis::Pool, RedisError> {
+    let addr = if cache_server.tls {
+        ConnectionAddr::TcpTls {
+            host: cache_server.host.clone(),
+            port: cache_server.port,
+            insecure: false,
+        }
+    } else {
+        ConnectionAddr::Tcp(cache_server.host.clone(), cache_server.port)
+    };
     let cache_connection_info = ConnectionInfo {
-        addr: ConnectionAddr::Tcp(cache_server.host.clone(), cache_server.port),
+        addr: addr,
         redis: RedisConnectionInfo {
             db: 0,
             username: cache_server.user.clone(),
@@ -491,11 +500,11 @@ fn init_db_pool(data_source: &DataSource) -> Result<Pool, anyhow::Error> {
     cfg.dbname(&data_source.dbname);
     cfg.user(&data_source.user);
     cfg.password(&data_source.password);
-    if data_source.ssl {
+    if data_source.tls {
         cfg.ssl_mode(SslMode::Require);
     }
     let max_size = data_source.max_size.unwrap_or(2).max(1);
-    let pool = if data_source.ssl {
+    let pool = if data_source.tls {
         let root_cert_store = if let Some(root_cert) = data_source.root_cert.as_ref() {
             let certs =
                 rustls_pemfile::certs(&mut root_cert.as_ref()).collect::<Result<Vec<_>, _>>()?;

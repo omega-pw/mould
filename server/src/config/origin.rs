@@ -13,6 +13,8 @@ pub struct CacheServer {
     pub port: u16,
     pub user: Option<String>,
     pub password: Option<String>,
+    #[serde(default)]
+    pub tls: bool,
     pub max_size: Option<usize>,
 }
 
@@ -25,7 +27,7 @@ pub struct DataSource {
     pub password: String,
     pub max_size: Option<usize>,
     #[serde(default)]
-    pub ssl: bool,
+    pub tls: bool,
     pub root_cert: Option<String>,
 }
 
