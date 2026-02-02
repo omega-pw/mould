@@ -1,8 +1,8 @@
-use yew::prelude::*;
+use leptos::prelude::*;
 
-#[function_component]
-pub fn Required() -> Html {
-    html! {
+#[component]
+pub fn Required() -> impl IntoView {
+    view! {
         <span style="color:red;margin-right: 0.25em;">{"*"}</span>
     }
 }

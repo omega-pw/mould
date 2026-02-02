@@ -1,19 +1,21 @@
 use crate::components::button::Button;
-use crate::components::input::BindingInput;
+use crate::components::input::Input;
 use crate::components::required::Required;
-use crate::components::selection::BindingSelection;
+use crate::components::selection::Selection;
 use crate::components::table::ArcRowRenderer;
 use crate::components::table::Column;
 use crate::components::table::Table;
 use crate::components::validate_wrapper::ValidateData;
+use crate::components::validate_wrapper::ValidateWrapper;
 use crate::components::ArcRenderer;
 use crate::sdk;
 use crate::utils;
-use crate::utils::binding::Binding;
 use crate::utils::request::ApiExt;
 use crate::utils::validator::RequiredValidator;
 use crate::utils::validator::Validators;
+use crate::Key;
 use crate::SharedString;
+use leptos::prelude::*;
 use sdk::environment_schema::read_environment_schema::ReadEnvironmentSchemaApi;
 use sdk::environment_schema::read_environment_schema::ReadEnvironmentSchemaReq;
 use sdk::environment_schema::save_environment_schema::SaveEnvironmentSchemaApi;
@@ -21,15 +23,10 @@ use sdk::environment_schema::save_environment_schema::SaveEnvironmentSchemaReq;
 use sdk::extension::query_extension::QueryExtensionApi;
 use sdk::extension::query_extension::QueryExtensionReq;
 use sdk::extension::Extension;
-use std::ops::Deref;
 use tihu::Id;
 use tihu::PrimaryKey;
-use yew::prelude::*;
-use yew::virtual_dom::Key;
 
-type ExtensionSelection = BindingSelection<(SharedString, String)>;
-
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone)]
 pub struct SchemaResource {
     id: Option<Id>,
     name: ValidateData<SharedString>,
@@ -39,148 +36,132 @@ pub struct SchemaResource {
 #[derive(Clone)]
 struct EditForm {
     name: ValidateData<SharedString>,
-    resource_list: UseStateHandle<Vec<(Key, Binding<SchemaResource>)>>,
+    resource_list: RwSignal<Vec<(Key, SchemaResource)>>,
 }
 
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props {
-    #[prop_or_default]
-    pub id: Option<Id>,
-    #[prop_or_default]
-    pub onsave: Option<Callback<PrimaryKey>>,
-}
-
-#[function_component]
-pub fn EnvironmentSchemaEdit(props: &Props) -> Html {
-    let is_saving: UseStateHandle<bool> = use_state(|| false);
-    let err_msg: UseStateHandle<Option<SharedString>> = use_state(|| None);
-    let extension_list: UseStateHandle<Vec<Extension>> = use_state(|| Default::default());
+#[component]
+pub fn EnvironmentSchemaEdit(
+    #[prop(optional)] id: Option<Id>,
+    #[prop(optional)] onsave: Option<UnsyncCallback<PrimaryKey>>,
+) -> impl IntoView {
+    let is_saving: RwSignal<bool> = RwSignal::new(false);
+    let err_msg: RwSignal<Option<SharedString>> = RwSignal::new(None);
+    let extension_list: RwSignal<Vec<Extension>> = RwSignal::new(Default::default());
     let edit_form = EditForm {
         name: ValidateData::new(
             Default::default(),
             Some(Validators::new().add(RequiredValidator::new("请输入环境规格名称"))),
         ),
-        resource_list: use_state(|| Default::default()),
+        resource_list: RwSignal::new(Default::default()),
     };
-    let id = props.id;
     let edit_form_clone = edit_form.clone();
     let extension_list_clone = extension_list.clone();
-    use_effect_with(id, move |_| {
-        wasm_bindgen_futures::spawn_local(async move {
-            query_extension_list(&extension_list_clone).await.ok();
-        });
-        if let Some(id) = id {
-            wasm_bindgen_futures::spawn_local(async move {
-                read_environment_schema_detail(&edit_form_clone.clone(), id)
-                    .await
-                    .ok();
-            });
-        }
-        || ()
+    wasm_bindgen_futures::spawn_local(async move {
+        query_extension_list(&extension_list_clone).await.ok();
     });
-    let err_msg_clone = err_msg.clone();
-    let clear_err_msg = Callback::from(move |_: ()| {
-        err_msg_clone.set(None);
-    });
-    let edit_form_clone = edit_form.clone();
-    let is_saving_clone = is_saving.clone();
-    let err_msg_clone = err_msg.clone();
-    let onsave_clone = props.onsave.clone();
-    let on_save = Callback::from(move |_| {
-        let edit_form: EditForm = edit_form_clone.clone();
-        let is_saving = is_saving_clone.clone();
-        let err_msg = err_msg_clone.clone();
-        let onsave = onsave_clone.clone();
+    if let Some(id) = id {
         wasm_bindgen_futures::spawn_local(async move {
-            save_environment_schema(id, &edit_form, is_saving, &err_msg, &onsave)
+            read_environment_schema_detail(&edit_form_clone.clone(), id)
                 .await
                 .ok();
         });
+    }
+    let err_msg_clone = err_msg.clone();
+    let clear_err_msg = UnsyncCallback::new(move |_: ()| {
+        err_msg_clone.set(None);
     });
+    let on_save = {
+        let edit_form_clone = edit_form.clone();
+        let is_saving_clone = is_saving.clone();
+        let err_msg_clone = err_msg.clone();
+        let onsave_clone = onsave.clone();
+        UnsyncCallback::new(move |_| {
+            let edit_form: EditForm = edit_form_clone.clone();
+            let is_saving = is_saving_clone.clone();
+            let err_msg = err_msg_clone.clone();
+            let onsave = onsave_clone.clone();
+            wasm_bindgen_futures::spawn_local(async move {
+                save_environment_schema(id, &edit_form, is_saving, &err_msg, &onsave)
+                    .await
+                    .ok();
+            });
+        })
+    };
 
     let resource_list_clone1 = edit_form.resource_list.clone();
     let resource_list_clone2 = edit_form.resource_list.clone();
     let clear_err_msg_clone = clear_err_msg.clone();
-    let columns: Vec<Column<Binding<SchemaResource>>> = vec![
+    let columns: Vec<Column<SchemaResource>> = vec![
         Column {
             key: "name".into(),
-            head: ArcRenderer::from(move |_: &'_ ()| {
-                html! { "规格名称" }
-            }),
-            row: ArcRowRenderer::from(move |item: &Binding<SchemaResource>, _index: usize| {
-                let clear_err_msg = clear_err_msg_clone.clone();
-                html! {
-                    item.view(move |item: UseStateHandle<SchemaResource>| {
-                        let clear_err_msg = clear_err_msg.clone();
-                        item.name.view(move |name: UseStateHandle<SharedString>, validator: Callback<SharedString>| {
-                            html! {
-                                <BindingInput value={name} placeholder={"规格名称"} onupdate={validator} onfocus={clear_err_msg.clone()}/>
-                            }
-                        })
-                    })
-                }
+            head: ArcRenderer::from(move |_: &'_ ()| "规格名称".into_any()),
+            row: ArcRowRenderer::from(move |item: &SchemaResource, _index: usize| {
+                let name = item.name.clone();
+                view! {
+                    <ValidateWrapper error={name.error()}>
+                        <Input value={name.data()} placeholder={"规格名称"} onupdate={name.listener()} onfocus={clear_err_msg_clone.clone()}/>
+                    </ValidateWrapper>
+                }.into_any()
             }),
             head_style: None,
             data_style: None,
         },
         Column {
             key: "extension".into(),
-            head: ArcRenderer::from(move |_: &'_ ()| {
-                html! { "资源类型" }
-            }),
-            row: ArcRowRenderer::from(move |item: &Binding<SchemaResource>, _index: usize| {
-                let extension_list = extension_list.clone();
-                html! {
-                    item.view(move |item: UseStateHandle<SchemaResource>| {
-                        let extension_list = extension_list.clone();
-                        item.extension_id.view(move |extension_id: UseStateHandle<Option<SharedString>>, validator: Callback<Option<SharedString>>| {
-                            let extension_list: Vec<_> = extension_list.iter().map(|item|(item.id.clone().into(), item.name.clone())).collect();
-                            let onchange = validator.reform(|option: Option<(SharedString, String)>| {
-                                option.map(|option| option.0)
-                            });
-                            html! {
-                                <ExtensionSelection value={extension_id.clone()} options={extension_list} onchange={onchange}/>
-                            }
-                        })
+            head: ArcRenderer::from(move |_: &'_ ()| "资源类型".into_any()),
+            row: ArcRowRenderer::from(move |item: &SchemaResource, _index: usize| {
+                let extension_list = {
+                    let extension_list = extension_list.clone();
+                    Signal::derive(move || {
+                        extension_list
+                            .read()
+                            .iter()
+                            .map(|item| (item.id.clone().into(), item.name.clone()))
+                            .collect()
                     })
-                }
+                };
+                let onchange = {
+                    let extension_id = item.extension_id.clone();
+                    UnsyncCallback::new(move |_| {
+                        extension_id.validate(true);
+                    })
+                };
+                let extension_id = item.extension_id.clone();
+                view! {
+                    <ValidateWrapper error={extension_id.error()}>
+                        <Selection value={extension_id.data()} options={extension_list} onchange={onchange}/>
+                    </ValidateWrapper>
+                }.into_any()
             }),
             head_style: None,
             data_style: None,
         },
         Column {
             key: "operation".into(),
-            head: ArcRenderer::from(move |_: &'_ ()| {
-                html! { "操作" }
-            }),
-            row: ArcRowRenderer::from(move |_attr: &Binding<SchemaResource>, index: usize| {
+            head: ArcRenderer::from(move |_: &'_ ()| "操作".into_any()),
+            row: ArcRowRenderer::from(move |_attr: &SchemaResource, index: usize| {
                 let resource_list = resource_list_clone1.clone();
-                let on_remove = Callback::from(move |_| {
-                    let mut new_resource_list = resource_list.deref().clone();
-                    new_resource_list.remove(index);
-                    resource_list.set(new_resource_list);
+                let on_remove = UnsyncCallback::new(move |_| {
+                    resource_list.write().remove(index);
                 });
-                html! {
-                    <Button onclick={on_remove} style="margin-left:0.5em;">{"移除"}</Button>
+                view! {
+                    <Button onclick={on_remove} style={SharedString::from("margin-left:0.5em;")}>{"移除"}</Button>
                 }
+                .into_any()
             }),
             head_style: None,
-            data_style: Some((|_index: usize| AttrValue::from("vertical-align: top;")).into()),
+            data_style: Some((|_index: usize| SharedString::from("vertical-align: top;")).into()),
         },
     ];
-    html! {
+    view! {
         <div class="width-fill height-fill border-box" style="padding:0.25em;">
             <table class="width-fill" style="border-collapse:collapse;table-layout: fixed;">
                 <tr>
                     <td class="align-right" style="width:8em;vertical-align: top;"><Required/>{"环境规格名称："}</td>
                     <td>
-                        {
-                            edit_form.name.view(move |name: UseStateHandle<SharedString>, validator: Callback<SharedString>| {
-                                html! {
-                                    <BindingInput value={name} onupdate={validator}/>
-                                }
-                            })
-                        }
+                        <ValidateWrapper error={edit_form.name.error()}>
+                            <Input value={edit_form.name.data()} onupdate={edit_form.name.listener()}/>
+                        </ValidateWrapper>
                     </td>
                 </tr>
                 <tr>
@@ -188,25 +169,21 @@ pub fn EnvironmentSchemaEdit(props: &Props) -> Html {
                     <td>
                         {
                             {
-                                let on_add = Callback::from(move |_| {
-                                    let mut resource_list_clone = resource_list_clone2.deref().clone();
-                                    resource_list_clone.push((
+                                let on_add = UnsyncCallback::new(move |_| {
+                                    resource_list_clone2.write().push((
                                         utils::gen_id().into(),
-                                        Binding::new(SchemaResource {
+                                        SchemaResource {
                                             id: None,
                                             name: init_resource_name(Default::default()),
                                             extension_id: init_extension_id(None),
-                                        }),
+                                        },
                                     ));
-                                    resource_list_clone2.set(resource_list_clone);
                                 });
-                                html! {
-                                    <>
-                                        <Table<Binding<SchemaResource>> list={edit_form.resource_list.deref().clone()} columns={columns} />
-                                        <div style="margin-top:0.5em">
-                                            <Button onclick={on_add}>{"添加"}</Button>
-                                        </div>
-                                    </>
+                                view! {
+                                    <Table list={edit_form.resource_list} columns={columns} />
+                                    <div style="margin-top:0.5em">
+                                        <Button onclick={on_add}>{"添加"}</Button>
+                                    </div>
                                 }
                             }
                         }
@@ -215,17 +192,12 @@ pub fn EnvironmentSchemaEdit(props: &Props) -> Html {
                 <tr>
                     <td></td>
                     <td style="padding-top:0.5em">
-                        <Button disabled={*is_saving} onclick={on_save}>{"保存"}</Button>
-                        {
-                            match err_msg.as_ref() {
-                                Some(err_msg) => {
-                                    html!{
-                                        <span class="middle" style="color:red;margin-left: 0.5em;">{err_msg}</span>
-                                    }
-                                },
-                                None => html!{}
-                            }
-                        }
+                        <Button disabled={is_saving} onclick={on_save}>{"保存"}</Button>
+                        <Show
+                            when={ let err_msg = err_msg.clone(); move || { err_msg.read().is_some() } }
+                        >
+                            <span class="middle" style="color:red;margin-left: 0.5em;">{err_msg}</span>
+                        </Show>
                     </td>
                 </tr>
             </table>
@@ -234,7 +206,7 @@ pub fn EnvironmentSchemaEdit(props: &Props) -> Html {
 }
 
 async fn query_extension_list(
-    extension_list: &UseStateHandle<Vec<Extension>>,
+    extension_list: &RwSignal<Vec<Extension>>,
 ) -> Result<(), SharedString> {
     let result = QueryExtensionApi.call(&QueryExtensionReq {}).await?;
     extension_list.set(result);
@@ -266,11 +238,11 @@ async fn read_environment_schema_detail(edit_form: &EditForm, id: Id) -> Result<
             .map(|schema_resource| {
                 (
                     utils::gen_id().into(),
-                    Binding::new(SchemaResource {
+                    SchemaResource {
                         id: Some(schema_resource.id),
                         name: init_resource_name(schema_resource.name.into()),
                         extension_id: init_extension_id(Some(schema_resource.extension_id.into())),
-                    }),
+                    },
                 )
             })
             .collect(),
@@ -283,11 +255,11 @@ fn chk_form_err(edit_form: &EditForm) -> Vec<SharedString> {
     if let Err(error) = edit_form.name.validate(true) {
         err_msgs.push(error);
     }
-    for (_, resource) in edit_form.resource_list.iter() {
-        if let Err(error) = resource.get().name.validate(true) {
+    for (_, resource) in edit_form.resource_list.read().iter() {
+        if let Err(error) = resource.name.validate(true) {
             err_msgs.push(error);
         }
-        if let Err(error) = resource.get().extension_id.validate(true) {
+        if let Err(error) = resource.extension_id.validate(true) {
             err_msgs.push(error);
         }
     }
@@ -298,8 +270,7 @@ fn collect_resource_list(
     edit_form: &EditForm,
 ) -> Vec<sdk::environment_schema::save_environment_schema::SchemaResource> {
     let mut resource_list: Vec<_> = Vec::new();
-    for (_, schema_resource_opt) in edit_form.resource_list.deref().iter() {
-        let schema_resource = schema_resource_opt.get();
+    for (_, schema_resource) in edit_form.resource_list.read().iter() {
         resource_list.push(
             sdk::environment_schema::save_environment_schema::SchemaResource {
                 id: schema_resource.id,
@@ -318,9 +289,9 @@ fn collect_resource_list(
 async fn save_environment_schema(
     id: Option<Id>,
     edit_form: &EditForm,
-    is_saving: UseStateHandle<bool>,
-    err_msg: &UseStateHandle<Option<SharedString>>,
-    onsave: &Option<Callback<PrimaryKey>>,
+    is_saving: RwSignal<bool>,
+    err_msg: &RwSignal<Option<SharedString>>,
+    onsave: &Option<UnsyncCallback<PrimaryKey>>,
 ) -> Result<(), SharedString> {
     let err_msgs = chk_form_err(edit_form);
     if let Some(first) = err_msgs.first() {
@@ -345,7 +316,7 @@ async fn save_environment_schema(
         Ok(pri_key) => {
             match onsave {
                 Some(onsave) => {
-                    onsave.emit(pri_key);
+                    onsave.run(pri_key);
                 }
                 None => (),
             }

@@ -1,9 +1,9 @@
 use crate::SharedString;
+use leptos::prelude::*;
 use std::fmt;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
-use yew::prelude::UseStateHandle;
 
 pub trait Validator<T: ?Sized> {
     fn validate(&self, data: &T) -> Option<SharedString>;
@@ -15,8 +15,8 @@ impl<T: ?Sized> fmt::Debug for dyn Validator<T> {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct ValidatorWrapper<T: ?Sized>(Arc<dyn Validator<T>>);
+#[derive(Clone)]
+pub struct ValidatorWrapper<T: ?Sized>(Arc<dyn Validator<T> + Send + Sync>);
 
 impl<T: ?Sized> Deref for ValidatorWrapper<T> {
     type Target = dyn Validator<T>;
@@ -32,7 +32,7 @@ impl<T: ?Sized> PartialEq for ValidatorWrapper<T> {
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq)]
 pub struct Validators<T: ?Sized> {
     pub validators: Vec<ValidatorWrapper<T>>,
 }
@@ -49,11 +49,11 @@ impl<T: ?Sized> Validators<T> {
             validators: Vec::new(),
         }
     }
-    pub fn add(mut self, validator: impl Validator<T> + 'static) -> Self {
+    pub fn add(mut self, validator: impl Validator<T> + Send + Sync + 'static) -> Self {
         self.validators.push(ValidatorWrapper(Arc::new(validator)));
         self
     }
-    pub fn validate_into(&self, data: &T, error: &UseStateHandle<Option<SharedString>>) {
+    pub fn validate_into(&self, data: &T, error: &RwSignal<Option<SharedString>>) {
         error.set(self.validate(data));
     }
 }
@@ -154,6 +154,7 @@ where
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct PositiveF64Validator {
     message: SharedString,
     equal: bool,

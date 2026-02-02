@@ -1,25 +1,23 @@
 use super::tree::Node;
 use super::tree::TreeNode;
+use crate::Key;
+use crate::SharedString;
+use leptos::prelude::*;
 use std::ops::Deref;
 use std::sync::Arc;
-use yew::prelude::*;
-use yew::virtual_dom::Key;
-use yew_router::prelude::use_navigator;
-use yew_router::AnyRoute;
-use yew_router::Routable;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone)]
 pub struct State {
-    pub expanded_key: UseStateHandle<Option<Key>>,
-    pub route: UseStateHandle<Option<String>>,
+    pub expanded_key: RwSignal<Option<Key>>,
+    pub active_key: RwSignal<Option<Key>>,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone)]
 pub struct MenuNode {
     pub state: Arc<State>,
     pub key: Key,
     pub name: String,
-    pub route: Option<AnyRoute>,
+    pub action: Option<UnsyncCallback<Key>>,
     pub children: Option<Arc<Vec<MenuNode>>>,
 }
 
@@ -27,33 +25,35 @@ impl Node for MenuNode {
     fn key(&self) -> Key {
         self.key.clone()
     }
-    fn render(&self) -> Html {
-        let is_active = if let (Some(node_route), Some(current_route)) =
-            (self.state.route.as_ref(), self.route.as_ref())
-        {
-            node_route == &current_route.to_path()
-        } else {
-            false
+    fn render(&self) -> AnyView {
+        let style = {
+            let key = self.key.clone();
+            let active_key = self.state.active_key.clone();
+            move || {
+                let is_active = active_key.read().as_ref() == Some(&key);
+                let addon_style = if is_active {
+                    "background-color: #EEE;"
+                } else {
+                    ""
+                };
+                format!(
+                    "cursor: default;padding-top: 0.5em;padding-bottom: 0.5em;padding-left: 0.5em;{}",
+                    addon_style
+                )
+            }
         };
-        let addon_style = if is_active {
-            "background-color: #EEE;"
-        } else {
-            ""
-        };
-        let style = format!(
-            "cursor: default;padding-top: 0.5em;padding-bottom: 0.5em;padding-left: 0.5em;{}",
-            addon_style
-        );
-        html! {
-            <div style={style}>{self.name.clone()}</div>
+        let name = self.name.clone();
+        view! {
+            <div style={style}>{name}</div>
         }
+        .into_any()
     }
-    fn children(&self) -> Option<&[Self]> {
-        self.children.as_ref().map(|children| children.as_slice())
+    fn children(&self) -> Option<Arc<Vec<MenuNode>>> {
+        self.children.clone()
     }
-    fn children_style(&self) -> Option<AttrValue> {
+    fn children_style(&self) -> Option<SharedString> {
         let base_style = "margin: 0;padding: 0;list-style-type: none;";
-        let addon_style = if &Some(self.key.clone()) == self.state.expanded_key.deref() {
+        let addon_style = if &Some(self.key.clone()) == self.state.expanded_key.read().deref() {
             "height: auto;"
         } else {
             "height: 0;overflow: hidden;"
@@ -62,43 +62,37 @@ impl Node for MenuNode {
     }
 }
 
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props {
-    pub list: Vec<MenuNode>,
-}
-
-#[function_component]
-pub fn Menu(props: &Props) -> Html {
-    let navigator = use_navigator().unwrap();
+#[component]
+pub fn Menu(#[prop(into)] list: Signal<Vec<MenuNode>>) -> impl IntoView {
     let ul_style = "margin: 0;padding: 0;list-style-type: none;";
-    html! {
+    view! {
         <ul style={ul_style}>
-            {
-                for props.list.iter().map(|data| {
-                    let navigator = navigator.clone();
-                    let onclick = Callback::from(move |data: MenuNode| {
+            <For
+                each=move || { list.get().into_iter() }
+                key=|node| { node.key.clone() }
+                children=move |node| {
+                    let onclick = UnsyncCallback::new(move |data: MenuNode| {
                         if data.children.is_none() {
-                            if let Some(route) = data.route.as_ref() {
-                                navigator.push(route);
+                            if let Some(action) = data.action.as_ref() {
+                                action.run(data.key.clone());
                             }
                         } else {
-                            let expanded_key = &data.state.expanded_key;
-                            if &Some(data.key.clone()) == expanded_key.deref() {
-                                expanded_key.set(None);
+                            let mut expanded_key = data.state.expanded_key.write();
+                            if Some(&data.key) == expanded_key.as_ref() {
+                                expanded_key.take();
                             } else {
-                                expanded_key.set(Some(data.key.clone()));
+                                expanded_key.replace(data.key.clone());
                             }
                         }
                     });
-                    html! {
+                    view! {
                         <TreeNode<MenuNode>
-                            key={data.key()}
-                            data={data.clone()}
-                            onclick={onclick}
+                            data={node.clone()}
+                            onclick={Some(onclick)}
                         />
                     }
-                })
-            }
+                }
+            />
         </ul>
     }
 }

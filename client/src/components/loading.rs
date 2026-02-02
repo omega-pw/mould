@@ -1,70 +1,34 @@
+use leptos::{prelude::*, tachys::view::any_view::AnyViewState};
+use send_wrapper::SendWrapper;
+use std::ops::DerefMut;
+use std::sync::{LazyLock, Mutex};
+use wasm_bindgen::JsCast;
 use web_sys::Element;
-use yew::prelude::*;
-use yew::{html, Component, Context, Html};
 
-struct State {
-    center_middle: bool,
-    z_index: u64,
-}
-
-pub enum Msg {}
-
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props {
-    pub center_middle: bool,
-    #[prop_or(999)]
-    pub z_index: u64,
-}
-
-pub struct Loading {
-    state: State,
-}
-
-impl Component for Loading {
-    type Message = Msg;
-    type Properties = Props;
-
-    fn create(ctx: &Context<Self>) -> Self {
-        let props = ctx.props();
-        let state = State {
-            center_middle: props.center_middle,
-            z_index: props.z_index,
-        };
-        Loading { state }
-    }
-
-    fn update(&mut self, _ctx: &Context<Self>, _msg: Self::Message) -> bool {
-        return true;
-    }
-
-    fn changed(&mut self, ctx: &Context<Self>, _old_props: &Self::Properties) -> bool {
-        let props = ctx.props();
-        self.state.center_middle = props.center_middle;
-        self.state.z_index = props.z_index;
-        return true;
-    }
-
-    fn view(&self, _ctx: &Context<Self>) -> Html {
-        if self.state.center_middle {
-            let style = format!("width: 3em;height: 3em;position: fixed;left: 50%;top: 50%;-ms-transform: translateX(-50%) translateY(-50%);-moz-transform: translateX(-50%) translateY(-50%);-webkit-transform: translateX(-50%) translateY(-50%);-o-transform: translateX(-50%) translateY(-50%);transform: translateX(-50%) translateY(-50%);z-index: {};",self.state.z_index);
-            html! {
-                <div style={style}>
-                    <i class="loading" style="width: 100%;height: 100%;"></i>
-                </div>
-            }
-        } else {
-            html! {
-                <i class="loading" style="width: 3em;height: 3em;"></i>
-            }
+#[component]
+pub fn Loading(center_middle: bool, #[prop(default = 999)] z_index: u64) -> impl IntoView {
+    if center_middle {
+        let style = format!("width: 3em;height: 3em;position: fixed;left: 50%;top: 50%;-ms-transform: translateX(-50%) translateY(-50%);-moz-transform: translateX(-50%) translateY(-50%);-webkit-transform: translateX(-50%) translateY(-50%);-o-transform: translateX(-50%) translateY(-50%);transform: translateX(-50%) translateY(-50%);z-index: {};", z_index);
+        view! {
+            <div style={style}>
+                <i class="loading" style="width: 100%;height: 100%;"></i>
+            </div>
         }
+        .into_any()
+    } else {
+        view! {
+            <i class="loading" style="width: 3em;height: 3em;"></i>
+        }
+        .into_any()
     }
 }
 
-static mut INSTANCE: Option<(AppHandle<Loading>, Element, u32)> = None;
+static INSTANCE: LazyLock<Mutex<Option<SendWrapper<(UnmountHandle<AnyViewState>, Element, u32)>>>> =
+    LazyLock::new(|| Mutex::new(None));
 
 pub fn show() {
-    let inst = unsafe { INSTANCE.as_mut() };
-    if let Some(inst) = inst {
+    let inst = LazyLock::force(&INSTANCE);
+    if let Some(inst) = inst.lock().unwrap().as_mut() {
         inst.2 += 1;
         return;
     }
@@ -72,21 +36,23 @@ pub fn show() {
     let body = document.body().unwrap();
     let loading_root = document.create_element("div").unwrap();
     body.append_child(&loading_root).unwrap();
-    let props = Props {
-        center_middle: true,
-        z_index: 999,
+    let renderer = || {
+        view! {
+            <Loading center_middle=true z_index=999 />
+        }
+        .into_any()
     };
-    let loading_handle =
-        yew::Renderer::<Loading>::with_root_and_props(loading_root.clone(), props).render();
-    unsafe {
-        INSTANCE.replace((loading_handle, loading_root, 1));
-    }
+    let loading_handle = leptos::mount::mount_to(loading_root.clone().unchecked_into(), renderer);
+    inst.lock()
+        .unwrap()
+        .replace(SendWrapper::new((loading_handle, loading_root, 1)));
 }
 
-fn destroy() {
-    let inst = unsafe { INSTANCE.take() };
-    if let Some((loading_handle, loading_root, _)) = inst {
-        loading_handle.destroy();
+fn destroy(inst: &mut Option<SendWrapper<(UnmountHandle<AnyViewState>, Element, u32)>>) {
+    let inst = inst.take();
+    if let Some(wrapper) = inst {
+        let (loading_handle, loading_root, _) = wrapper.take();
+        // loading_handle.destroy();
         let document = web_sys::window().unwrap().document().unwrap();
         let body = document.body().unwrap();
         body.remove_child(&loading_root).unwrap();
@@ -94,12 +60,13 @@ fn destroy() {
 }
 
 pub fn hide() {
-    let inst = unsafe { INSTANCE.as_mut() };
-    if let Some(inst) = inst {
-        if 1 >= inst.2 {
-            destroy();
+    let inst = LazyLock::force(&INSTANCE);
+    let mut inst = inst.lock().unwrap();
+    if let Some(wrapper) = inst.as_mut() {
+        if 1 >= wrapper.2 {
+            destroy(inst.deref_mut());
         } else {
-            inst.2 -= 1;
+            wrapper.2 -= 1;
         }
     }
 }

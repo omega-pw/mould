@@ -33,7 +33,7 @@ impl QueryJobRecordReq {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct JobRecord {
     pub id: Id,
     pub job_id: Id,

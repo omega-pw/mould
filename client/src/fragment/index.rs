@@ -1,11 +1,8 @@
-use yew::prelude::*;
+use leptos::prelude::*;
 
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props {}
-
-#[function_component]
-pub fn Index(_props: &Props) -> Html {
-    html! {
+#[component]
+pub fn Index() -> impl IntoView {
+    view! {
         <div class="relative width-fill height-fill">
             {"welcome"}
         </div>

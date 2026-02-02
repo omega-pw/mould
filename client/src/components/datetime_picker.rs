@@ -9,14 +9,20 @@ use chrono::Timelike;
 use chrono::Weekday;
 use gloo::timers::callback::Timeout;
 use js_sys::Date;
+use js_sys::Function;
+use js_sys::Promise;
+use leptos::prelude::*;
 use std::collections::HashMap;
 use std::fmt;
+use std::sync::Arc;
 use wasm_bindgen::JsCast;
+use wasm_bindgen_futures::JsFuture;
+use web_sys::Event;
 use web_sys::EventTarget;
+use web_sys::FocusEvent;
 use web_sys::HtmlInputElement;
-use yew::html::Scope;
-use yew::prelude::*;
-use yew::{html, Component, Context, Html};
+use web_sys::MouseEvent;
+use web_sys::WheelEvent;
 
 struct State {
     value: Option<NaiveDateTime>,
@@ -25,25 +31,6 @@ struct State {
     tm_hours: u32,
     tm_minutes: u32,
     tm_seconds: u32,
-    style: SharedString,
-}
-
-pub enum Msg {
-    PrevYear,
-    NextYear,
-    PrevMonth,
-    NextMonth,
-    SelectDate(NaiveDate),
-    ChangeHours(String),
-    ChangeMinutes(String),
-    ChangeSeconds(String),
-    MousewheelHours(WheelEvent),
-    MousewheelMinutes(WheelEvent),
-    MousewheelSeconds(WheelEvent),
-    SetTargetSelected(EventTarget),
-    Clear,
-    Save,
-    Noop,
 }
 
 #[derive(Clone, PartialEq)]
@@ -78,275 +65,341 @@ impl Default for Config {
     }
 }
 
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props {
-    pub value: Option<NaiveDateTime>,
-    pub config: Option<Config>,
-    pub ondone: Option<Callback<Option<NaiveDateTime>>>,
-    #[prop_or(SharedString::Static(""))]
-    pub style: SharedString,
-}
-
-pub struct DateTimePicker {
-    config: Config,
-    state: State,
-    timeout: Option<Timeout>,
-}
-
-impl Component for DateTimePicker {
-    type Message = Msg;
-    type Properties = Props;
-
-    fn create(ctx: &Context<Self>) -> Self {
-        let props = ctx.props();
-        let config = props.config.clone().unwrap_or_else(|| Config::default());
-        let initial_datetime = props
-            .value
-            .unwrap_or_else(|| get_curr_date_time() + Duration::seconds(config.time_offset));
-        let initial_date = initial_datetime.date();
-        let state = State {
-            value: props.value,
-            calendar: Calendar {
-                solar_year: initial_date.year() as u32, //年
-                solar_month: initial_date.month(),      //月
-                first_day: config.first_day,            //周几排在最前面
-            },
-            tm_date: initial_date,
-            tm_hours: initial_datetime.hour(),
-            tm_minutes: initial_datetime.minute(),
-            tm_seconds: initial_datetime.second(),
-            style: props.style.clone(),
-        };
-        DateTimePicker {
-            config: config,
-            state,
-            timeout: None,
+#[component]
+pub fn DateTimePicker(
+    value: Option<NaiveDateTime>,
+    #[prop(into, default = None)] config: Option<Config>,
+    #[prop(into, default = None)] ondone: Option<UnsyncCallback<Option<NaiveDateTime>>>,
+    #[prop(into, optional)] style: SharedString,
+) -> impl IntoView {
+    let config = Arc::new(config.clone().unwrap_or_else(|| Config::default()));
+    let initial_datetime =
+        value.unwrap_or_else(|| get_curr_date_time() + Duration::seconds(config.time_offset));
+    let initial_date = initial_datetime.date();
+    let state = RwSignal::new(State {
+        value: value,
+        calendar: Calendar {
+            solar_year: initial_date.year() as u32, //年
+            solar_month: initial_date.month(),      //月
+            first_day: config.first_day,            //周几排在最前面
+        },
+        tm_date: initial_date,
+        tm_hours: initial_datetime.hour(),
+        tm_minutes: initial_datetime.minute(),
+        tm_seconds: initial_datetime.second(),
+    });
+    let on_prev_year_click = {
+        let state = state.clone();
+        move |_evt: MouseEvent| {
+            state.write().calendar.goto_prev_year();
         }
-    }
-
-    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
-        match msg {
-            Msg::PrevYear => {
-                self.state.calendar.goto_prev_year();
-            }
-            Msg::NextYear => {
-                self.state.calendar.goto_next_year();
-            }
-            Msg::PrevMonth => {
-                self.state.calendar.goto_prev_month();
-            }
-            Msg::NextMonth => {
-                self.state.calendar.goto_next_month();
-            }
-            Msg::SelectDate(date) => {
-                self.select_date(date);
-            }
-            Msg::ChangeHours(hours) => {
-                self.change_hours(&hours);
-            }
-            Msg::ChangeMinutes(minutes) => {
-                self.change_minutes(&minutes);
-            }
-            Msg::ChangeSeconds(seconds) => {
-                self.change_seconds(&seconds);
-            }
-            Msg::MousewheelHours(evt) => {
-                self.handle_hours_mousewheel(ctx.link(), evt);
-            }
-            Msg::MousewheelMinutes(evt) => {
-                self.handle_minutes_mousewheel(ctx.link(), evt);
-            }
-            Msg::MousewheelSeconds(evt) => {
-                self.handle_seconds_mousewheel(ctx.link(), evt);
-            }
-            Msg::SetTargetSelected(target) => {
-                self.timeout.take();
-                set_target_selected(target);
-            }
-            Msg::Clear => {
-                if let Some(ondone) = ctx.props().ondone.as_ref() {
-                    ondone.emit(None);
-                }
-            }
-            Msg::Save => {
-                if let Some(ondone) = ctx.props().ondone.as_ref() {
-                    if let Ok(date_time) = self.check_selected_date_time() {
-                        ondone.emit(Some(date_time));
-                    }
-                }
-            }
-            Msg::Noop => (),
+    };
+    let on_next_year_click = {
+        let state = state.clone();
+        move |_evt: MouseEvent| {
+            state.write().calendar.goto_next_year();
         }
-        return true;
-    }
-
-    fn changed(&mut self, ctx: &Context<Self>, _old_props: &Self::Properties) -> bool {
-        let props = ctx.props();
-        self.state.value = props.value;
-        let config = props.config.clone().unwrap_or_else(|| Config::default());
-        self.state.calendar.first_day = config.first_day;
-        self.config = config;
-        self.state.style = props.style.clone();
-        return true;
-    }
-
-    fn view(&self, ctx: &Context<Self>) -> Html {
-        let link = ctx.link();
-        let on_prev_year_click = link.callback(|_evt: MouseEvent| Msg::PrevYear);
-        let on_next_year_click = link.callback(|_evt: MouseEvent| Msg::NextYear);
-        let on_prev_month_click = link.callback(|_evt: MouseEvent| Msg::PrevMonth);
-        let on_next_month_click = link.callback(|_evt: MouseEvent| Msg::NextMonth);
-        let on_change_hours = link.callback(|evt: InputEvent| {
-            let input: HtmlInputElement = evt.target_unchecked_into();
-            Msg::ChangeHours(input.value().trim().to_string())
-        });
-        let on_change_minutes = link.callback(|evt: InputEvent| {
-            let input: HtmlInputElement = evt.target_unchecked_into();
-            Msg::ChangeMinutes(input.value().trim().to_string())
-        });
-        let on_change_seconds = link.callback(|evt: InputEvent| {
-            let input: HtmlInputElement = evt.target_unchecked_into();
-            Msg::ChangeSeconds(input.value().trim().to_string())
-        });
-        let on_select_text = link.callback(|evt: FocusEvent| {
+    };
+    let on_prev_month_click = {
+        let state = state.clone();
+        move |_evt: MouseEvent| {
+            state.write().calendar.goto_prev_month();
+        }
+    };
+    let on_next_month_click = {
+        let state = state.clone();
+        move |_evt: MouseEvent| {
+            state.write().calendar.goto_next_month();
+        }
+    };
+    let on_change_hours = {
+        let state = state.clone();
+        move |evt: Event| {
             if let Some(target) = evt.target() {
-                set_target_selected(target);
+                let input: HtmlInputElement = target.unchecked_into();
+                state
+                    .write()
+                    .change_hours(&input.value().trim().to_string());
             }
-            Msg::Noop
-        });
-        let on_mousewheel_hours = link.callback(|evt: WheelEvent| Msg::MousewheelHours(evt));
-        let on_mousewheel_minutes = link.callback(|evt: WheelEvent| Msg::MousewheelMinutes(evt));
-        let on_mousewheel_seconds = link.callback(|evt: WheelEvent| Msg::MousewheelSeconds(evt));
-        let on_clear = link.callback(|_evt: MouseEvent| Msg::Clear);
-        let on_save = link.callback(|_evt: MouseEvent| Msg::Save);
-        let weekdays = self.weekdays();
-        let calendar_dates = self.calendar_dates();
-        let selected_date_time_ret: Result<NaiveDateTime, SharedString> =
-            self.check_selected_date_time();
-        let prev_year_btn_style = if self.prev_year_selectable() {
-            "visibility:visible;"
-        } else {
-            "visibility:hidden;"
-        };
-        let next_year_btn_style = if self.next_year_selectable() {
-            "visibility:visible;"
-        } else {
-            "visibility:hidden;"
-        };
-        let prev_month_btn_style = if self.prev_month_selectable() {
-            "visibility:visible;"
-        } else {
-            "visibility:hidden;"
-        };
-        let next_month_btn_style = if self.next_month_selectable() {
-            "visibility:visible;"
-        } else {
-            "visibility:hidden;"
-        };
-        html! {
-            <div class="date-time-picker" style={self.state.style.clone()}>
-                <table style="table-layout: fixed;border-collapse: collapse;">
-                    <caption class="year-month-area">
-                        <div class="year-area">
-                            <span class="icon-prev" style={prev_year_btn_style} onclick={on_prev_year_click}>{"<"}</span>
-                            <div class="year-wrapper">
-                                <div style="width:100%;">
-                                    {self.state.calendar.solar_year}{"年"}
-                                </div>
+        }
+    };
+    let on_change_minutes = {
+        let state = state.clone();
+        move |evt: Event| {
+            if let Some(target) = evt.target() {
+                let input: HtmlInputElement = target.unchecked_into();
+                state
+                    .write()
+                    .change_minutes(&input.value().trim().to_string());
+            }
+        }
+    };
+    let on_change_seconds = {
+        let state = state.clone();
+        move |evt: Event| {
+            if let Some(target) = evt.target() {
+                let input: HtmlInputElement = target.unchecked_into();
+                state
+                    .write()
+                    .change_seconds(&input.value().trim().to_string());
+            }
+        }
+    };
+    let on_select_text = |evt: FocusEvent| {
+        if let Some(target) = evt.target() {
+            set_target_selected(target);
+        }
+    };
+    let on_mousewheel_hours = {
+        let state = state.clone();
+        move |evt: WheelEvent| {
+            state.write().handle_hours_mousewheel(evt);
+        }
+    };
+    let on_mousewheel_minutes = {
+        let state = state.clone();
+        move |evt: WheelEvent| {
+            state.write().handle_minutes_mousewheel(evt);
+        }
+    };
+    let on_mousewheel_seconds = {
+        let state = state.clone();
+        move |evt: WheelEvent| {
+            state.write().handle_seconds_mousewheel(evt);
+        }
+    };
+    let on_clear = {
+        let ondone = ondone.clone();
+        move |_evt: MouseEvent| {
+            if let Some(ondone) = ondone.as_ref() {
+                ondone.run(None);
+            }
+        }
+    };
+    let on_save = {
+        let state = state.clone();
+        let config = config.clone();
+        let ondone = ondone.clone();
+        move |_evt: MouseEvent| {
+            if let Some(ondone) = ondone.as_ref() {
+                if let Ok(date_time) = state.read().check_selected_date_time(&config) {
+                    ondone.run(Some(date_time));
+                }
+            }
+        }
+    };
+    let weekdays = {
+        let state = state.clone();
+        move || state.read().weekdays()
+    };
+    let calendar_dates = {
+        let state = state.clone();
+        move || state.read().calendar_dates()
+    };
+    let selected_date_time_ret = {
+        let state = state.clone();
+        let config = config.clone();
+        move || state.read().check_selected_date_time(&config)
+    };
+    let visible_style = "visibility:visible;";
+    let hidden_style = "visibility:hidden;";
+    let prev_year_btn_style = {
+        let state = state.clone();
+        let config = config.clone();
+        move || {
+            if state.read().prev_year_selectable(&config) {
+                visible_style
+            } else {
+                hidden_style
+            }
+        }
+    };
+    let next_year_btn_style = {
+        let state = state.clone();
+        let config = config.clone();
+        move || {
+            if state.read().next_year_selectable(&config) {
+                visible_style
+            } else {
+                hidden_style
+            }
+        }
+    };
+    let prev_month_btn_style = {
+        let state = state.clone();
+        let config = config.clone();
+        move || {
+            if state.read().prev_month_selectable(&config) {
+                visible_style
+            } else {
+                hidden_style
+            }
+        }
+    };
+    let next_month_btn_style = {
+        let state = state.clone();
+        let config = config.clone();
+        move || {
+            if state.read().next_month_selectable(&config) {
+                visible_style
+            } else {
+                hidden_style
+            }
+        }
+    };
+    let solar_year = {
+        let state = state.clone();
+        move || state.read().calendar.solar_year
+    };
+    let solar_month = {
+        let state = state.clone();
+        move || state.read().calendar.solar_month
+    };
+    let tm_hours = {
+        let state = state.clone();
+        move || state.read().tm_hours
+    };
+    let tm_minutes = {
+        let state = state.clone();
+        move || state.read().tm_minutes
+    };
+    let tm_seconds = {
+        let state = state.clone();
+        move || state.read().tm_seconds
+    };
+    view! {
+        <div class="date-time-picker" style={style}>
+            <table style="table-layout: fixed;border-collapse: collapse;">
+                <caption class="year-month-area">
+                    <div class="year-area">
+                        <span class="icon-prev" style={prev_year_btn_style} on:click={on_prev_year_click}>{"<"}</span>
+                        <div class="year-wrapper">
+                            <div style="width:100%;">
+                                {solar_year}{"年"}
                             </div>
-                            <span class="icon-next" style={next_year_btn_style} onclick={on_next_year_click}>{">"}</span>
                         </div>
-                        <div class="month-area">
-                            <span class="icon-prev" style={prev_month_btn_style} onclick={on_prev_month_click}>{"<"}</span>
-                            <div class="month-wrapper">
-                                <div style="width:100%;">
-                                    {self.state.calendar.solar_month}{"月"}
-                                </div>
+                        <span class="icon-next" style={next_year_btn_style} on:click={on_next_year_click}>{">"}</span>
+                    </div>
+                    <div class="month-area">
+                        <span class="icon-prev" style={prev_month_btn_style} on:click={on_prev_month_click}>{"<"}</span>
+                        <div class="month-wrapper">
+                            <div style="width:100%;">
+                                {solar_month}{"月"}
                             </div>
-                            <span class="icon-next" style={next_month_btn_style} onclick={on_next_month_click}>{">"}</span>
                         </div>
-                    </caption>
-                    <thead>
-                        <tr>
-                            {
-                                for weekdays.into_iter().map(|weekday| {
-                                    html! {
-                                        <th class="head-cell">
-                                            {format_weekday(weekday)}
-                                        </th>
-                                    }
-                                })
+                        <span class="icon-next" style={next_month_btn_style} on:click={on_next_month_click}>{">"}</span>
+                    </div>
+                </caption>
+                <thead>
+                    <tr>
+                        <For
+                            each=move || { weekdays().into_iter() }
+                            key=|weekday| { *weekday }
+                            children=move |weekday| {
+                                view! {
+                                    <th class="head-cell">
+                                        {format_weekday(weekday)}
+                                    </th>
+                                }
                             }
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {
-                            for calendar_dates.into_iter().map(|row| {
-                                html! {
-                                    <tr>
-                                        {
-                                            for row.into_iter().map(|cell| {
-                                                let on_select_date = link.callback(move |_evt: MouseEvent| Msg::SelectDate(cell));
-                                                html! {
-                                                    <td class="cell" onclick={on_select_date} style={self.get_cell_style(cell)}>
-                                                        {cell.day()}
-                                                        {
-                                                            if let Some(text) = self.decorate_date(cell) {
-                                                                html! {
+                        />
+                    </tr>
+                </thead>
+                <tbody>
+                    <For
+                        each=move || { calendar_dates().into_iter().enumerate() }
+                        key=|(index, row)| { *index }
+                        children=move |(index, row)| {
+                            let state = state.clone();
+                            let config = config.clone();
+                            view! {
+                                <tr>
+                                    <For
+                                        each=move || { row.clone().into_iter().enumerate() }
+                                        key=|(index, cell)| { *index }
+                                        children=move |(index, cell)| {
+                                            let on_select_date = {
+                                                let state = state.clone();
+                                                let config = config.clone();
+                                                move |_evt: MouseEvent| {
+                                                    state.write().select_date(&config, cell);
+                                                }
+                                            };
+                                            let style = {
+                                                let state = state.clone();
+                                                let config = config.clone();
+                                                move || {
+                                                    state.read().get_cell_style(&config, cell)
+                                                }
+                                            };
+                                            view! {
+                                                <td class="cell" on:click={on_select_date} style={style}>
+                                                    {cell.day()}
+                                                    {
+                                                        let state = state.clone();
+                                                        let config = config.clone();
+                                                        move || {
+                                                            if let Some(text) = state.read().decorate_date(&config, cell) {
+                                                                view! {
                                                                     <div class="date-decorator">{text}</div>
-                                                                }
+                                                                }.into_any()
                                                             } else {
-                                                                html! {}
+                                                                view! {}.into_any()
                                                             }
                                                         }
-                                                    </td>
-                                                }
-                                            })
+                                                    }
+                                                </td>
+                                            }
                                         }
-                                    </tr>
-                                }
-                            })
+                                    />
+                                </tr>
+                            }
                         }
-                    </tbody>
-                </table>
-                <div class="footer-area">
-                    <div style="margin: 0.5em;overflow: auto;">
-                        <div style="float:left;">
-                            <span class="time-label" style="float: left;">{"时间"}</span>
-                            <span style="display:inline-block;float: left;">
-                                <input value={self.state.tm_hours.to_string()} oninput={on_change_hours} onfocus={on_select_text.clone()} onwheel={on_mousewheel_hours} class="text-box" type="text" style="border-right: none;" maxlength="2"/>
-                                <span class="time-spliter">{":"}</span>
-                                <input value={self.state.tm_minutes.to_string()} oninput={on_change_minutes} onfocus={on_select_text.clone()} onwheel={on_mousewheel_minutes} class="text-box" type="text" style="border-left: none;border-right: none;" maxlength="2"/>
-                                <span class="time-spliter">{":"}</span>
-                                <input value={self.state.tm_seconds.to_string()} oninput={on_change_seconds} onfocus={on_select_text} onwheel={on_mousewheel_seconds} class="text-box" type="text" style="border-left: none;" maxlength="2"/>
-                            </span>
-                        </div>
-                        <div class="action-area" style="float: right;">
-                            <button onclick={on_clear} class="btn-clear" style="margin-right: 0.5em;">{"清除"}</button>
-                            <button onclick={on_save} disabled={selected_date_time_ret.is_err()} class="btn-save">{"确定"}</button>
-                        </div>
+                    />
+                </tbody>
+            </table>
+            <div class="footer-area">
+                <div style="margin: 0.5em;overflow: auto;">
+                    <div style="float:left;">
+                        <span class="time-label" style="float: left;">{"时间"}</span>
+                        <span style="display:inline-block;float: left;">
+                            <input value={tm_hours} on:input={on_change_hours} on:focus={on_select_text.clone()} on:wheel={on_mousewheel_hours} class="text-box" type="text" style="border-right: none;" maxlength="2"/>
+                            <span class="time-spliter">{":"}</span>
+                            <input value={tm_minutes} on:input={on_change_minutes} on:focus={on_select_text.clone()} on:wheel={on_mousewheel_minutes} class="text-box" type="text" style="border-left: none;border-right: none;" maxlength="2"/>
+                            <span class="time-spliter">{":"}</span>
+                            <input value={tm_seconds} on:input={on_change_seconds} on:focus={on_select_text} on:wheel={on_mousewheel_seconds} class="text-box" type="text" style="border-left: none;" maxlength="2"/>
+                        </span>
                     </div>
-                    {
-                        match selected_date_time_ret {
+                    <div class="action-area" style="float: right;">
+                        <button on:click={on_clear} class="btn-clear" style="margin-right: 0.5em;">{"清除"}</button>
+                        <button on:click={on_save} disabled={
+                            let selected_date_time_ret = selected_date_time_ret.clone();
+                            move || selected_date_time_ret().is_err()
+                        } class="btn-save">{"确定"}</button>
+                    </div>
+                </div>
+                {
+                    move || {
+                        match selected_date_time_ret() {
                             Ok(date_time) => {
-                                html! {
+                                view! {
                                     <div style="text-align:center;">{format_date_time(date_time)}</div>
-                                }
+                                }.into_any()
                             },
                             Err(err_msg) => {
-                                html! {
-                                    <div style="color:red;text-align:center;">{err_msg}</div>
-                                }
+                                view! {
+                                    <div style="text-align:center;color:red;">{err_msg}</div>
+                                }.into_any()
                             }
                         }
                     }
-                </div>
+                }
             </div>
-        }
+        </div>
     }
 }
 
-impl DateTimePicker {
+impl State {
     fn weekdays(&self) -> Vec<Weekday> {
         let default = vec![
             Weekday::Sun,
@@ -359,7 +412,7 @@ impl DateTimePicker {
         ];
         let mut index = 0;
         for (idx, item) in default.iter().enumerate() {
-            if item == &self.state.calendar.first_day {
+            if item == &self.calendar.first_day {
                 index = idx;
                 break;
             }
@@ -371,11 +424,11 @@ impl DateTimePicker {
         }
     }
     fn calendar_dates(&self) -> Vec<Vec<NaiveDate>> {
-        self.state.calendar.get_grouped_dates()
+        self.calendar.get_grouped_dates()
     }
-    fn get_cell_style(&self, date: NaiveDate) -> String {
+    fn get_cell_style(&self, config: &Config, date: NaiveDate) -> String {
         let mut style: HashMap<&'static str, &'static str> = HashMap::new();
-        if !self.date_selectable(date) {
+        if !self.date_selectable(config, date) {
             //当天不可选，则置灰
             style.insert("background-color", "#eee");
             style.insert("color", "#aaa");
@@ -383,9 +436,9 @@ impl DateTimePicker {
         } else {
             style.insert("cursor", "pointer");
             //是选中的那一天
-            if self.state.tm_date == date {
+            if self.tm_date == date {
                 if let Some(date_time) = self.get_selected_date_time() {
-                    if let Ok(()) = self.check_date_time(date_time) {
+                    if let Ok(()) = self.check_date_time(config, date_time) {
                         //时间格式正确，时间检查也通过
                         style.insert("background-color", "green");
                     } else {
@@ -403,53 +456,55 @@ impl DateTimePicker {
     }
 
     fn get_selected_date_time(&self) -> Option<NaiveDateTime> {
-        if 24 <= self.state.tm_hours || 60 <= self.state.tm_minutes || 60 <= self.state.tm_seconds {
+        if 24 <= self.tm_hours || 60 <= self.tm_minutes || 60 <= self.tm_seconds {
             return None;
         }
-        let datetime = self.state.tm_date.and_hms(
-            self.state.tm_hours,
-            self.state.tm_minutes,
-            self.state.tm_seconds,
-        );
+        let datetime = self
+            .tm_date
+            .and_hms(self.tm_hours, self.tm_minutes, self.tm_seconds);
         return Some(datetime);
     }
 
-    fn check_selected_date_time(&self) -> Result<NaiveDateTime, SharedString> {
+    fn check_selected_date_time(&self, config: &Config) -> Result<NaiveDateTime, SharedString> {
         if let Some(date_time) = self.get_selected_date_time() {
-            if !self.date_selectable(date_time.date()) {
-                return Err(SharedString::Static("选中日期被禁用！"));
+            if !self.date_selectable(config, date_time.date()) {
+                return Err(SharedString::from("选中日期被禁用！"));
             } else {
-                self.check_date_time(date_time)?;
+                self.check_date_time(config, date_time)?;
                 return Ok(date_time);
             }
         } else {
-            return Err(SharedString::Static("时间格式错误！"));
+            return Err(SharedString::from("时间格式错误！"));
         }
     }
 
-    fn check_date_time(&self, date_time: NaiveDateTime) -> Result<(), SharedString> {
-        if let Some(check_date_time) = self.config.check_date_time.as_ref() {
+    fn check_date_time(
+        &self,
+        config: &Config,
+        date_time: NaiveDateTime,
+    ) -> Result<(), SharedString> {
+        if let Some(check_date_time) = config.check_date_time.as_ref() {
             return (check_date_time.0)(date_time);
         } else {
             return Ok(());
         }
     }
 
-    fn get_min_date(&self) -> Option<NaiveDate> {
-        return self.config.min_date.as_ref().map(|min_date| {
+    fn get_min_date(&self, config: &Config) -> Option<NaiveDate> {
+        return config.min_date.as_ref().map(|min_date| {
             return min_date.get().into_owned();
         });
     }
 
-    fn get_max_date(&self) -> Option<NaiveDate> {
-        return self.config.max_date.as_ref().map(|max_date| {
+    fn get_max_date(&self, config: &Config) -> Option<NaiveDate> {
+        return config.max_date.as_ref().map(|max_date| {
             return max_date.get().into_owned();
         });
     }
 
     //检查是否可以展示某个月的日历
-    fn month_selectable(&self, year: u32, month: u32) -> bool {
-        if let Some(min_date) = self.config.min_date.as_ref() {
+    fn month_selectable(&self, config: &Config, year: u32, month: u32) -> bool {
+        if let Some(min_date) = config.min_date.as_ref() {
             let min_date = min_date.get();
             if NaiveDate::from_ymd(year as i32, month, 1)
                 < NaiveDate::from_ymd(min_date.year(), min_date.month(), 1)
@@ -457,7 +512,7 @@ impl DateTimePicker {
                 return false;
             }
         }
-        if let Some(max_date) = self.config.max_date.as_ref() {
+        if let Some(max_date) = config.max_date.as_ref() {
             let max_date = max_date.get();
             if NaiveDate::from_ymd(year as i32, month, 1)
                 > NaiveDate::from_ymd(max_date.year(), max_date.month(), 1)
@@ -468,40 +523,40 @@ impl DateTimePicker {
         return true;
     }
 
-    fn prev_year_selectable(&self) -> bool {
-        let (solar_year, solar_month) = self.state.calendar.prev_year();
-        return self.month_selectable(solar_year, solar_month);
+    fn prev_year_selectable(&self, config: &Config) -> bool {
+        let (solar_year, solar_month) = self.calendar.prev_year();
+        return self.month_selectable(config, solar_year, solar_month);
     }
 
-    fn next_year_selectable(&self) -> bool {
-        let (solar_year, solar_month) = self.state.calendar.next_year();
-        return self.month_selectable(solar_year, solar_month);
+    fn next_year_selectable(&self, config: &Config) -> bool {
+        let (solar_year, solar_month) = self.calendar.next_year();
+        return self.month_selectable(config, solar_year, solar_month);
     }
 
-    fn prev_month_selectable(&self) -> bool {
-        let (solar_year, solar_month) = self.state.calendar.prev_month();
-        return self.month_selectable(solar_year, solar_month);
+    fn prev_month_selectable(&self, config: &Config) -> bool {
+        let (solar_year, solar_month) = self.calendar.prev_month();
+        return self.month_selectable(config, solar_year, solar_month);
     }
 
-    fn next_month_selectable(&self) -> bool {
-        let (solar_year, solar_month) = self.state.calendar.next_month();
-        return self.month_selectable(solar_year, solar_month);
+    fn next_month_selectable(&self, config: &Config) -> bool {
+        let (solar_year, solar_month) = self.calendar.next_month();
+        return self.month_selectable(config, solar_year, solar_month);
     }
 
-    fn date_selectable(&self, date: NaiveDate) -> bool {
-        let min_date = self.get_min_date();
+    fn date_selectable(&self, config: &Config, date: NaiveDate) -> bool {
+        let min_date = self.get_min_date(config);
         if let Some(min_date) = min_date {
             if date < min_date {
                 return false;
             }
         }
-        let max_date = self.get_max_date();
+        let max_date = self.get_max_date(config);
         if let Some(max_date) = max_date {
             if date > max_date {
                 return false;
             }
         }
-        if let Some(check_date) = self.config.date_selectable.as_ref() {
+        if let Some(check_date) = config.date_selectable.as_ref() {
             if !(check_date.0)(date) {
                 return false;
             }
@@ -509,19 +564,19 @@ impl DateTimePicker {
         return true;
     }
 
-    fn select_date(&mut self, date: NaiveDate) {
-        if !self.date_selectable(date) {
+    fn select_date(&mut self, config: &Config, date: NaiveDate) {
+        if !self.date_selectable(config, date) {
             //当天不能选择的，直接返回
             return;
         }
-        self.state.tm_date = date;
+        self.tm_date = date;
     }
 
     fn change_hours(&mut self, hours: &str) {
         match u32::from_str_radix(&hours, 10) {
             Ok(hours) => {
                 if 24 > hours {
-                    self.state.tm_hours = hours;
+                    self.tm_hours = hours;
                 } else {
                     log::info!("小时超出正常值: {:?}", hours);
                 }
@@ -536,7 +591,7 @@ impl DateTimePicker {
         match u32::from_str_radix(&minutes, 10) {
             Ok(minutes) => {
                 if 60 > minutes {
-                    self.state.tm_minutes = minutes;
+                    self.tm_minutes = minutes;
                 } else {
                     log::info!("分钟超出正常值: {:?}", minutes);
                 }
@@ -550,7 +605,7 @@ impl DateTimePicker {
         match u32::from_str_radix(&seconds, 10) {
             Ok(seconds) => {
                 if 60 > seconds {
-                    self.state.tm_seconds = seconds;
+                    self.tm_seconds = seconds;
                 } else {
                     log::info!("秒超出正常值: {:?}", seconds);
                 }
@@ -560,60 +615,62 @@ impl DateTimePicker {
             }
         }
     }
-    fn handle_hours_mousewheel(&mut self, link: &Scope<Self>, evt: WheelEvent) {
+    fn handle_hours_mousewheel(&mut self, evt: WheelEvent) {
         evt.prevent_default();
         let step = (evt.delta_y() / 100.0) as i32;
-        let new_hours = self.state.tm_hours as i32 - step;
-        self.state.tm_hours = new_hours.max(0).min(23) as u32;
-        let link = link.clone();
-        self.timeout = Some(Timeout::new(0, move || {
-            let msg = if let Some(target) = evt.target() {
-                Msg::SetTargetSelected(target)
-            } else {
-                Msg::Noop
-            };
-            link.send_message(msg)
-        }));
+        let new_hours = self.tm_hours as i32 - step;
+        self.tm_hours = new_hours.max(0).min(23) as u32;
+        wasm_bindgen_futures::spawn_local(async move {
+            wait(0).await;
+            if let Some(target) = evt.target() {
+                set_target_selected(target);
+            }
+        });
     }
-    fn handle_minutes_mousewheel(&mut self, link: &Scope<Self>, evt: WheelEvent) {
+    fn handle_minutes_mousewheel(&mut self, evt: WheelEvent) {
         evt.prevent_default();
         let step = (evt.delta_y() / 100.0) as i32;
-        let new_minutes = self.state.tm_minutes as i32 - step;
-        self.state.tm_minutes = new_minutes.max(0).min(59) as u32;
-        let link = link.clone();
-        self.timeout = Some(Timeout::new(0, move || {
-            let msg = if let Some(target) = evt.target() {
-                Msg::SetTargetSelected(target)
-            } else {
-                Msg::Noop
-            };
-            link.send_message(msg)
-        }));
+        let new_minutes = self.tm_minutes as i32 - step;
+        self.tm_minutes = new_minutes.max(0).min(59) as u32;
+        wasm_bindgen_futures::spawn_local(async move {
+            wait(0).await;
+            if let Some(target) = evt.target() {
+                set_target_selected(target);
+            }
+        });
     }
-    fn handle_seconds_mousewheel(&mut self, link: &Scope<Self>, evt: WheelEvent) {
+    fn handle_seconds_mousewheel(&mut self, evt: WheelEvent) {
         evt.prevent_default();
         let step = (evt.delta_y() / 100.0) as i32;
-        let new_seconds = self.state.tm_seconds as i32 - step;
-        self.state.tm_seconds = new_seconds.max(0).min(59) as u32;
-        let link = link.clone();
-        self.timeout = Some(Timeout::new(0, move || {
-            let msg = if let Some(target) = evt.target() {
-                Msg::SetTargetSelected(target)
-            } else {
-                Msg::Noop
-            };
-            link.send_message(msg)
-        }));
+        let new_seconds = self.tm_seconds as i32 - step;
+        self.tm_seconds = new_seconds.max(0).min(59) as u32;
+        wasm_bindgen_futures::spawn_local(async move {
+            wait(0).await;
+            if let Some(target) = evt.target() {
+                set_target_selected(target);
+            }
+        });
     }
 
-    fn decorate_date(&self, date: NaiveDate) -> Option<SharedString> {
-        return self
-            .config
+    fn decorate_date(&self, config: &Config, date: NaiveDate) -> Option<SharedString> {
+        return config
             .decorate_date
             .as_ref()
             .map(|decorate_date| (decorate_date.0)(date))
             .unwrap_or(None);
     }
+}
+
+pub async fn wait(millis: u32) {
+    let mut timeout = None;
+    let mut promise_fn = |resolve: Function, _reject: Function| {
+        timeout.replace(Timeout::new(millis, move || {
+            resolve.call0(&wasm_bindgen::JsValue::UNDEFINED).unwrap();
+        }));
+    };
+    let promise = Promise::new(&mut promise_fn);
+    JsFuture::from(promise).await.unwrap();
+    timeout.take();
 }
 
 fn set_target_selected(target: EventTarget) {

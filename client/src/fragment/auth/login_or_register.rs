@@ -1,12 +1,11 @@
 use super::login::Login;
 use super::register::Register;
 use crate::components::modal_dialog::ModalDialog;
-use crate::route::Route;
 use crate::sdk;
+use crate::SharedString;
+use leptos::prelude::*;
+use leptos_router::hooks::use_navigate;
 use sdk::auth::get_curr_user::GetCurrUserResp;
-use std::ops::Deref;
-use yew::prelude::*;
-use yew_router::components::Link;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Tab {
@@ -14,49 +13,54 @@ pub enum Tab {
     Register,
 }
 
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props {
-    #[prop_or_default]
-    pub init_tab: Option<Tab>,
-    pub ondone: Callback<GetCurrUserResp>,
-    #[prop_or_default]
-    pub oncancel: Callback<()>,
-}
-
-#[function_component]
-pub fn LoginOrRegister(props: &Props) -> Html {
-    let tab: UseStateHandle<Tab> = use_state(|| props.init_tab.unwrap_or(Tab::Login));
-    let tab_clone = tab.clone();
-    let on_switch_login = Callback::from(move |_| {
-        tab_clone.set(Tab::Login);
-    });
-    let tab_clone = tab.clone();
-    let on_switch_register = Callback::from(move |_| {
-        tab_clone.set(Tab::Register);
-    });
-    let ondone = props.ondone.clone();
-    let on_done = Callback::from(move |curr_user| {
-        ondone.emit(curr_user);
+#[component]
+pub fn LoginOrRegister(
+    #[prop(optional)] init_tab: Option<Tab>,
+    ondone: UnsyncCallback<GetCurrUserResp>,
+    #[prop(into, default = None)] oncancel: Option<UnsyncCallback<()>>,
+) -> impl IntoView {
+    let navigate = use_navigate();
+    let tab: RwSignal<Tab> = RwSignal::new(init_tab.unwrap_or(Tab::Login));
+    let on_switch_login = {
+        let tab = tab.clone();
+        move |_| {
+            tab.set(Tab::Login);
+        }
+    };
+    let on_switch_register = {
+        let tab = tab.clone();
+        move |_| {
+            tab.set(Tab::Register);
+        }
+    };
+    let on_done = UnsyncCallback::new(move |curr_user| {
+        ondone.run(curr_user);
         // handle_done(ctx, user);
     });
-    let title = match tab.deref() {
-        Tab::Login => "登录",
-        Tab::Register => "注册",
+    let title = {
+        let tab = tab.clone();
+        Signal::derive(move || match tab.get() {
+            Tab::Login => SharedString::from("登录"),
+            Tab::Register => SharedString::from("注册"),
+        })
     };
-    html! {
-        <ModalDialog title={title} closable=true onclose={props.oncancel.clone()}>
+    view! {
+        <ModalDialog title={title} closable=true onclose={oncancel}>
             <div style="padding-top:2em;padding-bottom:2em;">
                 <div style="padding-right:4em;">
                     {
-                        match tab.deref() {
-                            Tab::Login => {
-                                html! {
-                                    <Login ondone={on_done.clone()} />
-                                }
-                            },
-                            Tab::Register => {
-                                html! {
-                                    <Register ondone={on_done} />
+                        let tab = tab.clone();
+                        move || {
+                            match tab.get() {
+                                Tab::Login => {
+                                    view! {
+                                        <Login ondone={on_done} />
+                                    }.into_any()
+                                },
+                                Tab::Register => {
+                                    view! {
+                                        <Register ondone={on_done} />
+                                    }.into_any()
                                 }
                             }
                         }
@@ -64,18 +68,24 @@ pub fn LoginOrRegister(props: &Props) -> Html {
                 </div>
                 <div style="text-align:right;padding-right:1em;">
                     {
-                        match tab.deref() {
-                            Tab::Login => {
-                                html! {
-                                    <>
-                                        <Link<Route> to={Route::ResetPassword}>{"找回密码"}</Link<Route>>
-                                        <a href="javascript:void(0);" onclick={on_switch_register}>{"注册"}</a>
-                                    </>
-                                }
-                            },
-                            Tab::Register => {
-                                html! {
-                                    <a href="javascript:void(0);" onclick={on_switch_login}>{"登录"}</a>
+                        move || {
+                            match tab.get() {
+                                Tab::Login => {
+                                    let navigate = navigate.clone();
+                                    let on_reset_password = move |_| {
+                                        navigate("/resetPassword", Default::default());
+                                    };
+                                    view! {
+                                        <>
+                                            <a href="javascript:void(0);" on:click={on_reset_password}>{"找回密码"}</a>
+                                            <a href="javascript:void(0);" on:click={on_switch_register}>{"注册"}</a>
+                                        </>
+                                    }.into_any()
+                                },
+                                Tab::Register => {
+                                    view! {
+                                        <a href="javascript:void(0);" on:click={on_switch_login}>{"登录"}</a>
+                                    }.into_any()
                                 }
                             }
                         }
@@ -97,12 +107,12 @@ pub fn LoginOrRegister(props: &Props) -> Html {
 //         let new_ctx = crate::CONTEXT.clone();
 //         event::emit(event::ContextChange, (new_ctx, old_ctx));
 //     }
-//     ctx.props().ondone.emit(user);
+//     ctx.props().ondone.run(user);
 // }
 
 // pub fn login_or_register(
-//     done_cb: Callback<CurrOperator>,
-//     cancel_cb: Callback<()>,
+//     done_cb: UnsyncCallback<CurrOperator>,
+//     cancel_cb: UnsyncCallback<()>,
 //     init_tab: Option<Tab>,
 // ) {
 //     let document = web_sys::window().unwrap().document().unwrap();
@@ -116,8 +126,8 @@ pub fn LoginOrRegister(props: &Props) -> Html {
 //     let inst_root_clone2 = inst_root.clone();
 //     let props = Props {
 //         init_tab: init_tab,
-//         ondone: Callback::once(move |user: CurrUser| {
-//             done_cb.emit(user);
+//         ondone: UnsyncCallback::once(move |user: CurrUser| {
+//             done_cb.run(user);
 //             if let Some(inst_handle) = inst_handle_clone1.take() {
 //                 inst_handle.destroy();
 //                 let document = web_sys::window().unwrap().document().unwrap();
@@ -125,8 +135,8 @@ pub fn LoginOrRegister(props: &Props) -> Html {
 //                 body.remove_child(&inst_root_clone1).unwrap();
 //             }
 //         }),
-//         oncancel: Callback::once(move |_: ()| {
-//             cancel_cb.emit(());
+//         oncancel: UnsyncCallback::once(move |_: ()| {
+//             cancel_cb.run(());
 //             if let Some(inst_handle) = inst_handle_clone2.take() {
 //                 inst_handle.destroy();
 //                 let document = web_sys::window().unwrap().document().unwrap();

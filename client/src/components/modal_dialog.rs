@@ -2,102 +2,30 @@ use super::center_middle::CenterMiddle;
 use super::dialog::Dialog;
 use super::page::Page;
 use crate::SharedString;
-use yew::prelude::*;
-use yew::{html, Component, Context, Html};
+use leptos::prelude::*;
 
-struct State {
-    title: SharedString,
+#[component]
+pub fn ModalDialog(
+    #[prop(into)] title: Signal<SharedString>,
     closable: bool,
-    z_index: u64,
-    center_style: SharedString,
-    dialog_style: SharedString,
-    content_style: SharedString,
-}
-
-pub enum Msg {
-    Close,
-}
-
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props {
-    pub title: SharedString,
-    pub closable: bool,
-    #[prop_or(1)]
-    pub z_index: u64,
-    #[prop_or(SharedString::Static(""))]
-    pub center_style: SharedString,
-    #[prop_or(SharedString::Static(""))]
-    pub dialog_style: SharedString,
-    #[prop_or(SharedString::Static(""))]
-    pub content_style: SharedString,
-    #[prop_or_default]
-    pub onclose: Option<Callback<()>>,
-    pub children: Children,
-}
-
-pub struct ModalDialog {
-    state: State,
+    #[prop(default = 1)] z_index: u64,
+    #[prop(into, optional)] center_style: SharedString,
+    #[prop(into, optional)] dialog_style: SharedString,
+    #[prop(into, optional)] content_style: SharedString,
+    #[prop(into, default = None)] onclose: Option<UnsyncCallback<()>>,
     children: Children,
-}
-
-impl Component for ModalDialog {
-    type Message = Msg;
-    type Properties = Props;
-
-    fn create(ctx: &Context<Self>) -> Self {
-        let props = ctx.props();
-        let state = State {
-            title: props.title.clone(),
-            closable: props.closable,
-            z_index: props.z_index,
-            center_style: props.center_style.clone(),
-            dialog_style: props.dialog_style.clone(),
-            content_style: props.content_style.clone(),
-        };
-        ModalDialog {
-            state,
-            children: props.children.clone(),
-        }
+) -> impl IntoView {
+    let mut actual_content_style = String::from("background-color:#FFF;");
+    if !content_style.is_empty() {
+        actual_content_style.push_str(&content_style);
     }
-
-    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
-        match msg {
-            Msg::Close => match ctx.props().onclose.as_ref() {
-                Some(onclose) => {
-                    onclose.emit(());
-                }
-                None => (),
-            },
-        }
-        return true;
-    }
-
-    fn changed(&mut self, ctx: &Context<Self>, _old_props: &Self::Properties) -> bool {
-        let props = ctx.props();
-        self.state.title = props.title.clone();
-        self.state.closable = props.closable;
-        self.state.z_index = props.z_index;
-        self.state.center_style = props.center_style.clone();
-        self.state.dialog_style = props.dialog_style.clone();
-        self.state.content_style = props.content_style.clone();
-        self.children = props.children.clone();
-        return true;
-    }
-
-    fn view(&self, ctx: &Context<Self>) -> Html {
-        let mut content_style = String::from("background-color:#FFF;");
-        if !self.state.content_style.is_empty() {
-            content_style.push_str(&self.state.content_style);
-        }
-        let on_close = ctx.link().callback(|_| Msg::Close);
-        html! {
-            <Page mask=true z_index={self.state.z_index}>
-                <CenterMiddle content_style={self.state.center_style.clone()}>
-                    <Dialog title={self.state.title.clone()} closable={self.state.closable} onclose={Some(on_close)} style={self.state.dialog_style.clone()} content_style={self.state.content_style.clone()}>
-                        { self.children.clone() }
-                    </Dialog>
-                </CenterMiddle>
-            </Page>
-        }
+    view! {
+        <Page mask=true z_index={z_index}>
+            <CenterMiddle content_style={center_style.clone()}>
+                <Dialog title={title.clone()} closable={closable} onclose={onclose} style={dialog_style.clone()} content_style={actual_content_style}>
+                    { children() }
+                </Dialog>
+            </CenterMiddle>
+        </Page>
     }
 }

@@ -1,18 +1,25 @@
 use super::button::Button;
 use super::button_group::ButtonGroup;
-use super::input::BindingInput;
+use super::input::Input;
 use super::modal_dialog::ModalDialog;
+use super::on_cleanup_unsync;
 use super::uploading_files::upload_files;
 use super::validate_wrapper::ValidateData;
+use super::validate_wrapper::ValidateWrapper;
 use super::HashingFile;
+use super::LatestDestroy;
 use super::ResourceMetadata;
 use crate::utils::choose_file;
 use crate::utils::validator;
 use crate::utils::validator::Validator;
 use crate::utils::validator::Validators;
+use crate::SharedString;
 use js_sys::Function;
 use js_sys::Promise;
 use js_sys::JSON;
+use leptos::html;
+use leptos::prelude::*;
+use leptos::tachys::view::any_view::AnyViewState;
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -22,76 +29,68 @@ use std::sync::RwLock;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::DocumentFragment;
+use web_sys::Event;
 use web_sys::File;
 use web_sys::HtmlElement;
-use yew::prelude::*;
+use web_sys::MouseEvent;
 
 #[derive(Clone, PartialEq)]
 pub struct LinkInfo {
-    pub url: AttrValue,
-    pub title: Option<AttrValue>,
+    pub url: SharedString,
+    pub title: Option<SharedString>,
 }
 
-#[derive(Clone, PartialEq, Properties)]
-pub struct LinkPickerProps {
-    pub ondone: Callback<LinkInfo>,
-    pub oncancel: Callback<()>,
-}
-
-#[function_component]
-pub fn LinkPicker(props: &LinkPickerProps) -> Html {
-    let url_state: UseStateHandle<AttrValue> = use_state(|| Default::default());
+#[component]
+pub fn LinkPicker(ondone: UnsyncCallback<LinkInfo>, oncancel: UnsyncCallback<()>) -> impl IntoView {
+    let url_state: RwSignal<SharedString> = RwSignal::new(Default::default());
     let url = ValidateData::from_state(
-        url_state.clone(),
-        Some(use_state(|| Default::default())),
+        url_state.clone().into(),
+        Some(RwSignal::new(Default::default())),
         Some(Validators::new().add(validator::RequiredValidator::new("Please input url"))),
     );
-    let title: UseStateHandle<AttrValue> = use_state(|| Default::default());
+    let title: RwSignal<SharedString> = RwSignal::new(Default::default());
     let on_confirm = {
         let url_state = url_state.clone();
         let title = title.clone();
-        let ondone = props.ondone.clone();
-        Callback::from(move |_| {
+        UnsyncCallback::new(move |_| {
+            let url_state = url_state.read();
             if !url_state.is_empty() {
+                let title = title.read();
                 let link_info = LinkInfo {
-                    url: url_state.deref().clone(),
+                    url: url_state.clone(),
                     title: if title.is_empty() {
                         None
                     } else {
-                        Some(title.deref().clone())
+                        Some(title.clone())
                     },
                 };
-                ondone.emit(link_info);
+                ondone.run(link_info);
             }
         })
     };
-    html! {
-        <ModalDialog title={"编辑链接"} closable={false} content_style="padding-right:2em;padding-top: 1em;padding-bottom: 1em;">
+    view! {
+        <ModalDialog title={Signal::stored(SharedString::from("编辑链接"))} closable={false} content_style={SharedString::from("padding-right:2em;padding-top: 1em;padding-bottom: 1em;")}>
             <table style="border-collapse:collapse;table-layout: fixed;">
                 <tr>
                     <td class="align-right" style="width:4em;vertical-align: top;"><span style="color:red;margin-right: 0.25em;">{"*"}</span>{"Url:"}</td>
                     <td>
-                        {
-                            url.view(move |url: UseStateHandle<AttrValue>, validator| {
-                                html! {
-                                    <BindingInput value={url} onupdate={validator}/>
-                                }
-                            })
-                        }
+                        <ValidateWrapper error={url.error()}>
+                            <Input value={url.data().into()} onupdate={url.listener()}/>
+                        </ValidateWrapper>
                     </td>
                 </tr>
                 <tr>
                     <td class="align-right" style="width:4em;vertical-align: top;">{"Title:"}</td>
                     <td>
-                        <BindingInput value={title}/>
+                        <Input value={title}/>
                     </td>
                 </tr>
                 <tr>
                     <td></td>
                     <td style="padding-top: 1em;">
                         <ButtonGroup>
-                            <Button disabled={url_state.is_empty()} onclick={on_confirm}>{"Confirm"}</Button>
-                            <Button onclick={props.oncancel.clone()}>{"Cancel"}</Button>
+                            <Button disabled={Signal::derive(move || url_state.read().is_empty())} onclick={on_confirm}>{"Confirm"}</Button>
+                            <Button onclick={oncancel}>{"Cancel"}</Button>
                         </ButtonGroup>
                     </td>
                 </tr>
@@ -114,71 +113,75 @@ fn get_link() -> Promise {
         root.add_event_listener_with_callback("mousedown", &on_root_click)
             .unwrap();
         body.append_child(&root).unwrap();
-        let handle: Rc<Cell<Option<AppHandle<LinkPicker>>>> = Rc::new(Cell::new(None));
-        let props = LinkPickerProps {
-            ondone: {
-                let root = root.clone();
-                let on_root_click = on_root_click.clone();
-                let handle = handle.clone();
-                let resolve = resolve.clone();
-                Callback::from(move |link_info: LinkInfo| {
-                    let object = js_sys::Object::new();
-                    js_sys::Reflect::set(
-                        &object,
-                        &JsValue::from_str("href"),
-                        &JsValue::from_str(&link_info.url),
-                    )
-                    .unwrap();
-                    if let Some(title) = link_info.title.as_ref() {
-                        js_sys::Reflect::set(
-                            &object,
-                            &JsValue::from_str("title"),
-                            &JsValue::from_str(title),
-                        )
-                        .unwrap();
-                    }
-                    if let Err(err) = resolve.call1(&JsValue::UNDEFINED, &object) {
-                        log::error!("调用Promise的resolve失败: {:?}", err);
-                    }
-                    if let Some(handle) = handle.take() {
-                        handle.destroy();
-                        let document = web_sys::window().unwrap().document().unwrap();
-                        let body = document.body().unwrap();
-                        root.remove_event_listener_with_callback("mousedown", &on_root_click)
-                            .unwrap();
-                        body.remove_child(&root).unwrap();
-                    }
-                })
-            },
-            oncancel: {
-                let root = root.clone();
-                let handle = handle.clone();
-                Callback::from(move |_: ()| {
-                    if let Err(err) = resolve.call1(&JsValue::UNDEFINED, &JsValue::UNDEFINED) {
-                        log::error!("调用Promise的resolve失败: {:?}", err);
-                    }
-                    if let Some(handle) = handle.take() {
-                        handle.destroy();
-                        let document = web_sys::window().unwrap().document().unwrap();
-                        let body = document.body().unwrap();
-                        root.remove_event_listener_with_callback("mousedown", &on_root_click)
-                            .unwrap();
-                        body.remove_child(&root).unwrap();
-                    }
-                })
-            },
+        let handle: Rc<Cell<Option<UnmountHandle<AnyViewState>>>> = Rc::new(Cell::new(None));
+        let renderer = {
+            let handle = handle.clone();
+            let root = root.clone();
+            move || {
+                view! {
+                    <LinkPicker
+                        ondone={
+                            let root = root.clone();
+                            let on_root_click = on_root_click.clone();
+                            let handle = handle.clone();
+                            let resolve = resolve.clone();
+                            UnsyncCallback::new(move |link_info: LinkInfo| {
+                                let object = js_sys::Object::new();
+                                js_sys::Reflect::set(
+                                    &object,
+                                    &JsValue::from_str("href"),
+                                    &JsValue::from_str(&link_info.url),
+                                )
+                                .unwrap();
+                                if let Some(title) = link_info.title.as_ref() {
+                                    js_sys::Reflect::set(
+                                        &object,
+                                        &JsValue::from_str("title"),
+                                        &JsValue::from_str(title),
+                                    )
+                                    .unwrap();
+                                }
+                                if let Err(err) = resolve.call1(&JsValue::UNDEFINED, &object) {
+                                    log::error!("调用Promise的resolve失败: {:?}", err);
+                                }
+                                if let Some(handle) = handle.take() {
+                                    // handle.destroy();
+                                    let document = web_sys::window().unwrap().document().unwrap();
+                                    let body = document.body().unwrap();
+                                    root.remove_event_listener_with_callback("mousedown", &on_root_click)
+                                        .unwrap();
+                                    body.remove_child(&root).unwrap();
+                                }
+                            })
+                        }
+                        oncancel={
+                            let root = root.clone();
+                            let handle = handle.clone();
+                            UnsyncCallback::new(move |_: ()| {
+                                if let Err(err) = resolve.call1(&JsValue::UNDEFINED, &JsValue::UNDEFINED) {
+                                    log::error!("调用Promise的resolve失败: {:?}", err);
+                                }
+                                if let Some(handle) = handle.take() {
+                                    // handle.destroy();
+                                    let document = web_sys::window().unwrap().document().unwrap();
+                                    let body = document.body().unwrap();
+                                    root.remove_event_listener_with_callback("mousedown", &on_root_click)
+                                        .unwrap();
+                                    body.remove_child(&root).unwrap();
+                                }
+                            })
+                        }
+                    />
+                }
+                .into_any()
+            }
         };
-        handle.set(Some(
-            yew::Renderer::<LinkPicker>::with_root_and_props(root, props).render(),
-        ));
+        handle.set(Some(leptos::mount::mount_to(
+            root.unchecked_into(),
+            renderer,
+        )));
     };
     return Promise::new(&mut promise_fn);
-}
-
-#[derive(Clone, PartialEq, Properties)]
-pub struct ColorPickerProps {
-    pub ondone: Callback<AttrValue>,
-    pub oncancel: Callback<()>,
 }
 
 const PRESET_COLORS: [[&str; 8]; 2] = [
@@ -190,63 +193,69 @@ const PRESET_COLORS: [[&str; 8]; 2] = [
     ],
 ];
 
-#[function_component]
-pub fn ColorPicker(props: &ColorPickerProps) -> Html {
-    let color_state: UseStateHandle<AttrValue> = use_state(|| Default::default());
+#[component]
+pub fn ColorPicker(
+    ondone: UnsyncCallback<SharedString>,
+    oncancel: UnsyncCallback<()>,
+) -> impl IntoView {
+    let color_state: RwSignal<SharedString> = RwSignal::new(Default::default());
     let color = ValidateData::from_state(
-        color_state.clone(),
-        Some(use_state(|| Default::default())),
+        color_state.clone().into(),
+        Some(RwSignal::new(Default::default())),
         Some(Validators::new().add(validator::RequiredValidator::new("Please input color"))),
     );
     let on_confirm = {
         let color_state = color_state.clone();
-        let ondone = props.ondone.clone();
-        Callback::from(move |_| {
+        let ondone = ondone.clone();
+        UnsyncCallback::new(move |_| {
+            let color_state = color_state.read();
             if !color_state.is_empty() {
-                ondone.emit(color_state.deref().clone());
+                ondone.run(color_state.clone());
             }
         })
     };
-    html! {
-        <ModalDialog title={"颜色选择"} closable={false} content_style="padding:1em;">
+    view! {
+        <ModalDialog title={Signal::stored(SharedString::from("颜色选择"))} closable={false} content_style={SharedString::from("padding:1em;")}>
             <table style="border-spacing: 0.25em;border-collapse: separate;background-color: #EEE;">
-                {
-                    for PRESET_COLORS.iter().map(|row| {
-                        html! {
-                            <tr>
-                                {
-                                    for row.iter().map(|color| {
-                                        if color.is_empty() {
-                                            html! {}
-                                        } else {
-                                            let ondone = props.ondone.clone();
-                                            let on_click = Callback::from(move |_evt: MouseEvent| {
-                                                ondone.emit(AttrValue::Static(color));
-                                            });
-                                            let style = format!("width: 1.5em;height: 1.5em;cursor:pointer;background-color: {};", color);
-                                            html! {
-                                                <td onclick={on_click} title={AttrValue::Static(color)} style={style}></td>
+                <For
+                    each=|| { PRESET_COLORS.iter().enumerate() }
+                    key=|(index, _row)| { *index }
+                    children={
+                        move |(_index, row)| {
+                            let ondone = ondone.clone();
+                            view! {
+                                <tr>
+                                    <For
+                                        each=move || { row.iter() }
+                                        key=|color| { **color }
+                                        children=move |color| {
+                                            if color.is_empty() {
+                                                view! {}.into_any()
+                                            } else {
+                                                let on_click = move |_evt: MouseEvent| {
+                                                    ondone.run(SharedString::Borrowed(color));
+                                                };
+                                                let style = format!("width: 1.5em;height: 1.5em;cursor:pointer;background-color: {};", color);
+                                                view! {
+                                                    <td on:click={on_click} title={SharedString::Borrowed(color)} style={style}></td>
+                                                }.into_any()
                                             }
                                         }
-                                    })
-                                }
-                            </tr>
+                                    />
+                                </tr>
+                            }
                         }
-                    })
-                }
+                    }
+                />
             </table>
             <div style="margin-top: 1em;">
                 <span style="vertical-align: top;">{"Other:"}</span>
-                {
-                    color.view_with_style(move |color: UseStateHandle<AttrValue>, validator| {
-                        html! {
-                            <BindingInput value={color} onupdate={validator} style="width:8em;"/>
-                        }
-                    }, Some("display: inline-block;margin-left: 0.5em;".into()))
-                }
-                <ButtonGroup style="vertical-align: top;margin-left: 0.5em;">
-                    <Button disabled={color_state.is_empty()} onclick={on_confirm}>{"Confirm"}</Button>
-                    <Button onclick={props.oncancel.clone()}>{"Cancel"}</Button>
+                <ValidateWrapper error={color.error()} style={"display: inline-block;margin-left: 0.5em;"}>
+                    <Input value={color.data().into()} onupdate={color.listener()} style={SharedString::from("width:8em;")}/>
+                </ValidateWrapper>
+                <ButtonGroup style={SharedString::from("vertical-align: top;margin-left: 0.5em;")}>
+                    <Button disabled={Signal::derive(move || color_state.read().is_empty())} onclick={on_confirm}>{"Confirm"}</Button>
+                    <Button onclick={oncancel}>{"Cancel"}</Button>
                 </ButtonGroup>
             </div>
         </ModalDialog>
@@ -267,114 +276,145 @@ fn pick_color() -> Promise {
         root.add_event_listener_with_callback("mousedown", &on_root_click)
             .unwrap();
         body.append_child(&root).unwrap();
-        let handle: Rc<Cell<Option<AppHandle<ColorPicker>>>> = Rc::new(Cell::new(None));
-        let props = ColorPickerProps {
-            ondone: {
-                let root = root.clone();
-                let on_root_click = on_root_click.clone();
-                let handle = handle.clone();
-                let resolve = resolve.clone();
-                Callback::from(move |color: AttrValue| {
-                    if let Err(err) = resolve.call1(&JsValue::UNDEFINED, &JsValue::from_str(&color))
-                    {
-                        log::error!("调用Promise的resolve失败: {:?}", err);
-                    }
-                    if let Some(handle) = handle.take() {
-                        handle.destroy();
-                        let document = web_sys::window().unwrap().document().unwrap();
-                        let body = document.body().unwrap();
-                        root.remove_event_listener_with_callback("mousedown", &on_root_click)
-                            .unwrap();
-                        body.remove_child(&root).unwrap();
-                    }
-                })
-            },
-            oncancel: {
-                let root = root.clone();
-                let handle = handle.clone();
-                Callback::from(move |_: ()| {
-                    if let Err(err) = resolve.call1(&JsValue::UNDEFINED, &JsValue::UNDEFINED) {
-                        log::error!("调用Promise的resolve失败: {:?}", err);
-                    }
-                    if let Some(handle) = handle.take() {
-                        handle.destroy();
-                        let document = web_sys::window().unwrap().document().unwrap();
-                        let body = document.body().unwrap();
-                        root.remove_event_listener_with_callback("mousedown", &on_root_click)
-                            .unwrap();
-                        body.remove_child(&root).unwrap();
-                    }
-                })
-            },
+        let handle: Rc<Cell<Option<UnmountHandle<AnyViewState>>>> = Rc::new(Cell::new(None));
+        let renderer = {
+            let handle = handle.clone();
+            let root = root.clone();
+            move || {
+                view! {
+                    <ColorPicker
+                        ondone={
+                            let root = root.clone();
+                            let on_root_click = on_root_click.clone();
+                            let handle = handle.clone();
+                            let resolve = resolve.clone();
+                            UnsyncCallback::new(move |color: SharedString| {
+                                if let Err(err) = resolve.call1(&JsValue::UNDEFINED, &JsValue::from_str(&color))
+                                {
+                                    log::error!("调用Promise的resolve失败: {:?}", err);
+                                }
+                                if let Some(handle) = handle.take() {
+                                    // handle.destroy();
+                                    let document = web_sys::window().unwrap().document().unwrap();
+                                    let body = document.body().unwrap();
+                                    root.remove_event_listener_with_callback("mousedown", &on_root_click)
+                                        .unwrap();
+                                    body.remove_child(&root).unwrap();
+                                }
+                            })
+                        }
+                        oncancel={
+                            let root = root.clone();
+                            let handle = handle.clone();
+                            UnsyncCallback::new(move |_: ()| {
+                                if let Err(err) = resolve.call1(&JsValue::UNDEFINED, &JsValue::UNDEFINED) {
+                                    log::error!("调用Promise的resolve失败: {:?}", err);
+                                }
+                                if let Some(handle) = handle.take() {
+                                    // handle.destroy();
+                                    let document = web_sys::window().unwrap().document().unwrap();
+                                    let body = document.body().unwrap();
+                                    root.remove_event_listener_with_callback("mousedown", &on_root_click)
+                                        .unwrap();
+                                    body.remove_child(&root).unwrap();
+                                }
+                            })
+                        }
+                    />
+                }
+                .into_any()
+            }
         };
-        handle.set(Some(
-            yew::Renderer::<ColorPicker>::with_root_and_props(root, props).render(),
-        ));
+        handle.set(Some(leptos::mount::mount_to(
+            root.unchecked_into(),
+            renderer,
+        )));
     };
     return Promise::new(&mut promise_fn);
 }
 
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props {
-    pub value: JsValue,
-    #[prop_or_default]
-    pub placeholder: AttrValue,
-    #[prop_or_default]
-    pub style: Option<AttrValue>,
-    pub onchange: Callback<JsValue>,
-    #[prop_or_default]
-    pub onfocus: Callback<()>,
-}
-
-#[function_component]
-pub fn RichText(props: &Props) -> Html {
-    let div_ref = use_node_ref();
+#[component]
+pub fn RichText(
+    value: RwSignal<JsValue, LocalStorage>,
+    #[prop(optional)] readonly: bool,
+    #[prop(into, optional)] placeholder: SharedString,
+    #[prop(into, optional)] style: SharedString,
+    #[prop(into, default = None)] onchange: Option<UnsyncCallback<JsValue>>,
+    #[prop(into, default = None)] onfocus: Option<UnsyncCallback<()>>,
+) -> impl IntoView {
+    let div_ref: NodeRef<html::Div> = NodeRef::new();
+    let latest_destroy = LatestDestroy::new();
+    on_cleanup_unsync({
+        let latest_destroy = latest_destroy.clone();
+        move || {
+            latest_destroy.clear();
+        }
+    });
     {
         let div_ref = div_ref.clone();
-        let value = props.value.clone();
-        let editor_opt = use_state(|| None);
-        let inner_value = use_state(get_default_rich_text);
-        let onchange = props.onchange.clone();
+        let value = value.clone();
+        let editor_opt = RwSignal::new_local(None);
+        let inner_value = RwSignal::new_local(get_default_rich_text());
         let on_change = {
             let inner_value = inner_value.clone();
-            Callback::from(move |value: JsValue| {
-                inner_value.set(value.clone());
-                onchange.emit(value);
+            UnsyncCallback::new(move |new_value: JsValue| {
+                inner_value.set(new_value.clone());
+                if !readonly {
+                    value.set(new_value.clone());
+                }
+                if let Some(onchange) = &onchange {
+                    onchange.run(new_value);
+                }
             })
         };
         {
             let editor_opt = editor_opt.clone();
-            let placeholder = props.placeholder.clone();
+            let placeholder = placeholder.clone();
             let on_change = on_change.clone();
-            let on_focus = props.onfocus.clone();
-            use_effect_with(div_ref, move |div_ref| {
-                let div = div_ref
-                    .cast::<HtmlElement>()
-                    .expect("div_ref not attached to div element");
-                let editor =
-                    mount_text_editor(&div, &value, &placeholder, on_change, on_focus).unwrap();
-                editor_opt.set(Some(editor.clone()));
-                move || {
-                    editor_opt.set(None);
-                    unmount_text_editor(&editor);
-                }
-            });
+            let on_focus = onfocus.clone();
+            Effect::watch(
+                move || div_ref.get(),
+                move |div_ref, _, _| {
+                    if let Some(div) = div_ref {
+                        let editor = mount_text_editor(
+                            div,
+                            value.read().deref(),
+                            &placeholder,
+                            on_change,
+                            on_focus,
+                        )
+                        .unwrap();
+                        editor_opt.set(Some(editor.clone()));
+                        latest_destroy.replace(move || {
+                            editor_opt.set(None);
+                            unmount_text_editor(&editor);
+                        });
+                    }
+                },
+                false,
+            );
         }
         {
-            let value = props.value.clone();
-            let placeholder = props.placeholder.clone();
-            let on_focus = props.onfocus.clone();
-            use_effect_with(value, move |value| {
-                if inner_value.deref() != value {
-                    if let Some(editor) = editor_opt.as_ref() {
-                        update_rich_rext(editor, value, &placeholder, on_change, on_focus).unwrap();
+            let value = value.clone();
+            let placeholder = placeholder.clone();
+            let on_focus = onfocus.clone();
+            Effect::watch(
+                move || value.get(),
+                move |value, _, _| {
+                    let inner_value = inner_value.read();
+                    if inner_value.deref() != value {
+                        if let Some(editor) = editor_opt.read().as_ref() {
+                            update_rich_rext(editor, value, &placeholder, on_change, on_focus)
+                                .unwrap();
+                        }
                     }
-                }
-            });
+                },
+                false,
+            );
         }
     }
-    html! {
-        <div ref={div_ref} style={props.style.clone()}></div>
+    view! {
+        <div node_ref={div_ref} class="rich-text" style={style}></div>
     }
 }
 
@@ -396,8 +436,8 @@ fn package_resource_url(res_key: JsValue) -> String {
 
 fn build_config(
     placeholder: &str,
-    onchange: Callback<JsValue>,
-    onfocus: Callback<()>,
+    onchange: UnsyncCallback<JsValue>,
+    onfocus: Option<UnsyncCallback<()>>,
 ) -> js_sys::Object {
     let config = js_sys::Object::new();
 
@@ -454,18 +494,20 @@ fn build_config(
     .unwrap();
 
     let on_change = Closure::wrap(Box::new(move |value: JsValue| {
-        onchange.emit(value);
+        onchange.run(value);
     }) as Box<dyn Fn(JsValue)>)
     .into_js_value();
     js_sys::Reflect::set(&config, &JsValue::from_str("change"), &on_change).unwrap();
 
     // js_sys::Reflect::set(&config, &JsValue::from_str("blur"), &on_focus).unwrap();
 
-    let on_focus = Closure::wrap(Box::new(move |_value: JsValue| {
-        onfocus.emit(());
-    }) as Box<dyn Fn(JsValue)>)
-    .into_js_value();
-    js_sys::Reflect::set(&config, &JsValue::from_str("focus"), &on_focus).unwrap();
+    if let Some(onfocus) = onfocus {
+        let on_focus = Closure::wrap(Box::new(move |_value: JsValue| {
+            onfocus.run(());
+        }) as Box<dyn Fn(JsValue)>)
+        .into_js_value();
+        js_sys::Reflect::set(&config, &JsValue::from_str("focus"), &on_focus).unwrap();
+    }
 
     return config;
 }
@@ -474,8 +516,8 @@ fn mount_text_editor(
     root: &HtmlElement,
     value: &JsValue,
     placeholder: &str,
-    onchange: Callback<JsValue>,
-    onfocus: Callback<()>,
+    onchange: UnsyncCallback<JsValue>,
+    onfocus: Option<UnsyncCallback<()>>,
 ) -> Result<JsValue, JsValue> {
     let rich_text_obj =
         js_sys::Reflect::get(&web_sys::window().unwrap(), &JsValue::from_str("RichText")).unwrap();
@@ -519,7 +561,7 @@ pub fn get_default_rich_text() -> JsValue {
     return value;
 }
 
-pub fn get_default_rich_text_string() -> AttrValue {
+pub fn get_default_rich_text_string() -> SharedString {
     let value = get_default_rich_text();
     let value = JSON::stringify(&value).unwrap().as_string().unwrap();
     return value.into();
@@ -537,7 +579,8 @@ pub fn is_empty_rich_rext(value: &JsValue) -> bool {
     result.as_bool().unwrap_or(true)
 }
 
-pub fn render_rich_rext(content: &JsValue) -> Result<DocumentFragment, JsValue> {
+pub fn render_rich_rext(value: &str) -> Result<DocumentFragment, JsValue> {
+    let content = JSON::parse(value)?;
     let package_resource_url =
         Closure::wrap(Box::new(package_resource_url) as Box<dyn Fn(JsValue) -> String>)
             .into_js_value();
@@ -545,7 +588,7 @@ pub fn render_rich_rext(content: &JsValue) -> Result<DocumentFragment, JsValue> 
         js_sys::Reflect::get(&web_sys::window().unwrap(), &JsValue::from_str("RichText"))?;
     let render_text_method: js_sys::Function =
         js_sys::Reflect::get(&rich_text_obj, &JsValue::from_str("renderRichText"))?.dyn_into()?;
-    let content = render_text_method.call2(&rich_text_obj, content, &package_resource_url)?;
+    let content = render_text_method.call2(&rich_text_obj, &content, &package_resource_url)?;
     return Ok(content.unchecked_into());
 }
 
@@ -553,8 +596,8 @@ pub fn update_rich_rext(
     editor: &JsValue,
     value: &JsValue,
     placeholder: &str,
-    onchange: Callback<JsValue>,
-    onfocus: Callback<()>,
+    onchange: UnsyncCallback<JsValue>,
+    onfocus: Option<UnsyncCallback<()>>,
 ) -> Result<(), JsValue> {
     let rich_text_obj =
         js_sys::Reflect::get(&web_sys::window().unwrap(), &JsValue::from_str("RichText"))?;
@@ -569,10 +612,10 @@ pub fn update_rich_rext(
     return Ok(());
 }
 
-fn try_upload(files: JsValue, resolve: Function, reject: Function) -> Result<(), AttrValue> {
+fn try_upload(files: JsValue, resolve: Function, reject: Function) -> Result<(), SharedString> {
     let files: js_sys::Array = files.clone().dyn_into().map_err(|err| {
         log::error!("上传文件参数不是数组: {:?}", err);
-        AttrValue::from("参数错误！")
+        SharedString::from("参数错误！")
     })?;
     let files: Result<Vec<File>, JsValue> = files
         .to_vec()
@@ -581,7 +624,7 @@ fn try_upload(files: JsValue, resolve: Function, reject: Function) -> Result<(),
         .collect();
     let files = files.map_err(|err| {
         log::error!("文件列表里存在不是文件的元素: {:?}", err);
-        AttrValue::from("参数错误！")
+        SharedString::from("参数错误！")
     })?;
     let calc_file_sha512_method: js_sys::Function = js_sys::Reflect::get(
         &web_sys::window().unwrap(),
@@ -590,9 +633,12 @@ fn try_upload(files: JsValue, resolve: Function, reject: Function) -> Result<(),
     .unwrap()
     .dyn_into()
     .unwrap();
-    let result_map: Arc<RwLock<HashMap<usize, Result<ResourceMetadata, AttrValue>>>> =
+    let result_map: Arc<RwLock<HashMap<usize, Result<ResourceMetadata, SharedString>>>> =
         Default::default();
-    let files: Vec<(HashingFile, Callback<Result<ResourceMetadata, AttrValue>>)> = files
+    let files: Vec<(
+        HashingFile,
+        UnsyncCallback<Result<ResourceMetadata, SharedString>>,
+    )> = files
         .to_vec()
         .into_iter()
         .enumerate()
@@ -608,7 +654,7 @@ fn try_upload(files: JsValue, resolve: Function, reject: Function) -> Result<(),
                     file: file,
                     sha512: sha512,
                 },
-                Callback::from(move |result| {
+                UnsyncCallback::new(move |result| {
                     result_map.write().unwrap().insert(index, result);
                 }),
             )
@@ -642,7 +688,7 @@ fn try_upload(files: JsValue, resolve: Function, reject: Function) -> Result<(),
     return Ok(());
 }
 
-pub async fn upload_resource(value: &JsValue) -> Result<(), AttrValue> {
+pub async fn upload_resource(value: &JsValue) -> Result<(), SharedString> {
     let rich_text_obj =
         js_sys::Reflect::get(&web_sys::window().unwrap(), &JsValue::from_str("RichText")).unwrap();
     let upload_resource_method: js_sys::Function =
@@ -670,17 +716,17 @@ pub async fn upload_resource(value: &JsValue) -> Result<(), AttrValue> {
         .unwrap();
     JsFuture::from(upload_promise).await.map_err(|err| {
         log::error!("上传图片失败: {:?}", err);
-        AttrValue::from("上传图片失败！")
+        SharedString::from("上传图片失败！")
     })?;
     return Ok(());
 }
 
 pub struct RequiredValidator {
-    message: AttrValue,
+    message: SharedString,
 }
 
 impl RequiredValidator {
-    pub fn new(message: impl Into<AttrValue>) -> Self {
+    pub fn new(message: impl Into<SharedString>) -> Self {
         Self {
             message: message.into(),
         }
@@ -688,7 +734,7 @@ impl RequiredValidator {
 }
 
 impl Validator<str> for RequiredValidator {
-    fn validate(&self, data: &str) -> Option<AttrValue> {
+    fn validate(&self, data: &str) -> Option<SharedString> {
         match JSON::parse(data) {
             Ok(json) => {
                 if is_empty_rich_rext(&json) {
@@ -703,7 +749,7 @@ impl Validator<str> for RequiredValidator {
 }
 
 impl Validator<String> for RequiredValidator {
-    fn validate(&self, data: &String) -> Option<AttrValue> {
+    fn validate(&self, data: &String) -> Option<SharedString> {
         match JSON::parse(data) {
             Ok(json) => {
                 if is_empty_rich_rext(&json) {
@@ -717,8 +763,8 @@ impl Validator<String> for RequiredValidator {
     }
 }
 
-impl Validator<AttrValue> for RequiredValidator {
-    fn validate(&self, data: &AttrValue) -> Option<AttrValue> {
+impl Validator<SharedString> for RequiredValidator {
+    fn validate(&self, data: &SharedString) -> Option<SharedString> {
         match JSON::parse(data) {
             Ok(json) => {
                 if is_empty_rich_rext(&json) {
@@ -733,43 +779,11 @@ impl Validator<AttrValue> for RequiredValidator {
 }
 
 impl Validator<JsValue> for RequiredValidator {
-    fn validate(&self, data: &JsValue) -> Option<AttrValue> {
+    fn validate(&self, data: &JsValue) -> Option<SharedString> {
         if is_empty_rich_rext(data) {
             Some(self.message.clone())
         } else {
             None
         }
     }
-}
-
-#[derive(Clone, PartialEq, Properties)]
-pub struct BindingProps {
-    pub value: UseStateHandle<JsValue>,
-    #[prop_or_default]
-    pub placeholder: AttrValue,
-    #[prop_or_default]
-    pub style: Option<AttrValue>,
-    #[prop_or_default]
-    pub onchange: Callback<JsValue>,
-    #[prop_or_default]
-    pub onfocus: Callback<()>,
-}
-
-#[function_component]
-pub fn BindingRichText(props: &BindingProps) -> Html {
-    let value_clone = props.value.clone();
-    let onchange = props.onchange.clone();
-    let on_change = Callback::from(move |value: JsValue| {
-        value_clone.set(value.clone().into());
-        onchange.emit(value);
-    });
-    return html! {
-        <RichText
-            value={props.value.deref().clone()}
-            placeholder={props.placeholder.clone()}
-            style={props.style.clone()}
-            onchange={on_change}
-            onfocus={props.onfocus.clone()}
-        />
-    };
 }

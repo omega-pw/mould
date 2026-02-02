@@ -6,75 +6,68 @@ use crate::components::drawer::Drawer;
 use crate::components::pagination::Pagination as PaginationComp;
 use crate::sdk;
 use crate::utils;
+use crate::utils::fix_page_no;
+use crate::utils::list_exception_view;
 use crate::utils::request::ApiExt;
 use crate::utils::LoadStatus;
 use crate::SharedString;
+use leptos::prelude::*;
 use sdk::environment_schema::delete_environment_schema::DeleteEnvironmentSchemaApi;
 use sdk::environment_schema::delete_environment_schema::DeleteEnvironmentSchemaReq;
 use sdk::environment_schema::query_environment_schema::QueryEnvironmentSchemaApi;
 use sdk::environment_schema::query_environment_schema::QueryEnvironmentSchemaReq;
 use sdk::environment_schema::EnvironmentSchema;
-use std::ops::Deref;
 use tihu::Id;
 use tihu::Pagination;
 use tihu::PrimaryKey;
-use yew::prelude::*;
 
-#[function_component]
-pub fn EnvironmentSchemaList() -> Html {
-    let pagination: UseStateHandle<Pagination> = use_state(|| Pagination::new(0, 1, None, None));
-    let list: UseStateHandle<Vec<EnvironmentSchema>> = use_state(|| Vec::new());
-    let list_load_status: UseStateHandle<LoadStatus> = use_state(|| LoadStatus::NotStarted);
-    let detail_active: UseStateHandle<bool> = use_state(|| false);
-    let active_detail_id: UseStateHandle<Option<Id>> = use_state(|| None);
-    let edit_active: UseStateHandle<bool> = use_state(|| false);
-    let active_edit_id: UseStateHandle<Option<Id>> = use_state(|| None);
+#[component]
+pub fn EnvironmentSchemaList() -> impl IntoView {
+    let pagination: RwSignal<Pagination> = RwSignal::new(Pagination::new(0, 1, None, None));
+    let list: RwSignal<Vec<EnvironmentSchema>> = RwSignal::new(Vec::new());
+    let list_load_status: RwSignal<LoadStatus> = RwSignal::new(LoadStatus::NotStarted);
+    let detail_active: RwSignal<bool> = RwSignal::new(false);
+    let active_detail_id: RwSignal<Option<Id>> = RwSignal::new(None);
+    let edit_active: RwSignal<bool> = RwSignal::new(false);
+    let active_edit_id: RwSignal<Option<Id>> = RwSignal::new(None);
     let active_edit_id_clone = active_edit_id.clone();
     let edit_active_clone = edit_active.clone();
-    let on_open_insert = Callback::from(move |_: ()| {
+    let on_open_insert = UnsyncCallback::new(move |_: ()| {
         active_edit_id_clone.set(None);
         edit_active_clone.set(true);
     });
     let list_clone = list.clone();
     let list_load_status_clone = list_load_status.clone();
     let pagination_clone = pagination.clone();
-    let on_query = Callback::from(move |_| {
-        let list = list_clone.clone();
-        let list_load_status = list_load_status_clone.clone();
-        let pagination = pagination_clone.clone();
-        wasm_bindgen_futures::spawn_local(async move {
-            query_environment_schema_list(1, &list, &list_load_status, &pagination).await;
-        });
-    });
-    let on_query_clone = on_query.clone();
-    use_effect_with((), move |_| {
-        on_query_clone.emit(());
-        || ()
-    });
-    let list_clone = list.clone();
-    let list_load_status_clone = list_load_status.clone();
-    let pagination_clone = pagination.clone();
-    let on_page = Callback::from(move |page: u64| {
+    let query_by_page = move |page: u64| {
         let list = list_clone.clone();
         let list_load_status = list_load_status_clone.clone();
         let pagination = pagination_clone.clone();
         wasm_bindgen_futures::spawn_local(async move {
             query_environment_schema_list(page, &list, &list_load_status, &pagination).await;
         });
-    });
+    };
+    let on_query = {
+        let query_by_page = query_by_page.clone();
+        UnsyncCallback::new(move |_| {
+            query_by_page(1);
+        })
+    };
+    query_by_page(1);
+    let on_page = UnsyncCallback::new(query_by_page);
     let edit_active_clone = edit_active.clone();
     let active_edit_id_clone = active_edit_id.clone();
     let list_clone = list.clone();
     let list_load_status_clone = list_load_status.clone();
     let pagination_clone = pagination.clone();
-    let on_finish_save = Callback::from(move |_pri_key: PrimaryKey| {
+    let on_finish_save = UnsyncCallback::new(move |_pri_key: PrimaryKey| {
         edit_active_clone.set(false);
         let active_edit_id = active_edit_id_clone.clone();
         let list = list_clone.clone();
         let list_load_status = list_load_status_clone.clone();
         let pagination = pagination_clone.clone();
         wasm_bindgen_futures::spawn_local(async move {
-            if active_edit_id.is_some() {
+            if active_edit_id.read().is_some() {
                 refresh_list(&list, &list_load_status, &pagination).await;
             } else {
                 query_environment_schema_list(1, &list, &list_load_status, &pagination).await;
@@ -83,17 +76,17 @@ pub fn EnvironmentSchemaList() -> Html {
     });
     let detail_active_clone = detail_active.clone();
     let active_detail_id_clone = active_detail_id.clone();
-    let on_leave_detail = Callback::from(move |_| {
+    let on_leave_detail = UnsyncCallback::new(move |_| {
         detail_active_clone.set(false);
         active_detail_id_clone.set(None);
     });
     let edit_active_clone = edit_active.clone();
     let active_edit_id_clone = active_edit_id.clone();
-    let on_leave_edit = Callback::from(move |_| {
+    let on_leave_edit = UnsyncCallback::new(move |_| {
         edit_active_clone.set(false);
         active_edit_id_clone.set(None);
     });
-    html! {
+    view! {
         <div class="relative width-fill height-fill" style="overflow:hidden;">
             <div class="width-fill height-fill border-box" style="padding:0.25em;">
                 <div class="width-fill height-fill" style="display: -webkit-box;display: flex;-webkit-box-direction: normal;-webkit-box-orient: vertical;flex-direction: column;">
@@ -108,40 +101,58 @@ pub fn EnvironmentSchemaList() -> Html {
                     </header>
                     <div style="-webkit-box-flex: 1;flex-basis: auto;flex-grow: 1;overflow-y: auto;">
                         { table_view(&list, &list_load_status, &pagination,&detail_active, &active_detail_id, &edit_active, &active_edit_id) }
-                        { list_exception_view(list.is_empty(), list_load_status.deref().clone()) }
+                        { list_exception_view(list, list_load_status) }
                     </div>
                     <div style="-webkit-box-flex: 0;flex-basis: auto;flex-grow: 0;padding-top: 0.25em;">
-                        <PaginationComp pagination={pagination.deref().clone()} onpage={on_page} />
+                        <PaginationComp pagination={pagination} onpage={on_page} />
                     </div>
                 </div>
             </div>
-            <Drawer active={*detail_active} onclickother={on_leave_detail}>
+            <Drawer active={detail_active} onclickother={on_leave_detail}>
                 {
-                    match active_detail_id.as_ref() {
-                        Some(active_detail_id) => html! {
-                            <EnvironmentSchemaDetail id={*active_detail_id} />
-                        },
-                        None => html! {}
+                    move || {
+                        match active_detail_id.get() {
+                            Some(active_detail_id) => view! {
+                                <EnvironmentSchemaDetail id={active_detail_id} />
+                            }.into_any(),
+                            None => view! {}.into_any()
+                        }
                     }
                 }
             </Drawer>
-            <Drawer active={*edit_active} onclickother={on_leave_edit}>
-                <EnvironmentSchemaEdit id={active_edit_id.deref().clone()} onsave={on_finish_save} />
+            <Drawer active={edit_active} onclickother={on_leave_edit}>
+                {
+                    move || {
+                        match active_edit_id.get() {
+                            Some(active_edit_id) => view! {
+                                <EnvironmentSchemaEdit id={active_edit_id} onsave={on_finish_save} />
+                            }.into_any(),
+                            None => view! {}.into_any()
+                        }
+                    }
+                }
             </Drawer>
         </div>
     }
 }
 
 fn table_view(
-    list: &UseStateHandle<Vec<EnvironmentSchema>>,
-    list_load_status: &UseStateHandle<LoadStatus>,
-    pagination: &UseStateHandle<Pagination>,
-    detail_active: &UseStateHandle<bool>,
-    active_detail_id: &UseStateHandle<Option<Id>>,
-    edit_active: &UseStateHandle<bool>,
-    active_edit_id: &UseStateHandle<Option<Id>>,
-) -> Html {
-    return html! {
+    list: &RwSignal<Vec<EnvironmentSchema>>,
+    list_load_status: &RwSignal<LoadStatus>,
+    pagination: &RwSignal<Pagination>,
+    detail_active: &RwSignal<bool>,
+    active_detail_id: &RwSignal<Option<Id>>,
+    edit_active: &RwSignal<bool>,
+    active_edit_id: &RwSignal<Option<Id>>,
+) -> impl IntoView + use<> {
+    let list = StoredValue::new(list.clone());
+    let list_load_status = StoredValue::new(list_load_status.clone());
+    let pagination = StoredValue::new(pagination.clone());
+    let detail_active = StoredValue::new(detail_active.clone());
+    let active_detail_id = StoredValue::new(active_detail_id.clone());
+    let edit_active = StoredValue::new(edit_active.clone());
+    let active_edit_id = StoredValue::new(active_edit_id.clone());
+    return view! {
         <table class="e-table width-fill">
             <thead>
                 <tr>
@@ -149,46 +160,48 @@ fn table_view(
                     <th class="e-table-hcell">{"操作"}</th>
                 </tr>
             </thead>
-            {
-                if list_load_status.deref() == &LoadStatus::LoadOk || list_load_status.deref() == &LoadStatus::Loading {
-                    html! {
-                        <tbody>
-                            {
-                                for list.iter().map(|item| {
-                                    row_view(list, list_load_status, pagination, item, detail_active, active_detail_id, edit_active, active_edit_id)
-                                })
-                            }
-                        </tbody>
-                    }
-                } else {
-                    html! {}
-                }
-            }
+            <Show when=move || {
+                let list_load_status = list_load_status.read_value().get();
+                LoadStatus::LoadOk == list_load_status || LoadStatus::Loading == list_load_status
+            }>
+                <tbody>
+                    <For
+                        each={
+                            let list = list.clone();
+                            move || { list.read_value().get() }
+                        }
+                        key=|item| { item.id.clone() }
+                        children=move |item| {
+                            row_view(&list.read_value(), &list_load_status.read_value(), &pagination.read_value(), &item, &detail_active.read_value(), &active_detail_id.read_value(), &edit_active.read_value(), &active_edit_id.read_value())
+                        }
+                    />
+                </tbody>
+            </Show>
         </table>
     };
 }
 
 fn row_view(
-    list: &UseStateHandle<Vec<EnvironmentSchema>>,
-    list_load_status: &UseStateHandle<LoadStatus>,
-    pagination: &UseStateHandle<Pagination>,
+    list: &RwSignal<Vec<EnvironmentSchema>>,
+    list_load_status: &RwSignal<LoadStatus>,
+    pagination: &RwSignal<Pagination>,
     environment_schema: &EnvironmentSchema,
-    detail_active: &UseStateHandle<bool>,
-    active_detail_id: &UseStateHandle<Option<Id>>,
-    edit_active: &UseStateHandle<bool>,
-    active_edit_id: &UseStateHandle<Option<Id>>,
-) -> Html {
+    detail_active: &RwSignal<bool>,
+    active_detail_id: &RwSignal<Option<Id>>,
+    edit_active: &RwSignal<bool>,
+    active_edit_id: &RwSignal<Option<Id>>,
+) -> impl IntoView + use<> {
     let detail_id = environment_schema.id;
     let active_detail_id = active_detail_id.clone();
     let detail_active = detail_active.clone();
-    let on_open_detail = Callback::from(move |_: ()| {
+    let on_open_detail = UnsyncCallback::new(move |_: ()| {
         active_detail_id.set(Some(detail_id));
         detail_active.set(true);
     });
     let update_id = environment_schema.id;
     let active_edit_id = active_edit_id.clone();
     let edit_active = edit_active.clone();
-    let on_open_update = Callback::from(move |_: ()| {
+    let on_open_update = UnsyncCallback::new(move |_: ()| {
         active_edit_id.set(Some(update_id));
         edit_active.set(true);
     });
@@ -196,7 +209,7 @@ fn row_view(
     let list = list.clone();
     let list_load_status = list_load_status.clone();
     let pagination = pagination.clone();
-    let on_confirm_delete = Callback::from(move |_: ()| {
+    let on_confirm_delete = UnsyncCallback::new(move |_: ()| {
         let list = list.clone();
         let list_load_status = list_load_status.clone();
         let pagination = pagination.clone();
@@ -212,9 +225,9 @@ fn row_view(
             }
         });
     });
-    return html! {
+    return view! {
         <tr class="e-table-row">
-            <td class="e-table-cell align-center">{&environment_schema.name}</td>
+            <td class="e-table-cell align-center">{environment_schema.name.clone()}</td>
             <td class="e-table-cell align-center">
                 <ButtonGroup>
                     <Button onclick={on_open_detail}>{"详情"}</Button>
@@ -226,41 +239,16 @@ fn row_view(
     };
 }
 
-fn list_exception_view(is_empty: bool, list_load_status: LoadStatus) -> Html {
-    return html! {
-        match list_load_status {
-            LoadStatus::LoadFailed => {
-                html! {
-                    <p class="align-center">{"列表加载失败"}</p>
-                }
-            },
-            LoadStatus::LoadOk => {
-                if is_empty {
-                    html! {
-                        <p class="align-center">{"列表数据为空"}</p>
-                    }
-                } else {
-                    html! {}
-                }
-            },
-            _ => html! {}
-        }
-    };
-}
-
-fn clear_list(
-    list: &UseStateHandle<Vec<EnvironmentSchema>>,
-    pagination: &UseStateHandle<Pagination>,
-) {
+fn clear_list(list: &RwSignal<Vec<EnvironmentSchema>>, pagination: &RwSignal<Pagination>) {
     pagination.set(Pagination::new(0, 1, None, None));
     list.set(Vec::new());
 }
 
 async fn query_environment_schema_list(
     page_no: u64,
-    list: &UseStateHandle<Vec<EnvironmentSchema>>,
-    list_load_status: &UseStateHandle<LoadStatus>,
-    pagination: &UseStateHandle<Pagination>,
+    list: &RwSignal<Vec<EnvironmentSchema>>,
+    list_load_status: &RwSignal<LoadStatus>,
+    pagination: &RwSignal<Pagination>,
 ) {
     let params = QueryEnvironmentSchemaReq {
         page_no: Some(page_no),
@@ -283,23 +271,19 @@ async fn query_environment_schema_list(
 }
 
 async fn refresh_list(
-    list: &UseStateHandle<Vec<EnvironmentSchema>>,
-    list_load_status: &UseStateHandle<LoadStatus>,
-    pagination: &UseStateHandle<Pagination>,
+    list: &RwSignal<Vec<EnvironmentSchema>>,
+    list_load_status: &RwSignal<LoadStatus>,
+    pagination: &RwSignal<Pagination>,
 ) {
-    let page_no = if list.is_empty() {
-        pagination.page_no - 1
-    } else {
-        pagination.page_no
-    };
-    query_environment_schema_list(page_no.max(1), list, list_load_status, pagination).await;
+    let new_page_no = fix_page_no(pagination, list);
+    query_environment_schema_list(new_page_no, list, list_load_status, pagination).await;
 }
 
 async fn delete_environment_schema(
     id: Id,
-    list: &UseStateHandle<Vec<EnvironmentSchema>>,
-    list_load_status: &UseStateHandle<LoadStatus>,
-    pagination: &UseStateHandle<Pagination>,
+    list: &RwSignal<Vec<EnvironmentSchema>>,
+    list_load_status: &RwSignal<LoadStatus>,
+    pagination: &RwSignal<Pagination>,
 ) -> Result<(), SharedString> {
     let params = DeleteEnvironmentSchemaReq { id: id };
     DeleteEnvironmentSchemaApi.call(&params).await?;
@@ -314,16 +298,8 @@ async fn delete_environment_schema(
     return Ok(());
 }
 
-fn remove_environment_schema(id: Id, list: &UseStateHandle<Vec<EnvironmentSchema>>) {
-    let new_list: Vec<_> = list
-        .iter()
-        .filter_map(|item| {
-            if item.id == id {
-                None
-            } else {
-                Some(item.clone())
-            }
-        })
-        .collect();
-    list.set(new_list);
+fn remove_environment_schema(id: Id, list: &RwSignal<Vec<EnvironmentSchema>>) {
+    list.write().retain(|item| {
+        return item.id != id;
+    });
 }

@@ -1,19 +1,16 @@
 use crate::sdk;
 use crate::utils::request::ApiExt;
 use crate::SharedString;
+use leptos::prelude::*;
 use sdk::auth::logout::LogoutApi;
 use sdk::auth::logout::LogoutReq;
-use yew::prelude::*;
 
-#[function_component]
-pub fn Logout() -> Html {
-    use_effect_with((), move |_| {
-        wasm_bindgen_futures::spawn_local(async move {
-            logout().await.ok();
-        });
-        || ()
+#[component]
+pub fn Logout() -> impl IntoView {
+    wasm_bindgen_futures::spawn_local(async move {
+        logout().await.ok();
     });
-    html! {}
+    view! {}
 }
 
 async fn logout() -> Result<(), SharedString> {

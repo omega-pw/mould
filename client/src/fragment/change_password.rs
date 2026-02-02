@@ -1,5 +1,5 @@
 use crate::components::button::Button;
-use crate::components::input::BindingInput;
+use crate::components::input::Input;
 use crate::js;
 use crate::sdk;
 use crate::utils;
@@ -10,6 +10,7 @@ use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use js::sha512;
 use js::RsaPubKey2048;
+use leptos::prelude::*;
 use log;
 use sdk::auth::calc_salt;
 use sdk::auth::change_password::ChangePasswordApi;
@@ -20,42 +21,33 @@ use sdk::auth::get_nonce::GetNonceReq;
 use sdk::auth::get_rsa_pub_key::GetRsaPubKeyApi;
 use sdk::auth::get_rsa_pub_key::GetRsaPubKeyReq;
 use sdk::auth::RandomValue;
-use yew::prelude::*;
 
 #[derive(Clone)]
 struct ChangeForm {
-    old_password: UseStateHandle<SharedString>,
-    new_password: UseStateHandle<SharedString>,
-    confirm_new_password: UseStateHandle<SharedString>,
+    old_password: RwSignal<SharedString>,
+    new_password: RwSignal<SharedString>,
+    confirm_new_password: RwSignal<SharedString>,
 }
 
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props {
-    pub ondone: Callback<()>,
-}
-
-#[function_component]
-pub fn ChangePassword(props: &Props) -> Html {
+#[component]
+pub fn ChangePassword(ondone: UnsyncCallback<()>) -> impl IntoView {
     let app_context = use_context::<AppContext>().expect("no app context found");
     let form = ChangeForm {
-        old_password: use_state(|| "".into()),
-        new_password: use_state(|| "".into()),
-        confirm_new_password: use_state(|| "".into()),
+        old_password: RwSignal::new("".into()),
+        new_password: RwSignal::new("".into()),
+        confirm_new_password: RwSignal::new("".into()),
     };
-    let rsa_pub_key: UseStateHandle<Option<SharedString>> = use_state(|| None);
-    let is_saving: UseStateHandle<bool> = use_state(|| false);
-    let err_msg: UseStateHandle<Option<SharedString>> = use_state(|| None);
+    let rsa_pub_key: RwSignal<Option<SharedString>> = RwSignal::new(None);
+    let is_saving: RwSignal<bool> = RwSignal::new(false);
+    let err_msg: RwSignal<Option<SharedString>> = RwSignal::new(None);
 
     let rsa_pub_key_clone = rsa_pub_key.clone();
-    use_effect_with((), move |_| {
-        wasm_bindgen_futures::spawn_local(async move {
-            get_rsa_pub_key(&rsa_pub_key_clone).await.ok();
-        });
-        || ()
+    wasm_bindgen_futures::spawn_local(async move {
+        get_rsa_pub_key(&rsa_pub_key_clone).await.ok();
     });
 
     let err_msg_clone = err_msg.clone();
-    let clear_err_msg = Callback::from(move |_| {
+    let clear_err_msg = UnsyncCallback::new(move |_| {
         err_msg_clone.set(None);
     });
 
@@ -64,15 +56,12 @@ pub fn ChangePassword(props: &Props) -> Html {
     let err_msg_clone = err_msg.clone();
     if let Some(curr_user) = app_context.curr_user.as_ref() {
         match &curr_user.auth_source {
-            AuthSource::External { .. } => {
-                html! {}
-            }
+            AuthSource::External { .. } => view! {}.into_any(),
             AuthSource::System {
                 user_random_value, ..
             } => {
                 let user_random_value = user_random_value.clone();
-                let ondone = props.ondone.clone();
-                let on_save = Callback::from(move |_| {
+                let on_save = UnsyncCallback::new(move |_| {
                     let rsa_pub_key = rsa_pub_key.clone();
                     let is_saving = is_saving_clone.clone();
                     let form = form_clone.clone();
@@ -91,56 +80,49 @@ pub fn ChangePassword(props: &Props) -> Html {
                         .await;
                     });
                 });
-                html! {
+                view! {
                     <div class="width-fill height-fill border-box" style="padding:0.25em;">
                         <table style="border-collapse:collapse;table-layout: fixed;">
                             <tr>
                                 <td class="align-right" style="width:8em;">{"旧密码："}</td>
                                 <td>
-                                    <BindingInput r#type="password" disable_trim={true} value={form.old_password.clone()} onfocus={clear_err_msg.clone()}/>
+                                    <Input r#type="password" disable_trim={true} value={form.old_password.clone()} onfocus={clear_err_msg.clone()}/>
                                 </td>
                             </tr>
                             <tr>
                                 <td class="align-right" style="width:8em;">{"新密码："}</td>
                                 <td>
-                                    <BindingInput r#type="password" disable_trim={true} value={form.new_password.clone()} onfocus={clear_err_msg.clone()}/>
+                                    <Input r#type="password" disable_trim={true} value={form.new_password.clone()} onfocus={clear_err_msg.clone()}/>
                                 </td>
                             </tr>
                             <tr>
                                 <td class="align-right" style="width:8em;">{"确认新密码："}</td>
                                 <td>
-                                    <BindingInput r#type="password" disable_trim={true} value={form.confirm_new_password.clone()} onfocus={clear_err_msg}/>
+                                    <Input r#type="password" disable_trim={true} value={form.confirm_new_password.clone()} onfocus={clear_err_msg}/>
                                 </td>
                             </tr>
                             <tr>
                                 <td></td>
                                 <td>
-                                    <Button disabled={*is_saving} onclick={on_save}>{"保存"}</Button>
-                                    {
-                                        match err_msg.as_ref() {
-                                            Some(err_msg) => {
-                                                html!{
-                                                    <span class="middle" style="color:red;margin-left: 0.5em;">{err_msg}</span>
-                                                }
-                                            },
-                                            None => html!{}
-                                        }
-                                    }
+                                    <Button disabled={is_saving} onclick={on_save}>{"保存"}</Button>
+                                    <Show
+                                        when={ let err_msg = err_msg.clone(); move || { err_msg.read().is_some() } }
+                                    >
+                                        <span class="middle" style="color:red;margin-left: 0.5em;">{err_msg}</span>
+                                    </Show>
                                 </td>
                             </tr>
                         </table>
                     </div>
-                }
+                }.into_any()
             }
         }
     } else {
-        html! {}
+        view! {}.into_any()
     }
 }
 
-async fn get_rsa_pub_key(
-    rsa_pub_key: &UseStateHandle<Option<SharedString>>,
-) -> Result<(), SharedString> {
+async fn get_rsa_pub_key(rsa_pub_key: &RwSignal<Option<SharedString>>) -> Result<(), SharedString> {
     let params = GetRsaPubKeyReq {};
     let pub_key = GetRsaPubKeyApi.call(&params).await?;
     rsa_pub_key.set(Some(pub_key.into()));
@@ -149,31 +131,37 @@ async fn get_rsa_pub_key(
 
 fn chk_form_err(form: &ChangeForm) -> Vec<SharedString> {
     let mut err_msgs: Vec<SharedString> = Vec::new();
-    if form.old_password.is_empty() {
-        err_msgs.push(SharedString::Static("请输入旧密码"));
+    let old_password = form.old_password.get();
+    let old_password: &str = old_password.as_ref();
+    if old_password.is_empty() {
+        err_msgs.push(SharedString::from("请输入旧密码"));
     }
-    if form.new_password.is_empty() {
-        err_msgs.push(SharedString::Static("请输入新密码"));
+    let new_password = form.new_password.get();
+    let new_password: &str = new_password.as_ref();
+    if new_password.is_empty() {
+        err_msgs.push(SharedString::from("请输入新密码"));
     }
-    if form.confirm_new_password.is_empty() {
-        err_msgs.push(SharedString::Static("请输入确认新密码"));
+    let confirm_new_password = form.confirm_new_password.get();
+    let confirm_new_password: &str = confirm_new_password.as_ref();
+    if confirm_new_password.is_empty() {
+        err_msgs.push(SharedString::from("请输入确认新密码"));
     }
-    if form.confirm_new_password != form.new_password {
-        err_msgs.push(SharedString::Static("新密码不一致"));
+    if confirm_new_password != new_password {
+        err_msgs.push(SharedString::from("新密码不一致"));
     }
-    if form.old_password == form.new_password {
-        err_msgs.push(SharedString::Static("新旧密码不能相同"));
+    if old_password == new_password {
+        err_msgs.push(SharedString::from("新旧密码不能相同"));
     }
     return err_msgs;
 }
 
 async fn save_change(
-    rsa_pub_key: &UseStateHandle<Option<SharedString>>,
+    rsa_pub_key: &RwSignal<Option<SharedString>>,
     user_random_value: &str,
-    is_saving: &UseStateHandle<bool>,
+    is_saving: &RwSignal<bool>,
     form: &ChangeForm,
-    err_msg: &UseStateHandle<Option<SharedString>>,
-    ondone: &Callback<()>,
+    err_msg: &RwSignal<Option<SharedString>>,
+    ondone: &UnsyncCallback<()>,
 ) {
     let mut err_msgs = chk_form_err(form);
     if !err_msgs.is_empty() {
@@ -181,8 +169,8 @@ async fn save_change(
         err_msg.set(err_msgs.pop());
         return;
     }
-    if let Some(rsa_pub_key) = rsa_pub_key.as_ref() {
-        if **is_saving {
+    if let Some(rsa_pub_key) = rsa_pub_key.get() {
+        if is_saving.get() {
             return;
         }
         is_saving.set(true);
@@ -197,7 +185,7 @@ async fn save_change(
             }
             Ok(_) => {
                 utils::success(SharedString::from("修改成功"));
-                ondone.emit(());
+                ondone.run(());
             }
         }
     } else {
@@ -215,19 +203,19 @@ async fn change_password(
             .decode(user_random_value)
             .map_err(|err| -> SharedString {
                 log::error!("解码客户端随机数失败: {:?}", err);
-                return SharedString::Static("解码客户端随机数失败！");
+                return SharedString::from("解码客户端随机数失败！");
             })?;
     if 32 != user_random_value.len() {
-        return Err(SharedString::Static("客户端随机数位数不正确！"));
+        return Err(SharedString::from("客户端随机数位数不正确！"));
     }
     let mut data = [0u8; 32];
     data.copy_from_slice(&user_random_value);
     let salt = calc_salt(RandomValue::Client(data), sha512)
         .map_err(|error| SharedString::from(error.to_string()))?;
     let (old_auth_key, _old_encryption_key) =
-        sdk::auth::calc_derived_key(form.old_password.as_bytes(), &salt);
+        sdk::auth::calc_derived_key(form.old_password.get().as_bytes(), &salt);
     let (new_auth_key, _new_encryption_key) =
-        sdk::auth::calc_derived_key(form.new_password.as_bytes(), &salt);
+        sdk::auth::calc_derived_key(form.new_password.get().as_bytes(), &salt);
     let old_auth_key = BASE64_STANDARD.encode(&old_auth_key);
     let new_auth_key = BASE64_STANDARD.encode(&new_auth_key);
     let params = GetNonceReq {};

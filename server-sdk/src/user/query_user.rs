@@ -33,7 +33,7 @@ impl QueryUserReq {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct User {
     pub id: Id,
     pub user_source: enums::UserSource,

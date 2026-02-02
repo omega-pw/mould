@@ -1,292 +1,210 @@
+use super::on_cleanup_unsync;
 use super::SelectOption;
 use crate::SharedString;
 use js_sys::Function;
-use std::ops::Deref;
+use leptos::prelude::*;
+use std::hash::Hash;
 use wasm_bindgen::prelude::*;
-use web_sys::HtmlInputElement;
-use yew::prelude::*;
-use yew::{html, Component, Context, Html};
+use web_sys::{Event, HtmlInputElement, MouseEvent};
 
-struct State<O: SelectOption> {
-    value: Option<O::Value>,
-    options: Vec<O>,
-    placeholder: SharedString,
-    search_placeholder: SharedString,
-    searchable: bool,
-    panel_active: bool,
-    is_clear: bool,
-}
-
-pub enum Msg<O> {
-    ChangeValue(Option<O>),
-    Search(String),
-    ChangePanelState(bool),
-    ChangeClearState(bool),
-    Noop,
-}
-
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props<O: SelectOption>
+#[component]
+pub fn MockSelect<O: SelectOption>(
+    value: RwSignal<Option<O::Value>>,
+    #[prop(into)] options: Signal<Vec<O>>,
+    #[prop(optional)] readonly: bool,
+    #[prop(optional)] clearable: bool,
+    #[prop(into, default = SharedString::from("请选择"))] placeholder: SharedString,
+    #[prop(optional)] searchable: bool,
+    #[prop(into, default = SharedString::from("搜索"))] search_placeholder: SharedString,
+    #[prop(into, default = None)] onchange: Option<UnsyncCallback<Option<O>>>,
+    #[prop(into, default = None)] onsearch: Option<UnsyncCallback<Option<SharedString>>>,
+) -> impl IntoView
 where
-    O: Clone + PartialEq,
-    O::Value: PartialEq + Clone,
+    O: Clone + PartialEq + Send + Sync + 'static,
+    O::Value: Clone + Eq + Hash + Send + Sync + 'static,
 {
-    pub value: Option<O::Value>,
-    pub options: Vec<O>,
-    #[prop_or_default]
-    pub clearable: bool,
-    #[prop_or_else(||SharedString::from("请选择"))]
-    pub placeholder: SharedString,
-    #[prop_or_default]
-    pub searchable: bool,
-    #[prop_or_else(||SharedString::from("搜索"))]
-    pub search_placeholder: SharedString,
-    pub onchange: Callback<Option<O>>,
-    #[prop_or_default]
-    pub onsearch: Option<Callback<Option<SharedString>>>,
-}
-
-pub struct MockSelect<O: SelectOption>
-where
-    O: Clone + PartialEq + 'static,
-    O::Value: Clone + PartialEq + 'static,
-{
-    state: State<O>,
-    clear_tasks: Vec<Box<dyn Fn()>>,
-}
-
-impl<O> Component for MockSelect<O>
-where
-    O: Clone + PartialEq + SelectOption + 'static,
-    O::Value: Clone + PartialEq + 'static,
-{
-    type Message = Msg<O>;
-    type Properties = Props<O>;
-
-    fn create(ctx: &Context<Self>) -> Self {
-        let props = ctx.props();
-        let state = State {
-            value: props.value.clone(),
-            options: props.options.clone(),
-            placeholder: props.placeholder.clone(),
-            search_placeholder: props.search_placeholder.clone(),
-            searchable: props.searchable,
-            panel_active: false,
-            is_clear: false,
-        };
-        let mut clear_tasks: Vec<Box<dyn Fn()>> = Vec::new();
-        let document = web_sys::window().unwrap().document().unwrap();
-        let link = ctx.link().clone();
-        let listener: Function = Closure::wrap(Box::new(move || {
-            link.send_message(Msg::ChangePanelState(false));
-        }) as Box<dyn Fn()>)
-        .into_js_value()
-        .dyn_into()
-        .unwrap();
-        document
-            .add_event_listener_with_callback("click", &listener)
-            .unwrap();
-        clear_tasks.push(Box::new(move || {
-            document
-                .remove_event_listener_with_callback("click", &listener)
-                .unwrap();
-        }));
-        MockSelect {
-            state,
-            clear_tasks: clear_tasks,
+    let panel_active = RwSignal::new(false);
+    let is_clear = RwSignal::new(false);
+    let document = web_sys::window().unwrap().document().unwrap();
+    let listener: Function = Closure::wrap(Box::new({
+        let panel_active = panel_active.clone();
+        move || {
+            panel_active.set(false);
         }
-    }
+    }) as Box<dyn Fn()>)
+    .into_js_value()
+    .dyn_into()
+    .unwrap();
+    document
+        .add_event_listener_with_callback("click", &listener)
+        .unwrap();
+    on_cleanup_unsync(move || {
+        document
+            .remove_event_listener_with_callback("click", &listener)
+            .unwrap();
+    });
 
-    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
-        match msg {
-            Msg::ChangeValue(val) => {
-                self.state.panel_active = false;
-                ctx.props().onchange.emit(val);
-            }
-            Msg::Search(word) => {
-                if let Some(onsearch) = ctx.props().onsearch.as_ref() {
+    let on_root_click = |evt: MouseEvent| {
+        evt.stop_propagation();
+    };
+    let on_search = {
+        let onsearch = onsearch.clone();
+        move |evt: Event| {
+            if let Some(target) = evt.target() {
+                let input: HtmlInputElement = target.unchecked_into();
+                if let Some(onsearch) = onsearch.as_ref() {
+                    let word = input.value();
                     let word = word.trim();
-                    onsearch.emit(if word.is_empty() {
+                    onsearch.run(if word.is_empty() {
                         None
                     } else {
                         Some(SharedString::from(word.to_string()))
                     });
                 }
             }
-            Msg::ChangePanelState(panel_active) => {
-                self.state.panel_active = panel_active;
-                if self.state.panel_active {
-                    if let Some(onsearch) = ctx.props().onsearch.as_ref() {
-                        onsearch.emit(None);
-                    }
-                }
-            }
-            Msg::ChangeClearState(mut is_clear) => {
-                if is_clear && (!ctx.props().clearable || self.state.value.is_none()) {
-                    is_clear = false;
-                }
-                if is_clear == self.state.is_clear {
-                    return false;
-                }
-                self.state.is_clear = is_clear;
-            }
-            Msg::Noop => (),
         }
-        return true;
-    }
-
-    fn changed(&mut self, ctx: &Context<Self>, _old_props: &Self::Properties) -> bool {
-        let props = ctx.props();
-        self.state.value = props.value.clone();
-        self.state.options = props.options.clone();
-        self.state.placeholder = props.placeholder.clone();
-        self.state.search_placeholder = props.search_placeholder.clone();
-        self.state.searchable = props.searchable;
-        return true;
-    }
-
-    fn view(&self, ctx: &Context<Self>) -> Html {
-        let link = ctx.link();
-        let on_root_click = link.callback(|evt: MouseEvent| {
-            evt.stop_propagation();
-            Msg::Noop
-        });
-        let on_search = link.callback(|evt: InputEvent| {
-            let input: HtmlInputElement = evt.target_unchecked_into();
-            Msg::Search(input.value().trim().to_string())
-        });
-        let on_open_panel = link.callback(|_| Msg::ChangePanelState(true));
-        let mut box_class = String::from("e-mock-select-box");
-
-        let mut label_opt: Option<Html> = None;
-        match self.state.value.as_ref() {
-            Some(val) => {
-                for option in &self.state.options {
-                    if &option.value() == val {
+    };
+    let on_open_panel = {
+        let onsearch = onsearch.clone();
+        let panel_active = panel_active.clone();
+        move |_| {
+            panel_active.set(true);
+            if let Some(onsearch) = onsearch.as_ref() {
+                onsearch.run(None);
+            }
+        }
+    };
+    let active_label_opt = {
+        let value = value.clone();
+        let options = options.clone();
+        move || {
+            let mut label_opt: Option<AnyView> = None;
+            if let Some(value) = value.read().as_ref() {
+                for option in options.read().iter() {
+                    if &option.value() == value {
                         label_opt = Some(option.label());
                         break;
                     }
                 }
             }
-            None => (),
+            label_opt
         }
-        let label: Html = label_opt.unwrap_or_else(|| {
-            box_class.push_str(" s-empty");
-            self.state.placeholder.clone().into()
-        });
-        let on_clear = link.callback(|evt: MouseEvent| {
+    };
+    let label = {
+        let active_label_opt = active_label_opt.clone();
+        move || active_label_opt().unwrap_or(placeholder.clone().into_any())
+    };
+    let box_class = move || {
+        let mut class = String::from("e-mock-select-box");
+        if active_label_opt().is_none() {
+            class.push_str(" s-empty");
+        }
+        class
+    };
+    let on_clear = {
+        let value = value.clone();
+        let panel_active = panel_active.clone();
+        let onchange = onchange.clone();
+        move |evt: MouseEvent| {
             evt.stop_propagation();
-            Msg::ChangeValue(None)
-        });
-        let on_mouseenter = link.callback(|_evt: MouseEvent| Msg::ChangeClearState(true));
-        let on_mouseleave = link.callback(|_evt: MouseEvent| Msg::ChangeClearState(false));
-        html! {
-            <div class="e-mock-select" onclick={on_root_click} style="position:relative;">
-                <div class={box_class} onclick={on_open_panel} style="padding: 0.25em;border-width: 1px;border-style: solid;">
-                    {label}
-                    <span style="float:right;" onmouseenter={on_mouseenter} onmouseleave={on_mouseleave}>
-                        {
-                            if self.state.is_clear {
-                                html! {
-                                    <i class="fa fa-times" aria-hidden="true" onclick={on_clear} style="line-height: normal;cursor: pointer;"></i>
-                                }
+            panel_active.set(false);
+            if !readonly {
+                value.set(None);
+            }
+            if let Some(onchange) = onchange.as_ref() {
+                onchange.run(None);
+            }
+        }
+    };
+    let on_mouseenter = {
+        let value = value.clone();
+        let is_clear = is_clear.clone();
+        move |_evt: MouseEvent| {
+            let mut new_is_clear = true;
+            if !clearable || value.read().is_none() {
+                new_is_clear = false;
+            }
+            is_clear.set(new_is_clear);
+        }
+    };
+    let on_mouseleave = {
+        let is_clear = is_clear.clone();
+        move |_evt: MouseEvent| {
+            is_clear.set(false);
+        }
+    };
+    let search_placeholder = StoredValue::new(search_placeholder);
+    view! {
+        <div class="e-mock-select" on:click={on_root_click} style="position:relative;">
+            <div class={box_class} on:click={on_open_panel} style="padding: 0.25em;border-width: 1px;border-style: solid;">
+                {label}
+                <span style="float:right;" on:mouseenter={on_mouseenter} on:mouseleave={on_mouseleave}>
+                    {
+                        let is_clear = is_clear.clone();
+                        move || {
+                            if is_clear.get() {
+                                view! {
+                                    <i class="fa fa-times" aria-hidden="true" on:click={on_clear.clone()} style="line-height: normal;cursor: pointer;"></i>
+                                }.into_any()
                             } else {
-                                html! {
+                                view! {
                                     <i class="fa fa-caret-down" aria-hidden="true" style="line-height: normal;"></i>
-                                }
+                                }.into_any()
                             }
                         }
-                    </span>
-                </div>
-                {
-                    if self.state.panel_active {
-                        html! {
-                            <div class="e-mock-option-panel" style="position:absolute;left:0;right:0;top:100%;border-left-width: 1px;border-left-style: solid;border-right-width: 1px;border-right-style: solid;border-bottom-width: 1px;border-bottom-style: solid;">
-                                {
-                                    if self.state.searchable {
-                                        html! {
-                                            <div style="padding:0.25em;">
-                                                <input type="text" class="e-mock-search-input" oninput={on_search} placeholder={self.state.search_placeholder.clone()} style="box-sizing: border-box;width: 100%;padding-top: 0.25em;padding-bottom: 0.25em;"/>
-                                            </div>
+                    }
+                </span>
+            </div>
+            <Show
+                when={
+                    let panel_active = panel_active.clone();
+                    move || { panel_active.get() }
+                }
+            >
+                <div class="e-mock-option-panel" style="position:absolute;left:0;right:0;top:100%;border-left-width: 1px;border-left-style: solid;border-right-width: 1px;border-right-style: solid;border-bottom-width: 1px;border-bottom-style: solid;">
+                    <Show
+                        when=move || { searchable }
+                    >
+                        <div style="padding:0.25em;">
+                            <input type="text" class="e-mock-search-input" on:input={on_search} placeholder={search_placeholder.read_value().clone()} style="box-sizing: border-box;width: 100%;padding-top: 0.25em;padding-bottom: 0.25em;"/>
+                        </div>
+                    </Show>
+                    <ul style="margin: 0;padding: 0;list-style-type: none;max-height: 20em;overflow-y: auto;">
+                        <For
+                            each={
+                                let options = options.clone();
+                                move || { options.get().into_iter() }
+                            }
+                            key=|option| { option.value() }
+                            children={
+                                let value = value.clone();
+                                let panel_active = panel_active.clone();
+                                let onchange = onchange.clone();
+                                move |option| {
+                                    let value = value.clone();
+                                    let panel_active = panel_active.clone();
+                                    let onchange = onchange.clone();
+                                    let on_change = {
+                                        let option = option.clone();
+                                        move |_| {
+                                            panel_active.set(false);
+                                            if !readonly {
+                                                value.set(Some(option.value()));
+                                            }
+                                            if let Some(onchange) = onchange.as_ref() {
+                                                onchange.run(Some(option.clone()));
+                                            }
                                         }
-                                    } else {
-                                        html! {}
+                                    };
+                                    view! {
+                                        <li class="e-mock-option" on:click={on_change} style="padding: 0.25em;">{option.label()}</li>
                                     }
                                 }
-                                <ul style="margin: 0;padding: 0;list-style-type: none;max-height: 20em;overflow-y: auto;">
-                                    {
-                                        for self.state.options.iter().map(|item| {
-                                            let val = item.clone();
-                                            let on_change = link.callback(move |_| Msg::ChangeValue(Some(val.clone())));
-                                            html! {
-                                                <li class="e-mock-option" onclick={on_change} style="padding: 0.25em;">{item.label()}</li>
-                                            }
-                                        })
-                                    }
-                                </ul>
-                            </div>
-                        }
-                    } else {
-                        html! {}
-                    }
-                }
-            </div>
-        }
+                            }
+                        />
+                    </ul>
+                </div>
+            </Show>
+        </div>
     }
-
-    fn destroy(&mut self, _ctx: &Context<Self>) {
-        while let Some(clear_task) = self.clear_tasks.pop() {
-            clear_task();
-        }
-    }
-}
-
-#[derive(Clone, PartialEq, Properties)]
-pub struct BindingProps<O>
-where
-    O: Clone + PartialEq + SelectOption,
-    O::Value: PartialEq,
-{
-    pub value: UseStateHandle<Option<O::Value>>,
-    pub options: Vec<O>,
-    #[prop_or_default]
-    pub clearable: bool,
-    #[prop_or_else(||SharedString::from("请选择"))]
-    pub placeholder: SharedString,
-    #[prop_or_default]
-    pub searchable: bool,
-    #[prop_or_else(||SharedString::from("搜索"))]
-    pub search_placeholder: SharedString,
-    #[prop_or_default]
-    pub onchange: Option<Callback<Option<O>>>,
-    #[prop_or_default]
-    pub onsearch: Option<Callback<Option<SharedString>>>,
-}
-
-#[function_component]
-pub fn BindingMockSelect<O: SelectOption>(props: &BindingProps<O>) -> Html
-where
-    O: Clone + PartialEq + SelectOption + 'static,
-    O::Value: Clone + PartialEq + 'static,
-{
-    let value_clone = props.value.clone();
-    let onchange = props.onchange.clone();
-    let on_change = Callback::from(move |option: Option<O>| {
-        value_clone.set(option.as_ref().map(|option| option.value()));
-        if let Some(onchange) = onchange.as_ref() {
-            onchange.emit(option);
-        }
-    });
-    return html! {
-        <MockSelect<O>
-            value={props.value.deref().clone()}
-            options={props.options.clone()}
-            clearable={props.clearable}
-            placeholder={props.placeholder.clone()}
-            searchable={props.searchable}
-            search_placeholder={props.search_placeholder.clone()}
-            onchange={on_change}
-            onsearch={props.onsearch.clone()}
-        />
-    };
 }

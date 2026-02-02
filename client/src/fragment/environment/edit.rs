@@ -1,28 +1,27 @@
-use super::super::extension::config_view;
 use super::super::extension::get_configuration_schema;
 use super::super::extension::get_default_config;
 use super::super::extension::parse_config;
 use super::super::extension::serialize_config;
 use super::super::extension::AttributeValue;
+use super::super::extension::ConfigView;
 use crate::components::button::Button;
-use crate::components::input::BindingInput;
+use crate::components::input::Input;
 use crate::components::required::Required;
-use crate::components::rich_text::upload_resource;
-use crate::components::selection::BindingSelection;
-use crate::components::show::Show;
+use crate::components::selection::Selection;
 use crate::components::uploading_files::upload_files;
 use crate::components::validate_wrapper::ValidateData;
 use crate::components::validate_wrapper::ValidateWrapper;
+use crate::components::visable::Visable;
 use crate::components::Resource;
-use crate::components::ResourceMetadata;
 use crate::sdk;
 use crate::utils;
-use crate::utils::binding::Binding;
 use crate::utils::gen_id;
 use crate::utils::request::ApiExt;
 use crate::utils::validator::RequiredValidator;
 use crate::utils::validator::Validators;
+use crate::Key;
 use crate::SharedString;
+use leptos::prelude::*;
 use sdk::environment::insert_environment::InsertEnvironmentApi;
 use sdk::environment::insert_environment::InsertEnvironmentReq;
 use sdk::environment::read_environment::Environment;
@@ -42,73 +41,62 @@ use sdk::extension::test_configuration::TestConfigurationApi;
 use sdk::extension::test_configuration::TestConfigurationReq;
 use sdk::extension::Attribute;
 use sdk::extension::Extension;
-use std::ops::Deref;
 use std::sync::Arc;
 use std::sync::Mutex;
 use tihu::Id;
 use tihu::PrimaryKey;
-use yew::prelude::*;
-use yew::virtual_dom::Key;
 
-type EnvironmentSchemaSelection = BindingSelection<(Id, String)>;
-
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone)]
 pub struct EnvironmentResource {
     id: Option<Id>,
     name: ValidateData<SharedString>,
     extension_configuration: Vec<(Key, Attribute, AttributeValue)>, //扩展配置
-    test_error: Binding<Option<Result<(), SharedString>>>,
+    test_error: RwSignal<Option<Result<(), SharedString>>>,
 }
 
 /**
  * 环境规格资源
  */
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Debug)]
 pub struct EnvironmentSchemaResource {
     id: Id,
     extension_id: String,
     name: String,
-    resource_list: Binding<Vec<(Key, EnvironmentResource)>>,
+    resource_list: RwSignal<Vec<(Key, EnvironmentResource)>>,
 }
 
 #[derive(Clone)]
 struct EditForm {
-    active_schema_resource_id: UseStateHandle<Option<Id>>,
-    active_resource_key: UseStateHandle<Option<Key>>,
+    active_schema_resource_id: RwSignal<Option<Id>>,
+    active_resource_key: RwSignal<Option<Key>>,
     environment_schema_id: ValidateData<Option<Id>>,
     name: ValidateData<SharedString>,
-    schema_resource_list: UseStateHandle<Vec<(Key, EnvironmentSchemaResource)>>,
-}
-
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props {
-    #[prop_or_default]
-    pub id: Option<Id>,
-    #[prop_or_default]
-    pub onsave: Option<Callback<PrimaryKey>>,
+    schema_resource_list: RwSignal<Vec<(Key, EnvironmentSchemaResource)>>,
 }
 
 #[derive(Clone)]
 struct EnvironmentEditState {
-    is_saving: UseStateHandle<bool>,
-    err_msg: UseStateHandle<Option<SharedString>>,
-    environment_schema_list: UseStateHandle<Vec<EnvironmentSchema>>,
-    environment_schema_detail: UseStateHandle<Option<EnvironmentSchemaDetail>>,
-    extension_list: UseStateHandle<Vec<Extension>>,
+    is_saving: RwSignal<bool>,
+    err_msg: RwSignal<Option<SharedString>>,
+    environment_schema_list: RwSignal<Vec<EnvironmentSchema>>,
+    environment_schema_detail: RwSignal<Option<EnvironmentSchemaDetail>>,
+    extension_list: RwSignal<Vec<Extension>>,
     edit_form: EditForm,
 }
 
-#[function_component]
-pub fn EnvironmentEdit(props: &Props) -> Html {
-    let is_saving: UseStateHandle<bool> = use_state(|| false);
-    let err_msg: UseStateHandle<Option<SharedString>> = use_state(|| None);
-    let environment_schema_list: UseStateHandle<Vec<EnvironmentSchema>> = use_state(|| Vec::new());
-    let environment_schema_detail: UseStateHandle<Option<EnvironmentSchemaDetail>> =
-        use_state(|| None);
-    let extension_list: UseStateHandle<Vec<Extension>> = use_state(|| Default::default());
+#[component]
+pub fn EnvironmentEdit(
+    #[prop(into, default = None)] id: Option<Id>,
+    #[prop(into, default = None)] onsave: Option<UnsyncCallback<PrimaryKey>>,
+) -> impl IntoView {
+    let is_saving: RwSignal<bool> = RwSignal::new(false);
+    let err_msg: RwSignal<Option<SharedString>> = RwSignal::new(None);
+    let environment_schema_list: RwSignal<Vec<EnvironmentSchema>> = RwSignal::new(Vec::new());
+    let environment_schema_detail: RwSignal<Option<EnvironmentSchemaDetail>> = RwSignal::new(None);
+    let extension_list: RwSignal<Vec<Extension>> = RwSignal::new(Default::default());
     let edit_form = EditForm {
-        active_schema_resource_id: use_state(|| Default::default()),
-        active_resource_key: use_state(|| Default::default()),
+        active_schema_resource_id: RwSignal::new(Default::default()),
+        active_resource_key: RwSignal::new(Default::default()),
         environment_schema_id: ValidateData::new(
             Default::default(),
             Some(Validators::new().add(RequiredValidator::new("请选择环境规格"))),
@@ -117,7 +105,7 @@ pub fn EnvironmentEdit(props: &Props) -> Html {
             Default::default(),
             Some(Validators::new().add(RequiredValidator::new("请输入环境名称"))),
         ),
-        schema_resource_list: use_state(|| Vec::new()),
+        schema_resource_list: RwSignal::new(Vec::new()),
     };
     let environment_edit_state = EnvironmentEditState {
         is_saving: is_saving.clone(),
@@ -127,7 +115,6 @@ pub fn EnvironmentEdit(props: &Props) -> Html {
         extension_list: extension_list.clone(),
         edit_form: edit_form.clone(),
     };
-    let id = props.id;
     let environment_schema_id = edit_form.environment_schema_id.clone();
     let schema_resource_list = edit_form.schema_resource_list.clone();
     let schema_resource_list_clone = edit_form.schema_resource_list.clone();
@@ -136,132 +123,128 @@ pub fn EnvironmentEdit(props: &Props) -> Html {
     let extension_list_clone = extension_list.clone();
     let environment_schema_detail_clone = environment_schema_detail.clone();
     let environment_schema_detail_clone2 = environment_schema_detail.clone();
-    use_effect_with(id, move |_| {
-        wasm_bindgen_futures::spawn_local(async move {
-            match query_environment_schema_list(&environment_schema_list_clone).await {
-                Ok(environment_schema_list) => {
-                    if id.is_none() {
-                        //新增场景，默认选择第一个环境规格
-                        if let Some(environment_schema) = environment_schema_list.first() {
-                            if let Ok(_) = handle_environment_schema_change(
-                                environment_schema.id,
-                                &environment_schema_detail_clone,
-                                &schema_resource_list_clone,
+    wasm_bindgen_futures::spawn_local(async move {
+        match query_environment_schema_list(&environment_schema_list_clone).await {
+            Ok(environment_schema_list) => {
+                if id.is_none() {
+                    //新增场景，默认选择第一个环境规格
+                    if let Some(environment_schema) = environment_schema_list.first() {
+                        if let Ok(_) = handle_environment_schema_change(
+                            environment_schema.id,
+                            &environment_schema_detail_clone,
+                            &schema_resource_list_clone,
+                        )
+                        .await
+                        {
+                            environment_schema_id.set(Some(environment_schema.id));
+                        }
+                    } else {
+                        utils::error(SharedString::from("请先添加环境规格"));
+                    }
+                }
+            }
+            Err(_err) => {
+                //
+            }
+        }
+    });
+    wasm_bindgen_futures::spawn_local(async move {
+        match query_extension_list(&extension_list_clone).await {
+            Ok(extension_list) => {
+                if let Some(id) = id {
+                    match read_environment_detail(&edit_form_clone.clone(), &extension_list, id)
+                        .await
+                    {
+                        Ok(environment) => {
+                            read_environment_schema_detail(
+                                &environment_schema_detail_clone2,
+                                environment.environment_schema_id,
                             )
                             .await
-                            {
-                                environment_schema_id.set(Some(environment_schema.id));
-                            }
-                        } else {
-                            utils::error(SharedString::from("请先添加环境规格"));
+                            .ok();
+                        }
+                        Err(_err) => {
+                            //
                         }
                     }
                 }
-                Err(_err) => {
-                    //
-                }
             }
-        });
-        wasm_bindgen_futures::spawn_local(async move {
-            match query_extension_list(&extension_list_clone).await {
-                Ok(extension_list) => {
-                    if let Some(id) = id {
-                        match read_environment_detail(&edit_form_clone.clone(), &extension_list, id)
-                            .await
-                        {
-                            Ok(environment) => {
-                                read_environment_schema_detail(
-                                    &environment_schema_detail_clone2,
-                                    environment.environment_schema_id,
-                                )
-                                .await
-                                .ok();
-                            }
-                            Err(_err) => {
-                                //
-                            }
-                        }
-                    }
-                }
-                Err(_err) => {
-                    //
-                }
+            Err(_err) => {
+                //
             }
-        });
-        || ()
+        }
     });
     let edit_form_clone = edit_form.clone();
     let is_saving_clone = is_saving.clone();
     let err_msg_clone = err_msg.clone();
-    let onsave_clone = props.onsave.clone();
-    let on_save = Callback::from(move |_| {
+    let on_save = UnsyncCallback::new(move |_| {
         let edit_form: EditForm = edit_form_clone.clone();
         let is_saving = is_saving_clone.clone();
         let err_msg = err_msg_clone.clone();
-        let onsave = onsave_clone.clone();
+        let onsave = onsave.clone();
         wasm_bindgen_futures::spawn_local(async move {
             save_environment(id, &edit_form, is_saving, &err_msg, &onsave)
                 .await
                 .ok();
         });
     });
-    let environment_schema_list: Vec<_> = environment_schema_list
-        .iter()
-        .map(|item| (item.id.clone().into(), item.name.clone()))
-        .collect();
-    html! {
+    let environment_schema_list = Signal::derive(move || {
+        environment_schema_list
+            .read()
+            .iter()
+            .map(|item| (item.id.clone().into(), item.name.clone()))
+            .collect()
+    });
+    view! {
         <div class="width-fill height-fill border-box" style="padding:0.25em;display:flex;flex-direction: column;">
             <table class="width-fill" style="border-collapse:collapse;table-layout: fixed;">
                 <tr>
                     <td class="align-right" style="width:8em;vertical-align: top;"><Required/>{"环境名称："}</td>
                     <td>
-                        {
-                            edit_form.name.view(move |name: UseStateHandle<SharedString>, validator| {
-                                html! {
-                                    <BindingInput value={name} onupdate={validator}/>
-                                }
-                            })
-                        }
+                        <ValidateWrapper error={edit_form.name.error()}>
+                            <Input value={edit_form.name.data()} onupdate={edit_form.name.listener()}/>
+                        </ValidateWrapper>
                     </td>
                     <td class="align-right" style="width:8em;vertical-align: top;"><Required/>{"环境规格："}</td>
                     <td style="vertical-align: top;">
                         {
                             if id.is_none() {
-                                let environment_schema_detail = environment_schema_detail.clone();
-                                let schema_resource_list = schema_resource_list.clone();
-                                {
-                                    edit_form.environment_schema_id.view(move |environment_schema_id, validator: Callback<Option<Id>>| {
-                                        let environment_schema_detail = environment_schema_detail.clone();
-                                        let schema_resource_list = schema_resource_list.clone();
-                                        let onchange = Callback::from(move |option: Option<(Id, String)>| {
-                                            if let Some((id, _name)) = option {
-                                                let environment_schema_detail = environment_schema_detail.clone();
-                                                let schema_resource_list = schema_resource_list.clone();
-                                                wasm_bindgen_futures::spawn_local(async move {
-                                                    handle_environment_schema_change(
-                                                        id,
-                                                        &environment_schema_detail,
-                                                        &schema_resource_list,
-                                                    )
-                                                    .await.ok();
-                                                });
-                                                validator.emit(Some(id));
-                                            } else {
-                                                validator.emit(None);
-                                            }
-                                        });
-                                        html! {
-                                            <EnvironmentSchemaSelection value={environment_schema_id} options={environment_schema_list.clone()} onchange={onchange}/>
+                                let onchange = {
+                                    let environment_schema_detail = environment_schema_detail.clone();
+                                    let schema_resource_list = schema_resource_list.clone();
+                                    let validator = edit_form.environment_schema_id.listener();
+                                    UnsyncCallback::new(move |option: Option<(Id, String)>| {
+                                        if let Some((id, _name)) = option {
+                                            let environment_schema_detail = environment_schema_detail.clone();
+                                            let schema_resource_list = schema_resource_list.clone();
+                                            wasm_bindgen_futures::spawn_local(async move {
+                                                handle_environment_schema_change(
+                                                    id,
+                                                    &environment_schema_detail,
+                                                    &schema_resource_list,
+                                                )
+                                                .await.ok();
+                                            });
+                                            validator.run(Some(id));
+                                        } else {
+                                            validator.run(None);
                                         }
                                     })
-                                }
+                                };
+                                view! {
+                                    <ValidateWrapper error={edit_form.environment_schema_id.error()}>
+                                        <Selection value={edit_form.environment_schema_id.data()} options={environment_schema_list} onchange={onchange}/>
+                                    </ValidateWrapper>
+                                }.into_any()
                             } else {
-                                //一旦指定了环境规格之后，就不让修改
-                                if let Some(environment_schema_detail) = environment_schema_detail.as_ref() {
-                                    html! {environment_schema_detail.name.clone()}
-                                } else {
-                                    html!{}
-                                }
+                                (move || {
+                                    //一旦指定了环境规格之后，就不让修改
+                                    if let Some(environment_schema_detail) = environment_schema_detail.read().as_ref() {
+                                        environment_schema_detail.name.clone().into_any()
+                                    } else {
+                                        view! {}.into_any()
+                                    }
+                                }).into_any()
                             }
                         }
                     </td>
@@ -271,166 +254,185 @@ pub fn EnvironmentEdit(props: &Props) -> Html {
                 <div style="width:16em;height:100%;display:flex;flex-direction:column;border-right: 1px solid #CCC;box-sizing: border-box;">
                     <div style="font-weight: bold;border-bottom: 1px solid #CCC;padding-bottom: 0.5em;">{"资源规格"}</div>
                     <div style="flex-grow: 1;flex-shrink: 1;overflow: auto;">
-                        {
-                            for edit_form.schema_resource_list.iter().map(|(key, schema_resource)| {
+                        <For
+                            each={
+                                let schema_resource_list = edit_form.schema_resource_list.clone();
+                                move || { schema_resource_list.get() }
+                            }
+                            key=|(key, _schema_resource)| { key.clone() }
+                            children=move |(_key, schema_resource)| {
                                 let environment_edit_state = environment_edit_state.clone();
                                 let extension_id = schema_resource.extension_id.clone();
                                 let extension_list = extension_list.clone();
                                 let schema_resource_id = schema_resource.id;
                                 let schema_resource_name = schema_resource.name.clone();
-                                let active_schema_resource_id = edit_form.active_schema_resource_id.clone();
-                                let is_active = active_schema_resource_id.deref() == &Some(schema_resource_id);
-                                let background_color = if is_active {
-                                    "background-color: #EEE"
-                                } else {
-                                    ""
+                                let is_active = {
+                                    let active_schema_resource_id = edit_form.active_schema_resource_id.clone();
+                                    move || {
+                                        &active_schema_resource_id.read() == &Some(schema_resource_id.clone())
+                                    }
                                 };
-                                html! {
-                                    <div key={key.clone()}>
-                                        <div style={format!("border-bottom: 1px solid #CCC;padding: 0 0.5em;display: flex;justify-content: space-between;align-items: center;{}", background_color)}>
-                                            <div onclick={Callback::from(move |_| {
-                                                let active_schema_resource_id = active_schema_resource_id.clone();
-                                                wasm_bindgen_futures::spawn_local(async move {
-                                                    active_schema_resource_id.set(Some(schema_resource_id));
-                                                    utils::wait(0).await;
-                                                    utils::trigger_resize();
-                                                });
-                                            })} style="flex-grow: 1;flex-shrink: 1;padding: 0.5em 0;">
+                                let background_color = {
+                                    let is_active = is_active.clone();
+                                    move || {
+                                        if is_active() {
+                                            "background-color: #EEE"
+                                        } else {
+                                            ""
+                                        }
+                                    }
+                                };
+                                view! {
+                                    <div>
+                                        <div style={move || format!("border-bottom: 1px solid #CCC;padding: 0 0.5em;display: flex;justify-content: space-between;align-items: center;{}", background_color())}>
+                                            <div on:click={
+                                                let active_schema_resource_id = edit_form.active_schema_resource_id.clone();
+                                                move |_| {
+                                                    let active_schema_resource_id = active_schema_resource_id.clone();
+                                                    wasm_bindgen_futures::spawn_local(async move {
+                                                        active_schema_resource_id.set(Some(schema_resource_id));
+                                                        utils::wait(0).await;
+                                                        utils::trigger_resize();
+                                                    });
+                                                }
+                                            } style="flex-grow: 1;flex-shrink: 1;padding: 0.5em 0;">
                                                 {schema_resource_name}
                                             </div>
                                         </div>
-                                        <Show condition={is_active} style="position:absolute;left:16em;right:0;top:0;bottom:0;overflow: auto;">
+                                        <Visable condition={is_active} style="position:absolute;left:16em;right:0;top:0;bottom:0;overflow: auto;">
                                             {
-                                                {
-                                                    let extension_list = extension_list.clone();
-                                                    let active_resource_key = edit_form.active_resource_key.clone();
-                                                    schema_resource.resource_list.view(move |resource_list: UseStateHandle<Vec<(Key, EnvironmentResource)>>| {
-                                                        let environment_edit_state = environment_edit_state.clone();
-                                                        let active_resource_key = active_resource_key.clone();
-                                                        let active_resource_key_clone = active_resource_key.clone();
-                                                        let extension_id = extension_id.clone();
-                                                        let extension_list = extension_list.clone();
-                                                        let resource_list_clone = resource_list.clone();
-                                                        html! {
-                                                            <div style="width:20em;height:100%;display:flex;flex-direction:column;border-right: 1px solid #CCC;box-sizing: border-box;">
-                                                                <div style="font-weight: bold;border-bottom: 1px solid #CCC;padding-bottom: 0.5em;">{"资源列表"}</div>
-                                                                <div style="flex-grow: 1;flex-shrink: 1;overflow: auto;">
-                                                                    {
-                                                                        for resource_list.deref().clone().into_iter().enumerate().map(|(index, (resource_key, resource))| {
-                                                                            let environment_edit_state = environment_edit_state.clone();
-                                                                            let extension_id = extension_id.clone();
-                                                                            let active_resource_key = active_resource_key.clone();
-                                                                            let error = resource.name.error.clone();
-                                                                            let name_validators = resource.name.validators.clone();
-                                                                            let resource_list = resource_list_clone.clone();
-                                                                            let resource_clone = resource.clone();
-                                                                            let on_remove = Callback::from(move |_| {
-                                                                                let mut new_items = resource_list.deref().clone();
-                                                                                new_items.remove(index);
-                                                                                resource_list.set(new_items);
-                                                                            });
-                                                                            html! {
-                                                                                <div key={resource_key.clone()}>
-                                                                                    {
-                                                                                        resource.name.data.view(move |name: UseStateHandle<AttrValue>| {
-                                                                                            let environment_edit_state = environment_edit_state.clone();
-                                                                                            let extension_id = extension_id.clone();
-                                                                                            let active_resource_key = active_resource_key.clone();
-                                                                                            let resource_key = resource_key.clone();
-                                                                                            let name_validators = name_validators.clone();
-                                                                                            let resource = resource_clone.clone();
-                                                                                            let on_remove = on_remove.clone();
-                                                                                            error.view(move |error: UseStateHandle<Option<AttrValue>>| {
-                                                                                                let extension_id = extension_id.clone();
+                                                let extension_list = extension_list.clone();
+                                                let active_resource_key = edit_form.active_resource_key.clone();
+                                                let environment_edit_state = environment_edit_state.clone();
+                                                let active_resource_key = active_resource_key.clone();
+                                                let active_resource_key_clone = active_resource_key.clone();
+                                                let extension_id_clone = extension_id.clone();
+                                                let extension_list = extension_list.clone();
+                                                let resource_list = schema_resource.resource_list.clone();
+                                                view! {
+                                                    <div style="width:20em;height:100%;display:flex;flex-direction:column;border-right: 1px solid #CCC;box-sizing: border-box;">
+                                                        <div style="font-weight: bold;border-bottom: 1px solid #CCC;padding-bottom: 0.5em;">{"资源列表"}</div>
+                                                        <div style="flex-grow: 1;flex-shrink: 1;overflow: auto;">
+                                                            <For
+                                                                each={
+                                                                    let resource_list = resource_list.clone();
+                                                                    move || { resource_list.get().into_iter().enumerate() }
+                                                                }
+                                                                key=|(_index, (resource_key, _resource))| { resource_key.clone() }
+                                                                children=move |(index, (resource_key, resource))| {
+                                                                    let environment_edit_state = environment_edit_state.clone();
+                                                                    let extension_id = extension_id_clone.clone();
+                                                                    let active_resource_key = active_resource_key.clone();
+                                                                    let error = resource.name.error();
+                                                                    let name_validators = resource.name.validators();
+                                                                    let resource_clone = resource.clone();
+                                                                    let on_remove = {
+                                                                        let resource_list = resource_list.clone();
+                                                                        UnsyncCallback::new(move |_| {
+                                                                            resource_list.write().remove(index);
+                                                                        })
+                                                                    };
+                                                                    let name = resource.name.data();
+                                                                    view! {
+                                                                        <ValidateWrapper error={resource.name.error()}>
+                                                                            {
+                                                                                let environment_edit_state = environment_edit_state.clone();
+                                                                                let extension_id = extension_id.clone();
+                                                                                let active_resource_key = active_resource_key.clone();
+                                                                                let resource_key = resource_key.clone();
+                                                                                let name_validators = name_validators.clone();
+                                                                                let resource = resource_clone.clone();
+                                                                                let on_remove = on_remove.clone();
+                                                                                let extension_id = extension_id.clone();
+                                                                                let resource = resource.clone();
+                                                                                let on_remove = on_remove.clone();
+                                                                                let is_active = {
+                                                                                    let active_resource_key = active_resource_key.clone();
+                                                                                    let resource_key = resource_key.clone();
+                                                                                    move || {
+                                                                                        &active_resource_key.read() == &Some(resource_key.clone())
+                                                                                    }
+                                                                                };
+                                                                                let background_color = {
+                                                                                    let is_active = is_active.clone();
+                                                                                    move || {
+                                                                                        if is_active() {
+                                                                                            "background-color: #EEE"
+                                                                                        } else {
+                                                                                            ""
+                                                                                        }
+                                                                                    }
+                                                                                };
+                                                                                view! {
+                                                                                    <div>
+                                                                                        <div style={move || format!("border-bottom: 1px solid #CCC;padding: 0 0.5em;display: flex;justify-content: space-between;align-items: center;{}", background_color())}>
+                                                                                            <div on:click={move |_| {
                                                                                                 let active_resource_key = active_resource_key.clone();
                                                                                                 let resource_key = resource_key.clone();
-                                                                                                let name_validators = name_validators.clone();
-                                                                                                let resource = resource.clone();
-                                                                                                let on_remove = on_remove.clone();
-                                                                                                let is_active = active_resource_key.deref() == &Some(resource_key.clone());
-                                                                                                let background_color = if is_active {
-                                                                                                    "background-color: #EEE"
-                                                                                                } else {
-                                                                                                    ""
-                                                                                                };
-                                                                                                html! {
-                                                                                                    <div>
-                                                                                                        <div style={format!("border-bottom: 1px solid #CCC;padding: 0 0.5em;display: flex;justify-content: space-between;align-items: center;{}", background_color)}>
-                                                                                                            <div onclick={Callback::from(move |_| {
-                                                                                                                let active_resource_key = active_resource_key.clone();
-                                                                                                                let resource_key = resource_key.clone();
-                                                                                                                wasm_bindgen_futures::spawn_local(async move {
-                                                                                                                    active_resource_key.set(Some(resource_key.clone()));
-                                                                                                                    utils::wait(0).await;
-                                                                                                                    utils::trigger_resize();
-                                                                                                                });
-                                                                                                            })} style="flex-grow: 1;flex-shrink: 1;padding: 0.5em 0;">
-                                                                                                                {
-                                                                                                                    if name.is_empty() {
-                                                                                                                        SharedString::from("(缺少资源名称)")
-                                                                                                                    } else {
-                                                                                                                        name.deref().clone()
-                                                                                                                    }
-                                                                                                                }
-                                                                                                            </div>
-                                                                                                            <Button onclick={on_remove} style="margin-left:0.5em;">{"移除"}</Button>
-                                                                                                        </div>
-                                                                                                        <Show condition={is_active} style="position:absolute;left:20em;right:0;top:0;bottom:0;overflow: auto;">
-                                                                                                            {environment_edit_state.resource_edit_view(extension_id, &resource, name.clone(), error, name_validators)}
-                                                                                                        </Show>
-                                                                                                    </div>
+                                                                                                wasm_bindgen_futures::spawn_local(async move {
+                                                                                                    active_resource_key.set(Some(resource_key.clone()));
+                                                                                                    utils::wait(0).await;
+                                                                                                    utils::trigger_resize();
+                                                                                                });
+                                                                                            }} style="flex-grow: 1;flex-shrink: 1;padding: 0.5em 0;">
+                                                                                                {
+                                                                                                    move || {
+                                                                                                        let name = name.get();
+                                                                                                        if name.is_empty() {
+                                                                                                            SharedString::from("(缺少资源名称)")
+                                                                                                        } else {
+                                                                                                            name
+                                                                                                        }
+                                                                                                    }
                                                                                                 }
-                                                                                            })
-                                                                                        })
-                                                                                    }
-                                                                                </div>
+                                                                                            </div>
+                                                                                            <Button onclick={on_remove} style={SharedString::from("margin-left:0.5em;")}>{"移除"}</Button>
+                                                                                        </div>
+                                                                                        <Visable condition={is_active} style="position:absolute;left:20em;right:0;top:0;bottom:0;overflow: auto;">
+                                                                                            {environment_edit_state.resource_edit_view(extension_id, &resource, name.clone(), error, name_validators)}
+                                                                                        </Visable>
+                                                                                    </div>
+                                                                                }
                                                                             }
-                                                                        })
+                                                                        </ValidateWrapper>
                                                                     }
-                                                                    <div style="margin-top: 0.5em;">
-                                                                        <Button onclick={Callback::from(move |_| {
-                                                                            let configuration_schema = get_configuration_schema(&extension_list, &extension_id)
-                                                                            .map(|configuration_schema| configuration_schema.clone())
-                                                                            .unwrap_or_default();
-                                                                            let new_environment = EnvironmentResource {
-                                                                                id: Default::default(),
-                                                                                name: init_resource_name(Default::default()),
-                                                                                extension_configuration: get_default_config(configuration_schema),
-                                                                                test_error: Default::default(),
-                                                                            };
-                                                                            let mut new_list = resource_list.deref().clone();
-                                                                            let new_key: Key = gen_id().into();
-                                                                            active_resource_key_clone.set(Some(new_key.clone()));
-                                                                            new_list.push((new_key, new_environment));
-                                                                            resource_list.set(new_list);
-                                                                        })}>{"添加"}</Button>
-                                                                    </div>
-                                                                </div>
+                                                                }
+                                                            />
+                                                            <div style="margin-top: 0.5em;">
+                                                                <Button onclick={UnsyncCallback::new(move |_| {
+                                                                    let configuration_schema = get_configuration_schema(&extension_list.read(), &extension_id)
+                                                                    .map(|configuration_schema| configuration_schema.clone())
+                                                                    .unwrap_or_default();
+                                                                    let new_environment = EnvironmentResource {
+                                                                        id: Default::default(),
+                                                                        name: init_resource_name(Default::default()),
+                                                                        extension_configuration: get_default_config(configuration_schema),
+                                                                        test_error: Default::default(),
+                                                                    };
+                                                                    let new_key: Key = gen_id().into();
+                                                                    active_resource_key_clone.set(Some(new_key.clone()));
+                                                                    resource_list.write().push((new_key, new_environment));
+                                                                })}>{"添加"}</Button>
                                                             </div>
-                                                        }
-                                                    })
+                                                        </div>
+                                                    </div>
                                                 }
                                             }
-                                        </Show>
+                                        </Visable>
                                     </div>
                                 }
-                            })
-                        }
+                            }
+                        />
                     </div>
                 </div>
             </div>
             <div style="margin-top: 0.5em;">
-                <Button disabled={*is_saving} onclick={on_save}>{"保存"}</Button>
-                {
-                    match err_msg.as_ref() {
-                        Some(err_msg) => {
-                            html!{
-                                <span class="middle" style="color:red;margin-left: 0.5em;">{err_msg}</span>
-                            }
-                        },
-                        None => html!{}
-                    }
-                }
+                <Button disabled={is_saving} onclick={on_save}>{"保存"}</Button>
+                <Show
+                    when={ let err_msg = err_msg.clone(); move || { err_msg.read().is_some() } }
+                >
+                    <span class="middle" style="color:red;margin-left: 0.5em;">{err_msg}</span>
+                </Show>
             </div>
         </div>
     }
@@ -441,19 +443,19 @@ impl EnvironmentEditState {
         &self,
         extension_id: String,
         resource: &EnvironmentResource,
-        name: UseStateHandle<SharedString>,
-        error: UseStateHandle<Option<SharedString>>,
-        name_validators: Validators<SharedString>,
-    ) -> Html {
+        name: RwSignal<SharedString>,
+        error: RwSignal<Option<SharedString>>,
+        name_validators: Arc<Validators<SharedString>>,
+    ) -> impl IntoView + use<> {
         let extension_configuration = resource.extension_configuration.clone();
-        html! {
+        view! {
             <div style="padding: 0.25em;">
                 <table>
                     <tr>
                         <td class="align-right" style="vertical-align: top;"><Required/>{"资源名称"}</td>
                         <td>
-                            <ValidateWrapper error={error.deref().clone()} style="display:inline-block;">
-                                <BindingInput value={name} onupdate={Callback::from(move |value| {
+                            <ValidateWrapper error={error.clone()} style="display:inline-block;">
+                                <Input value={name} onupdate={UnsyncCallback::new(move |value| {
                                     name_validators.validate_into(&value, &error)
                                 })}/>
                             </ValidateWrapper>
@@ -462,47 +464,46 @@ impl EnvironmentEditState {
                     <tr>
                         <td class="align-right" style="vertical-align: top;">{"资源配置"}</td>
                         <td>
-                            { config_view(&resource.extension_configuration) }
+                            <ConfigView attributes={extension_configuration.clone()}/>
                         </td>
                     </tr>
                     <tr>
                         <td class="align-right" style="vertical-align: top;">{"测试配置"}</td>
                         <td>
                             {
-                                resource.test_error.view(move |test_error: UseStateHandle<Option<Result<(), SharedString>>>| {
-                                    let extension_id = extension_id.clone();
-                                    let extension_configuration = extension_configuration.clone();
-                                    let on_test = {
-                                        let test_error = test_error.clone();
-                                        Callback::from(move |_| {
-                                            test_error.set(None);
-                                            test_configuration(extension_id.clone(), extension_configuration.clone(), test_error.clone());
-                                        })
-                                    };
-                                    html! {
-                                        <div>
-                                            <Button onclick={on_test}>{"测试"}</Button>
-                                            {
-                                                if let Some(test_error) = test_error.deref() {
+                                let on_test = {
+                                    let test_error = resource.test_error.clone();
+                                    UnsyncCallback::new(move |_| {
+                                        test_error.set(None);
+                                        test_configuration(extension_id.clone(), extension_configuration.clone(), test_error.clone());
+                                    })
+                                };
+                                view! {
+                                    <div>
+                                        <Button onclick={on_test}>{"测试"}</Button>
+                                        {
+                                            let test_error = resource.test_error.clone();
+                                            move || {
+                                                if let Some(test_error) = test_error.get() {
                                                     match test_error {
                                                         Ok(_) => {
-                                                            html! {
+                                                            view! {
                                                                 <span style="color: green;">{"测试成功!"}</span>
-                                                            }
+                                                            }.into_any()
                                                         },
                                                         Err(err) => {
-                                                            html! {
+                                                            view! {
                                                                 <span style="color: red;">{err}</span>
-                                                            }
+                                                            }.into_any()
                                                         }
                                                     }
                                                 } else {
-                                                    html! {}
+                                                    view! {}.into_any()
                                                 }
                                             }
-                                        </div>
-                                    }
-                                })
+                                        }
+                                    </div>
+                                }
                             }
                         </td>
                     </tr>
@@ -513,7 +514,7 @@ impl EnvironmentEditState {
 }
 
 async fn query_environment_schema_list(
-    list: &UseStateHandle<Vec<EnvironmentSchema>>,
+    list: &RwSignal<Vec<EnvironmentSchema>>,
 ) -> Result<Vec<EnvironmentSchema>, SharedString> {
     let pagination_list = QueryEnvironmentSchemaApi
         .call(&QueryEnvironmentSchemaReq {
@@ -526,7 +527,7 @@ async fn query_environment_schema_list(
 }
 
 async fn query_extension_list(
-    extension_list: &UseStateHandle<Vec<Extension>>,
+    extension_list: &RwSignal<Vec<Extension>>,
 ) -> Result<Vec<Extension>, SharedString> {
     let result = QueryExtensionApi.call(&QueryExtensionReq {}).await?;
     extension_list.set(result.clone());
@@ -534,7 +535,7 @@ async fn query_extension_list(
 }
 
 async fn read_environment_schema_detail(
-    detail: &UseStateHandle<Option<EnvironmentSchemaDetail>>,
+    detail: &RwSignal<Option<EnvironmentSchemaDetail>>,
     environment_schema_id: Id,
 ) -> Result<EnvironmentSchemaDetail, SharedString> {
     let params = ReadEnvironmentSchemaReq {
@@ -554,8 +555,8 @@ fn init_resource_name(value: SharedString) -> ValidateData<SharedString> {
 
 async fn handle_environment_schema_change(
     environment_schema_id: Id,
-    detail: &UseStateHandle<Option<EnvironmentSchemaDetail>>,
-    schema_resource_list: &UseStateHandle<Vec<(Key, EnvironmentSchemaResource)>>,
+    detail: &RwSignal<Option<EnvironmentSchemaDetail>>,
+    schema_resource_list: &RwSignal<Vec<(Key, EnvironmentSchemaResource)>>,
 ) -> Result<(), SharedString> {
     let environment_schema_detail =
         read_environment_schema_detail(detail, environment_schema_id).await?;
@@ -605,7 +606,7 @@ async fn read_environment_detail(
                         id: schema_resource.id,
                         name: schema_resource.name.clone(),
                         extension_id: schema_resource.extension_id.clone(),
-                        resource_list: Binding::new(
+                        resource_list: RwSignal::new(
                             schema_resource
                                 .resource_list
                                 .iter()
@@ -637,7 +638,7 @@ async fn read_environment_detail(
 fn test_configuration(
     extension_id: String,
     extension_configuration: Vec<(Key, Attribute, AttributeValue)>,
-    test_error: UseStateHandle<Option<Result<(), SharedString>>>,
+    test_error: RwSignal<Option<Result<(), SharedString>>>,
 ) {
     wasm_bindgen_futures::spawn_local(async move {
         try_test_configuration(extension_id, &extension_configuration, &test_error)
@@ -649,7 +650,7 @@ fn test_configuration(
 async fn try_test_configuration(
     extension_id: String,
     extension_configuration: &[(Key, Attribute, AttributeValue)],
-    test_error: &UseStateHandle<Option<Result<(), SharedString>>>,
+    test_error: &RwSignal<Option<Result<(), SharedString>>>,
 ) -> Result<(), SharedString> {
     let err_msgs = chk_single_err(extension_configuration).await;
     if let Some(first) = err_msgs.first() {
@@ -699,7 +700,7 @@ async fn upload_single_files(
                             let handle = file_value.clone();
                             files.push((
                                 hashing_file.clone(),
-                                Callback::from(move |result| match result {
+                                UnsyncCallback::new(move |result| match result {
                                     Ok(metadata) => {
                                         handle.set(Some(Resource::Remote(metadata)));
                                     }
@@ -720,19 +721,19 @@ async fn upload_single_files(
                 let lock_data = Arc::new(Mutex::new((new_files, finished_count)));
                 for (index, (_key, file, ())) in file_list.get().into_iter().enumerate() {
                     let lock_data = lock_data.clone();
-                    match file {
+                    match file.get() {
                         Resource::Local(hashing_file) => {
                             let file_list = file_list.clone();
                             files.push((
                                 hashing_file.clone(),
-                                Callback::from(move |result| {
+                                UnsyncCallback::new(move |result| {
                                     let mut lock_data = lock_data.lock().unwrap();
                                     let finished_count = lock_data.1 + 1;
                                     lock_data.1 = finished_count;
                                     let new_files = &mut lock_data.0;
                                     match result {
                                         Ok(metadata) => {
-                                            new_files[index].1 = Resource::Remote(metadata);
+                                            new_files[index].1.set(Resource::Remote(metadata));
                                         }
                                         Err(err) => {
                                             log::error!("上传文件失败: {:?}", err);
@@ -769,7 +770,7 @@ async fn chk_form_err(id: Option<Id>, edit_form: &EditForm) -> Vec<SharedString>
     }
     let mut empty_id = None;
     let mut active_ids = None;
-    for (_key, schema_resource) in edit_form.schema_resource_list.iter() {
+    for (_key, schema_resource) in edit_form.schema_resource_list.get().iter() {
         let schema_resource_list = schema_resource.resource_list.get();
         if schema_resource_list.is_empty() {
             err_msgs.push(SharedString::from(format!(
@@ -816,7 +817,7 @@ async fn chk_form_err(id: Option<Id>, edit_form: &EditForm) -> Vec<SharedString>
 
 async fn try_upload_files(edit_form: &EditForm) -> Result<(), SharedString> {
     let mut files = Vec::new();
-    for (_key, schema_resource) in edit_form.schema_resource_list.iter() {
+    for (_key, schema_resource) in edit_form.schema_resource_list.get().iter() {
         let resource_list = schema_resource.resource_list.get();
         for (_, resource) in resource_list.iter() {
             for (_, _, attr_value) in &resource.extension_configuration {
@@ -835,7 +836,7 @@ async fn try_upload_files(edit_form: &EditForm) -> Result<(), SharedString> {
                                     let handle = file_value.clone();
                                     files.push((
                                         hashing_file.clone(),
-                                        Callback::from(move |result| match result {
+                                        UnsyncCallback::new(move |result| match result {
                                             Ok(metadata) => {
                                                 handle.set(Some(Resource::Remote(metadata)));
                                             }
@@ -856,19 +857,21 @@ async fn try_upload_files(edit_form: &EditForm) -> Result<(), SharedString> {
                         let lock_data = Arc::new(Mutex::new((new_files, finished_count)));
                         for (index, (_key, file, ())) in file_list.get().into_iter().enumerate() {
                             let lock_data = lock_data.clone();
-                            match file {
+                            match file.get() {
                                 Resource::Local(hashing_file) => {
                                     let file_list = file_list.clone();
                                     files.push((
                                         hashing_file.clone(),
-                                        Callback::from(move |result| {
+                                        UnsyncCallback::new(move |result| {
                                             let mut lock_data = lock_data.lock().unwrap();
                                             let finished_count = lock_data.1 + 1;
                                             lock_data.1 = finished_count;
                                             let new_files = &mut lock_data.0;
                                             match result {
                                                 Ok(metadata) => {
-                                                    new_files[index].1 = Resource::Remote(metadata);
+                                                    new_files[index]
+                                                        .1
+                                                        .set(Resource::Remote(metadata));
                                                 }
                                                 Err(err) => {
                                                     log::error!("上传文件失败: {:?}", err);
@@ -898,8 +901,9 @@ async fn try_upload_files(edit_form: &EditForm) -> Result<(), SharedString> {
 fn collect_resource_list(
     edit_form: &EditForm,
 ) -> Vec<(Id, String, Vec<(Option<Id>, String, String)>)> {
-    let mut schema_resource_list: Vec<_> = Vec::with_capacity(edit_form.schema_resource_list.len());
-    for (_key, schema_resource) in edit_form.schema_resource_list.deref().iter() {
+    let list = edit_form.schema_resource_list.get();
+    let mut schema_resource_list: Vec<_> = Vec::with_capacity(list.len());
+    for (_key, schema_resource) in list.iter() {
         schema_resource_list.push((
             schema_resource.id,
             schema_resource.extension_id.clone(),
@@ -925,9 +929,9 @@ fn collect_resource_list(
 async fn save_environment(
     id: Option<Id>,
     edit_form: &EditForm,
-    is_saving: UseStateHandle<bool>,
-    err_msg: &UseStateHandle<Option<SharedString>>,
-    onsave: &Option<Callback<PrimaryKey>>,
+    is_saving: RwSignal<bool>,
+    err_msg: &RwSignal<Option<SharedString>>,
+    onsave: &Option<UnsyncCallback<PrimaryKey>>,
 ) -> Result<(), SharedString> {
     let err_msgs = chk_form_err(id, edit_form).await;
     if let Some(first) = err_msgs.first() {
@@ -974,7 +978,7 @@ async fn save_environment(
             Ok(_) => {
                 match onsave {
                     Some(onsave) => {
-                        onsave.emit(tihu::PrimaryKey { id: id });
+                        onsave.run(tihu::PrimaryKey { id: id });
                     }
                     None => (),
                 }
@@ -1015,7 +1019,7 @@ async fn save_environment(
             Ok(pri_key) => {
                 match onsave {
                     Some(onsave) => {
-                        onsave.emit(pri_key);
+                        onsave.run(pri_key);
                     }
                     None => (),
                 }

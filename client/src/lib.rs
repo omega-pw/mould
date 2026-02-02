@@ -6,54 +6,36 @@ mod components;
 mod fragment;
 mod id_gen;
 mod js;
+mod layouts;
 mod logger;
 mod pages;
 mod route;
 mod utils;
 
 use id_gen::IdGen;
+use leptos::mount::mount_to_body;
 use sdk::auth::get_curr_user::User;
 pub use server_sdk as sdk;
 use std::borrow::Cow;
 use std::future::Future;
 use std::pin::Pin;
-use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock, Mutex};
 use tihu::api::Response;
 use wasm_bindgen::prelude::*;
-use yew::prelude::*;
 
-static mut ID_GEN: Option<IdGen> = None;
+static ID_GEN: LazyLock<Mutex<Option<IdGen>>> = LazyLock::new(|| Mutex::new(None));
 
-pub type SharedString = yew::virtual_dom::AttrValue;
+pub type SharedString = leptos::prelude::Oco<'static, str>;
+pub type Key = leptos::prelude::Oco<'static, str>;
 
-#[derive(Debug, Clone, PartialEq, Default, Properties)]
-pub struct Context {
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct AppContext {
     pub curr_user: Option<User>,
 }
 
-pub enum ContextAction {
-    UpdateUser(User),
-}
+pub struct ArcFn<In, Out>(Arc<dyn Fn(In) -> Out + Send + Sync>);
 
-impl Reducible for Context {
-    type Action = ContextAction;
-
-    fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
-        let app_context = match action {
-            ContextAction::UpdateUser(curr_user) => Context {
-                curr_user: Some(curr_user),
-            },
-        };
-        app_context.into()
-    }
-}
-
-pub type AppContext = UseReducerHandle<Context>;
-
-pub struct ArcFn<In, Out>(Arc<dyn Fn(In) -> Out>);
-
-impl<In, Out, F: Fn(In) -> Out + 'static> From<F> for ArcFn<In, Out> {
+impl<In, Out, F: Fn(In) -> Out + Send + Sync + 'static> From<F> for ArcFn<In, Out> {
     fn from(func: F) -> Self {
         ArcFn(Arc::new(func))
     }
@@ -121,14 +103,17 @@ fn init_request() {
             Box::pin(async {})
         },
     );
-    unsafe {
-        utils::request::DEFAULT_HTTP_REQUESTOR =
-            Some(Arc::new(
+    LazyLock::force(&utils::request::DEFAULT_HTTP_REQUESTOR)
+                            .write()
+                            .unwrap().replace(Arc::new(
                 |(url, req): (SharedString, SharedString)| -> Pin<
                     Box<dyn Future<Output = Result<SharedString, SharedString>>>,
                 > { Box::pin(utils::default_http_requestor((url, req))) },
             ));
-        utils::request::DEFAULT_LOADING_HANDLER = Some(Arc::new(
+    LazyLock::force(&utils::request::DEFAULT_LOADING_HANDLER)
+        .write()
+        .unwrap()
+        .replace(Arc::new(
             |state: bool| -> Pin<Box<dyn Future<Output = ()>>> {
                 if state {
                     components::loading::show();
@@ -138,7 +123,10 @@ fn init_request() {
                 Box::pin(async {})
             },
         ));
-        utils::request::DEFAULT_DATA_UNWRAPPER = Some(Arc::new(
+    LazyLock::force(&utils::request::DEFAULT_DATA_UNWRAPPER)
+        .write()
+        .unwrap()
+        .replace(Arc::new(
             |value: serde_json::Value| -> Pin<Box<dyn Future<Output = Result<serde_json::Value, SharedString>>>> {
                 let result = serde_json::from_value::<Response<serde_json::Value>>(value).map_err(|err| -> SharedString {
                     log::error!("响应数据格式不正确：{}", err);
@@ -167,24 +155,34 @@ fn init_request() {
                 })
             },
         ));
-        utils::request::DEFAULT_VALIDATE_ERROR_HANDLER = Some(error_handler.clone());
-        utils::request::DEFAULT_REQ_ERROR_HANDLER = Some(error_handler.clone());
-        utils::request::DEFAULT_UNWRAP_ERROR_HANDLER = Some(error_handler);
-    }
+    LazyLock::force(&utils::request::DEFAULT_VALIDATE_ERROR_HANDLER)
+        .write()
+        .unwrap()
+        .replace(error_handler.clone());
+
+    LazyLock::force(&utils::request::DEFAULT_REQ_ERROR_HANDLER)
+        .write()
+        .unwrap()
+        .replace(error_handler.clone());
+    LazyLock::force(&utils::request::DEFAULT_UNWRAP_ERROR_HANDLER)
+        .write()
+        .unwrap()
+        .replace(error_handler);
 }
 
 // This is the entry point for the web app
 #[wasm_bindgen]
 pub fn run_app() -> Result<(), JsValue> {
-    unsafe {
-        ID_GEN = Some(IdGen::new(None));
-    }
+    LazyLock::force(&ID_GEN)
+        .lock()
+        .unwrap()
+        .replace(IdGen::new(None));
     utils::set_panic_hook();
     logger::init();
     init_request();
     wasm_bindgen_futures::spawn_local(async move {
         utils::init_time_diff().await.ok();
-        yew::Renderer::<app::App>::new().render();
+        mount_to_body(app::App);
     });
     Ok(())
 }

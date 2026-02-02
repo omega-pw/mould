@@ -12,7 +12,7 @@ use tihu::SharedString;
 
 pub const READ_USER_API: &str = "/api/user/readUser";
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SystemUser {
     pub id: Id,
     pub email: String,
@@ -22,7 +22,7 @@ pub struct SystemUser {
     pub last_modified_time: DateTime<Utc>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ExternalUser {
     pub id: Id,
     pub provider_type: enums::ProviderType,
@@ -35,13 +35,13 @@ pub struct ExternalUser {
     pub last_modified_time: DateTime<Utc>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum UserSource {
     System(SystemUser),     //系统用户
     External(ExternalUser), //外部用户
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct User {
     pub id: Id,
     pub name: String,

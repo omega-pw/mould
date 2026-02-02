@@ -1,35 +1,62 @@
 use crate::sdk;
 use crate::utils::request::ApiExt;
 use crate::SharedString;
+use leptos::prelude::*;
+use leptos::Params;
+use leptos_router::hooks::use_params;
+use leptos_router::params::Params;
 use sdk::auth::get_curr_user::GetCurrUserResp;
 use sdk::auth::login_by_oauth2_code::LoginByOauth2CodeApi;
 use sdk::auth::login_by_oauth2_code::LoginByOauth2CodeReq;
 use std::collections::HashMap;
-use yew::prelude::*;
 
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props {
-    pub provider: String,
-    pub ondone: Callback<GetCurrUserResp>,
+#[derive(Params, Clone, PartialEq)]
+struct AuthParams {
+    provider: Option<String>,
 }
 
-#[function_component]
-pub fn Oauth2Authorize(props: &Props) -> Html {
-    let provider = props.provider.clone();
-    let ondone = props.ondone.clone();
-    use_effect_with((), move |_| {
-        let ondone = ondone.clone();
-        wasm_bindgen_futures::spawn_local(async move {
-            login_by_code(provider, &ondone).await.ok();
-        });
-        || ()
+#[component]
+pub fn Oauth2AuthorizePage(ondone: UnsyncCallback<GetCurrUserResp>) -> impl IntoView {
+    let auth_params = use_params::<AuthParams>();
+    move || {
+        let auth_params = auth_params.get();
+        match auth_params {
+            Ok(auth_params) => {
+                if let Some(provider) = auth_params.provider {
+                    view! {
+                        <Oauth2Authorize provider={provider} ondone={ondone}/>
+                    }
+                    .into_any()
+                } else {
+                    view! {
+                        <div>
+                            {"参数错误: provider为空"}
+                        </div>
+                    }
+                    .into_any()
+                }
+            }
+            Err(err) => view! {
+                <div>
+                    {format!("参数错误: {}", err)}
+                </div>
+            }
+            .into_any(),
+        }
+    }
+}
+
+#[component]
+pub fn Oauth2Authorize(provider: String, ondone: UnsyncCallback<GetCurrUserResp>) -> impl IntoView {
+    wasm_bindgen_futures::spawn_local(async move {
+        login_by_code(provider, &ondone).await.ok();
     });
-    html! {}
+    view! {}
 }
 
 async fn login_by_code(
     provider: String,
-    ondone: &Callback<GetCurrUserResp>,
+    ondone: &UnsyncCallback<GetCurrUserResp>,
 ) -> Result<(), SharedString> {
     let window = web_sys::window().unwrap();
     let mut query = window.location().search().unwrap();
@@ -65,6 +92,6 @@ async fn login_by_code(
         pkce_verifier: pkce_verifier,
     };
     let curr_user = LoginByOauth2CodeApi.call(&params).await?;
-    ondone.emit(curr_user);
+    ondone.run(curr_user);
     return Ok(());
 }

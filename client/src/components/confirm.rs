@@ -3,105 +3,56 @@ use super::button_group::ButtonGroup;
 use super::modal_dialog::ModalDialog;
 use crate::SharedString;
 use js_sys::Function;
+use leptos::prelude::*;
+use leptos::tachys::view::any_view::AnyViewState;
 use std::cell::Cell;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
-use yew::prelude::*;
-use yew::{html, Component, Context, Html};
+use web_sys::Event;
 
-struct State {
-    title: SharedString,
+#[component]
+pub fn Confirm(
+    #[prop(into, default = Signal::stored(SharedString::from("确认")))] title: Signal<SharedString>,
     content: SharedString,
-    z_index: u64,
-    ok_text: SharedString,
-    cancel_text: SharedString,
-}
-
-pub enum Msg {
-    Done(bool),
-}
-
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props {
-    #[prop_or_else(||SharedString::from("确认"))]
-    pub title: SharedString,
-    pub content: SharedString,
-    #[prop_or(999)]
-    pub z_index: u64,
-    #[prop_or_else(||SharedString::from("确定"))]
-    pub ok_text: SharedString,
-    #[prop_or_else(||SharedString::from("取消"))]
-    pub cancel_text: SharedString,
-    pub ondone: Callback<bool>,
-}
-
-pub struct Confirm {
-    state: State,
-}
-
-impl Component for Confirm {
-    type Message = Msg;
-    type Properties = Props;
-
-    fn create(ctx: &Context<Self>) -> Self {
-        let props = ctx.props();
-        let state = State {
-            title: props.title.clone(),
-            content: props.content.clone(),
-            z_index: props.z_index,
-            ok_text: props.ok_text.clone(),
-            cancel_text: props.cancel_text.clone(),
-        };
-        Confirm { state }
+    #[prop(default = 999)] z_index: u64,
+    #[prop(into, default = SharedString::from("确定"))] ok_text: SharedString,
+    #[prop(into, default = SharedString::from("取消"))] cancel_text: SharedString,
+    ondone: UnsyncCallback<bool>,
+) -> impl IntoView {
+    let is_mobile = false;
+    let center_style = if is_mobile {
+        "min-width:40%;max-width:60%;"
+    } else {
+        "min-width:24em;max-width:48em;"
+    };
+    let mut footer_style = String::from("text-align:center;");
+    if !is_mobile {
+        footer_style.push_str("padding-bottom:0.5em;");
     }
-
-    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
-        match msg {
-            Msg::Done(ok) => {
-                ctx.props().ondone.emit(ok);
-            }
-        }
-        return true;
+    let mut btn_style = String::from("font-size: inherit;");
+    if is_mobile {
+        btn_style.push_str("display:block;width:100%;background-color:transparent;border:none;border-top-width:1px;border-top-style:solid;border-top-color:#EEEEEE");
     }
-
-    fn changed(&mut self, ctx: &Context<Self>, _old_props: &Self::Properties) -> bool {
-        let props = ctx.props();
-        self.state.title = props.title.clone();
-        self.state.content = props.content.clone();
-        self.state.z_index = props.z_index;
-        self.state.ok_text = props.ok_text.clone();
-        self.state.cancel_text = props.cancel_text.clone();
-        return true;
-    }
-
-    fn view(&self, ctx: &Context<Self>) -> Html {
-        let is_mobile = false;
-        let center_style = if is_mobile {
-            "min-width:40%;max-width:60%;"
-        } else {
-            "min-width:24em;max-width:48em;"
-        };
-        let mut footer_style = String::from("text-align:center;");
-        if !is_mobile {
-            footer_style.push_str("padding-bottom:0.5em;");
+    let btn_style = SharedString::from(btn_style);
+    let on_ok = UnsyncCallback::new({
+        let ondone = ondone.clone();
+        move |_| {
+            ondone.run(true);
         }
-        let mut btn_style = String::from("font-size: inherit;");
-        if is_mobile {
-            btn_style.push_str("display:block;width:100%;background-color:transparent;border:none;border-top-width:1px;border-top-style:solid;border-top-color:#EEEEEE");
-        }
-        let on_ok = ctx.link().callback(|_| Msg::Done(true));
-        let on_cancel = ctx.link().callback(|_| Msg::Done(false));
-        html! {
-            <ModalDialog title={self.state.title.clone()} closable=false z_index={self.state.z_index} center_style={center_style}>
-                <div style="min-height: 2em;padding:0.5em;">{&self.state.content}</div>
-                <div style={footer_style}>
-                    <ButtonGroup>
-                        <Button onclick={on_ok} style={btn_style.clone()}>{self.state.ok_text.clone()}</Button>
-                        <Button onclick={on_cancel} style={btn_style.clone()}>{self.state.cancel_text.clone()}</Button>
-                    </ButtonGroup>
-                </div>
-            </ModalDialog>
-        }
+    });
+    let on_cancel = UnsyncCallback::new(move |_| {
+        ondone.run(false);
+    });
+    view! {
+        <ModalDialog title={title} closable=false z_index={z_index} center_style={center_style}>
+            <div style="min-height: 2em;padding:0.5em;">{content}</div>
+            <div style={footer_style}>
+                <ButtonGroup>
+                    <Button onclick={on_ok} style={btn_style.clone()}>{ok_text}</Button>
+                    <Button onclick={on_cancel} style={btn_style}>{cancel_text}</Button>
+                </ButtonGroup>
+            </div>
+        </ModalDialog>
     }
 }
 
@@ -120,29 +71,35 @@ pub fn confirm(content: SharedString, title: Option<SharedString>, cb: impl Fn(b
         .add_event_listener_with_callback("mousedown", &on_root_click)
         .unwrap();
     body.append_child(&confirm_root).unwrap();
-    let confirm_handle: Rc<Cell<Option<AppHandle<Confirm>>>> = Rc::new(Cell::new(None));
+    let confirm_handle: Rc<Cell<Option<UnmountHandle<AnyViewState>>>> = Rc::new(Cell::new(None));
     let confirm_handle_clone = confirm_handle.clone();
     let confirm_root_clone = confirm_root.clone();
-    let props = Props {
-        title: title.unwrap_or_else(|| SharedString::from("确认")),
-        content: content,
-        z_index: 999,
-        ok_text: SharedString::from("确定"),
-        cancel_text: SharedString::from("取消"),
-        ondone: Callback::from(move |ret: bool| {
-            cb(ret);
-            if let Some(confirm_handle) = confirm_handle_clone.take() {
-                confirm_handle.destroy();
-                let document = web_sys::window().unwrap().document().unwrap();
-                let body = document.body().unwrap();
-                body.remove_child(&confirm_root_clone).unwrap();
-            }
-            confirm_root_clone
-                .remove_event_listener_with_callback("mousedown", &on_root_click)
-                .unwrap();
-        }),
+    let renderer = || {
+        view! {
+            <Confirm
+                title=title.unwrap_or_else(|| SharedString::from("确认"))
+                content=content
+                z_index=999
+                ok_text=SharedString::from("确定")
+                cancel_text=SharedString::from("取消")
+                ondone=UnsyncCallback::new(move |ret: bool| {
+                    cb(ret);
+                    if let Some(confirm_handle) = confirm_handle_clone.take() {
+                        // confirm_handle.destroy();
+                        let document = web_sys::window().unwrap().document().unwrap();
+                        let body = document.body().unwrap();
+                        body.remove_child(&confirm_root_clone).unwrap();
+                    }
+                    confirm_root_clone
+                        .remove_event_listener_with_callback("mousedown", &on_root_click)
+                        .unwrap();
+                })
+            />
+        }
+        .into_any()
     };
-    confirm_handle.set(Some(
-        yew::Renderer::<Confirm>::with_root_and_props(confirm_root, props).render(),
-    ));
+    confirm_handle.set(Some(leptos::mount::mount_to(
+        confirm_root.unchecked_into(),
+        renderer,
+    )));
 }

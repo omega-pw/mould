@@ -1,175 +1,117 @@
-use std::ops::Deref;
+use crate::SharedString;
+use leptos::prelude::*;
+use wasm_bindgen::JsCast;
+use web_sys::Event;
 use web_sys::HtmlTextAreaElement;
-use yew::prelude::*;
+use web_sys::KeyboardEvent;
 
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props {
-    pub value: AttrValue,
-    #[prop_or(4)]
-    pub rows: u32,
-    #[prop_or_default]
-    pub disable_trim: bool,
-    #[prop_or_default]
-    pub tabindex: Option<i32>,
-    #[prop_or_default]
-    pub placeholder: Option<AttrValue>,
-    #[prop_or_default]
-    pub style: Option<AttrValue>,
-    #[prop_or_default]
-    #[prop_or_default]
-    pub oninput: Option<Callback<InputEvent>>,
-    #[prop_or_default]
-    pub onchange: Option<Callback<Event>>,
-    #[prop_or_default]
-    pub onupdate: Option<Callback<AttrValue>>,
-    #[prop_or_default]
-    pub onfocus: Option<Callback<()>>,
-    #[prop_or_default]
-    pub onblur: Option<Callback<()>>,
-    #[prop_or_default]
-    pub onkeydown: Option<Callback<KeyboardEvent>>,
-    #[prop_or_default]
-    pub onkeyup: Option<Callback<KeyboardEvent>>,
-    #[prop_or_default]
-    pub onenter: Option<Callback<()>>,
-}
-
-#[function_component]
-pub fn Textarea(props: &Props) -> Html {
-    let disable_trim = props.disable_trim;
-    let oninput = props.oninput.clone();
-    let onupdate = props.onupdate.clone();
-    let on_input = Callback::from(move |evt: InputEvent| {
-        let input: HtmlTextAreaElement = evt.target_unchecked_into();
-        let value = input.value();
-        if let Some(onupdate) = onupdate.as_ref() {
-            onupdate.emit(value.into());
+#[component]
+pub fn Textarea(
+    value: RwSignal<SharedString>,
+    #[prop(default = 4)] rows: u32,
+    #[prop(optional)] disable_trim: bool,
+    #[prop(optional)] readonly: bool,
+    #[prop(default = None)] tabindex: Option<i32>,
+    #[prop(into, optional)] placeholder: SharedString,
+    #[prop(into, optional)] style: SharedString,
+    #[prop(into, default = None)] oninput: Option<UnsyncCallback<Event>>,
+    #[prop(into, default = None)] onchange: Option<UnsyncCallback<Event>>,
+    #[prop(into, default = None)] onupdate: Option<UnsyncCallback<SharedString>>,
+    #[prop(into, default = None)] onfocus: Option<UnsyncCallback<()>>,
+    #[prop(into, default = None)] onblur: Option<UnsyncCallback<()>>,
+    #[prop(into, default = None)] onkeydown: Option<UnsyncCallback<KeyboardEvent>>,
+    #[prop(into, default = None)] onkeyup: Option<UnsyncCallback<KeyboardEvent>>,
+    #[prop(into, default = None)] onenter: Option<UnsyncCallback<()>>,
+) -> impl IntoView {
+    let on_input = {
+        let value = value.clone();
+        let onupdate = onupdate.clone();
+        move |evt: Event| {
+            if let Some(target) = evt.target() {
+                let input: HtmlTextAreaElement = target.unchecked_into();
+                let new_value = input.value();
+                let new_value = if disable_trim {
+                    new_value
+                } else {
+                    new_value.trim().to_string()
+                };
+                let new_value = SharedString::from(new_value);
+                if !readonly {
+                    value.set(new_value.clone());
+                }
+                if let Some(onupdate) = onupdate.as_ref() {
+                    onupdate.run(new_value);
+                }
+                if let Some(oninput) = oninput.as_ref() {
+                    oninput.run(evt);
+                }
+            }
         }
-        if let Some(oninput) = oninput.as_ref() {
-            oninput.emit(evt);
+    };
+    let on_change = {
+        let value = value.clone();
+        move |evt: Event| {
+            if let Some(target) = evt.target() {
+                let input: HtmlTextAreaElement = target.unchecked_into();
+                let new_value = input.value();
+                let new_value = if disable_trim {
+                    new_value
+                } else {
+                    new_value.trim().to_string()
+                };
+                let new_value = SharedString::from(new_value);
+                if !readonly {
+                    value.set(new_value.clone());
+                }
+                if let Some(onupdate) = onupdate.as_ref() {
+                    onupdate.run(new_value);
+                }
+                if let Some(onchange) = onchange.as_ref() {
+                    onchange.run(evt);
+                }
+            }
         }
-    });
-    let onchange = props.onchange.clone();
-    let onupdate = props.onupdate.clone();
-    let on_change = Callback::from(move |evt: Event| {
-        if let Some(onupdate) = onupdate.as_ref() {
-            let input: HtmlTextAreaElement = evt.target_unchecked_into();
-            let value = input.value();
-            let value = if disable_trim {
-                value
-            } else {
-                value.trim().to_string()
-            };
-            onupdate.emit(value.into());
-        }
-        if let Some(onchange) = onchange.as_ref() {
-            onchange.emit(evt);
-        }
-    });
-    let onfocus = props.onfocus.clone();
-    let on_focus = Callback::from(move |_| {
+    };
+    let on_focus = move |_| {
         if let Some(onfocus) = onfocus.as_ref() {
-            onfocus.emit(());
+            onfocus.run(());
         }
-    });
-    let onblur = props.onblur.clone();
-    let on_blur = Callback::from(move |_| {
+    };
+    let on_blur = move |_| {
         if let Some(onblur) = onblur.as_ref() {
-            onblur.emit(());
+            onblur.run(());
         }
-    });
-    let onkeydown = props.onkeydown.clone();
-    let on_keydown = Callback::from(move |evt: KeyboardEvent| {
+    };
+    let on_keydown = move |evt: KeyboardEvent| {
         if let Some(onkeydown) = onkeydown.as_ref() {
-            onkeydown.emit(evt);
+            onkeydown.run(evt);
         }
-    });
-    let onkeyup = props.onkeyup.clone();
-    let onenter = props.onenter.clone();
-    let on_keyup = Callback::from(move |evt: KeyboardEvent| {
+    };
+    let on_keyup = move |evt: KeyboardEvent| {
         let key_code = evt.key_code();
         if let Some(onkeyup) = onkeyup.as_ref() {
-            onkeyup.emit(evt);
+            onkeyup.run(evt);
         }
         if 13 == key_code {
             if let Some(onenter) = onenter.as_ref() {
-                onenter.emit(());
+                onenter.run(());
             }
         }
-    });
-    html! {
+    };
+    view! {
         <textarea
-            value={props.value.clone()}
+            prop:value={move || value.read().to_string()}
             class="e-input"
-            rows={props.rows.to_string()}
-            tabindex={props.tabindex.map(|tabindex|tabindex.to_string())}
-            placeholder={props.placeholder.clone()}
-            style={props.style.clone()}
-            oninput={on_input}
-            onchange={on_change}
-            onfocus={on_focus}
-            onblur={on_blur}
-            onkeydown={on_keydown}
-            onkeyup={on_keyup}
+            prop:rows={rows}
+            tabindex={tabindex}
+            placeholder={placeholder}
+            style={style}
+            on:input={on_input}
+            on:change={on_change}
+            on:focus={on_focus}
+            on:blur={on_blur}
+            on:keydown={on_keydown}
+            on:keyup={on_keyup}
         />
     }
-}
-
-#[derive(Clone, PartialEq, Properties)]
-pub struct BindingProps {
-    pub value: UseStateHandle<AttrValue>,
-    #[prop_or(4)]
-    pub rows: u32,
-    #[prop_or_default]
-    pub disable_trim: bool,
-    #[prop_or_default]
-    pub tabindex: Option<i32>,
-    #[prop_or_default]
-    pub placeholder: Option<AttrValue>,
-    #[prop_or_default]
-    pub style: Option<AttrValue>,
-    #[prop_or_default]
-    pub oninput: Option<Callback<InputEvent>>,
-    #[prop_or_default]
-    pub onchange: Option<Callback<Event>>,
-    #[prop_or_default]
-    pub onupdate: Option<Callback<AttrValue>>,
-    #[prop_or_default]
-    pub onfocus: Option<Callback<()>>,
-    #[prop_or_default]
-    pub onblur: Option<Callback<()>>,
-    #[prop_or_default]
-    pub onkeydown: Option<Callback<KeyboardEvent>>,
-    #[prop_or_default]
-    pub onkeyup: Option<Callback<KeyboardEvent>>,
-    #[prop_or_default]
-    pub onenter: Option<Callback<()>>,
-}
-
-#[function_component]
-pub fn BindingTextarea(props: &BindingProps) -> Html {
-    let value_clone = props.value.clone();
-    let onupdate = props.onupdate.clone();
-    let on_update = Callback::from(move |value: AttrValue| {
-        value_clone.set(value.clone());
-        if let Some(onupdate) = onupdate.as_ref() {
-            onupdate.emit(value);
-        }
-    });
-    return html! {
-        <Textarea
-            value={props.value.deref().clone()}
-            rows={props.rows.clone()}
-            tabindex={props.tabindex.clone()}
-            placeholder={props.placeholder.clone()}
-            style={props.style.clone()}
-            oninput={props.oninput.clone()}
-            onchange={props.onchange.clone()}
-            onupdate={on_update}
-            onfocus={props.onfocus.clone()}
-            onblur={props.onblur.clone()}
-            onkeydown={props.onkeydown.clone()}
-            onkeyup={props.onkeyup.clone()}
-        />
-    };
 }

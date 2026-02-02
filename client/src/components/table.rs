@@ -1,29 +1,30 @@
 use super::ArcRenderer;
 use crate::ArcFn;
+use crate::Key;
+use crate::SharedString;
+use leptos::prelude::*;
 use std::fmt;
 use std::ops::Deref;
 use std::sync::Arc;
-use yew::prelude::*;
-use yew::virtual_dom::Key;
 
 pub trait RowRenderer<T> {
-    fn render(&self, data: &T, index: usize) -> Html;
+    fn render(&self, data: &T, index: usize) -> AnyView;
 }
 
 impl<T, F> RowRenderer<T> for F
 where
-    F: Fn(&T, usize) -> Html,
+    F: Fn(&T, usize) -> AnyView,
 {
-    fn render(&self, data: &T, index: usize) -> Html {
+    fn render(&self, data: &T, index: usize) -> AnyView {
         self(data, index)
     }
 }
 
 pub struct ArcRowRenderer<T> {
-    pub inner: Arc<dyn RowRenderer<T>>,
+    pub inner: Arc<dyn RowRenderer<T> + Send + Sync>,
 }
 
-impl<T, F: Fn(&T, usize) -> Html + 'static> From<F> for ArcRowRenderer<T> {
+impl<T, F: Fn(&T, usize) -> AnyView + Send + Sync + 'static> From<F> for ArcRowRenderer<T> {
     fn from(inner: F) -> Self {
         ArcRowRenderer {
             inner: Arc::new(inner),
@@ -60,55 +61,68 @@ impl<T> fmt::Debug for ArcRowRenderer<T> {
     }
 }
 
-#[derive(Clone, PartialEq, Properties)]
-pub struct Column<T: Clone + PartialEq> {
+#[derive(Clone)]
+pub struct Column<T: Clone> {
     pub key: Key,
     pub head: ArcRenderer<()>,
     pub row: ArcRowRenderer<T>,
-    pub head_style: Option<AttrValue>,
-    pub data_style: Option<ArcFn<usize, AttrValue>>,
+    pub head_style: Option<SharedString>,
+    pub data_style: Option<ArcFn<usize, SharedString>>,
 }
 
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props<T: Clone + PartialEq> {
-    pub list: Vec<(Key, T)>,
-    pub columns: Vec<Column<T>>,
-    #[prop_or_default]
-    pub style: Option<AttrValue>,
-}
-
-#[function_component]
-pub fn Table<T: Clone + PartialEq>(props: &Props<T>) -> Html {
-    html! {
-        <table class="e-table" style={props.style.clone()}>
+#[component]
+pub fn Table<T>(
+    #[prop(into)] list: Signal<Vec<(Key, T)>>,
+    #[prop(into)] columns: Signal<Vec<Column<T>>>,
+    #[prop(into, optional)] style: SharedString,
+) -> impl IntoView
+where
+    T: Clone + Send + Sync + 'static,
+{
+    view! {
+        <table class="e-table" style={style}>
             <thead>
                 <tr>
-                    {
-                        for props.columns.iter().map(|column| {
-                            html! {
-                                <th key={column.key.clone()} class="e-table-hcell" style={column.head_style.clone()}>{column.head.render(&())}</th>
+                    <For
+                        each={
+                            let columns = columns.clone();
+                            move || { columns.get() }
+                        }
+                        key=|column| { column.key.clone() }
+                        children=move |column| {
+                            view! {
+                                <th class="e-table-hcell" style={column.head_style.clone()}>{column.head.render(&())}</th>
                             }
-                        })
-                    }
+                        }
+                    />
                 </tr>
             </thead>
             <tbody>
-                {
-                    for props.list.iter().enumerate().map(|(index, (key, row))| {
-                        html!{
-                            <tr key={key.clone()} class="e-table-row">
-                                {
-                                    for props.columns.iter().map(|column| {
-                                        let style = column.data_style.as_ref().map(|data_style| data_style(index));
-                                        html!{
-                                            <td key={column.key.clone()} class="e-table-cell" style={style}>{column.row.render(row, index)}</td>
+                <tr>
+                    <For
+                        each=move || { list.get().into_iter().enumerate() }
+                        key=|(_index, (key, _row))| { key.clone() }
+                        children=move |(index, (_key, row))| {
+                            view! {
+                                <tr class="e-table-row">
+                                    <For
+                                        each={
+                                            let columns = columns.clone();
+                                            move || { columns.get() }
                                         }
-                                    })
-                                }
-                            </tr>
+                                        key=|column| { column.key.clone() }
+                                        children=move |column| {
+                                            let style = column.data_style.as_ref().map(|data_style| data_style(index));
+                                            view! {
+                                                <td class="e-table-cell" style={style}>{column.row.render(&row, index)}</td>
+                                            }
+                                        }
+                                    />
+                                </tr>
+                            }
                         }
-                    })
-                }
+                    />
+                </tr>
             </tbody>
         </table>
     }

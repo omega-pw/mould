@@ -1,46 +1,32 @@
+use crate::SharedString;
 use gloo::timers::callback::Timeout;
 use js_sys::Function;
 use js_sys::Promise;
-use std::ops::Deref;
+use leptos::prelude::*;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use wasm_bindgen_futures::JsFuture;
-use yew::prelude::*;
 
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props {
-    #[prop_or(AttrValue::from("..."))]
-    pub text: AttrValue,
-    #[prop_or(500)]
-    pub step: u32,
-}
-
-#[function_component]
-pub fn Running(props: &Props) -> Html {
-    let curr_text: UseStateHandle<String> = use_state(|| String::from(""));
+#[component]
+pub fn Running(
+    #[prop(into, default = SharedString::from("..."))] text: SharedString,
+    #[prop(default = 500)] step: u32,
+) -> impl IntoView {
+    let curr_text: RwSignal<String> = RwSignal::new(String::from(""));
     let curr_text_clone = curr_text.clone();
-    let text = props.text.clone();
-    let step = props.step;
-    use_effect_with((text.clone(), step), move |_| {
-        let destroyed = Arc::new(AtomicBool::new(false));
-        let destroyed_clone = destroyed.clone();
-        wasm_bindgen_futures::spawn_local(async move {
-            start_loop(&curr_text_clone, &text, step, &destroyed_clone).await;
-        });
-        move || {
-            destroyed.store(true, Ordering::Relaxed);
-        }
+    let destroyed = Arc::new(AtomicBool::new(false));
+    let destroyed_clone = destroyed.clone();
+    wasm_bindgen_futures::spawn_local(async move {
+        start_loop(&curr_text_clone, &text, step, &destroyed_clone).await;
     });
-    html! { curr_text.deref().clone() }
+    on_cleanup(move || {
+        destroyed.store(true, Ordering::Relaxed);
+    });
+    curr_text.into_any()
 }
 
-async fn start_loop(
-    curr_text: &UseStateHandle<String>,
-    text: &str,
-    step: u32,
-    destroyed: &AtomicBool,
-) {
+async fn start_loop(curr_text: &RwSignal<String>, text: &str, step: u32, destroyed: &AtomicBool) {
     let mut max_char_count: usize = 0;
     let char_count = text.chars().count();
     loop {

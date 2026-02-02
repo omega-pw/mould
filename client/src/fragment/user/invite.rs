@@ -1,33 +1,28 @@
 use crate::components::button::Button;
-use crate::components::input::BindingInput;
+use crate::components::input::Input;
 use crate::components::validate_wrapper::ValidateData;
+use crate::components::validate_wrapper::ValidateWrapper;
 use crate::sdk;
 use crate::utils;
 use crate::utils::request::ApiExt;
 use crate::utils::validator::RequiredValidator;
 use crate::utils::validator::Validators;
 use crate::SharedString;
+use leptos::prelude::*;
 use sdk::user::invite_user::InviteUserApi;
 use sdk::user::invite_user::InviteUserReq;
 use tihu::PrimaryKey;
 use uuid::Uuid;
-use yew::prelude::*;
 
 #[derive(Clone)]
 struct InviteForm {
     user_id: ValidateData<SharedString>,
 }
 
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props {
-    #[prop_or_default]
-    pub onsave: Option<Callback<PrimaryKey>>,
-}
-
-#[function_component]
-pub fn InviteEdit(props: &Props) -> Html {
-    let is_saving: UseStateHandle<bool> = use_state(|| false);
-    let err_msg: UseStateHandle<Option<SharedString>> = use_state(|| None);
+#[component]
+pub fn InviteEdit(#[prop(optional)] onsave: Option<UnsyncCallback<PrimaryKey>>) -> impl IntoView {
+    let is_saving: RwSignal<bool> = RwSignal::new(false);
+    let err_msg: RwSignal<Option<SharedString>> = RwSignal::new(None);
     let invite_form = InviteForm {
         user_id: ValidateData::new(
             Default::default(),
@@ -37,47 +32,37 @@ pub fn InviteEdit(props: &Props) -> Html {
     let invite_form_clone = invite_form.clone();
     let is_saving_clone = is_saving.clone();
     let err_msg_clone = err_msg.clone();
-    let onsave_clone = props.onsave.clone();
-    let on_save = Callback::from(move |_| {
+    let on_save = UnsyncCallback::new(move |_| {
         let invite_form: InviteForm = invite_form_clone.clone();
         let is_saving = is_saving_clone.clone();
         let err_msg = err_msg_clone.clone();
-        let onsave = onsave_clone.clone();
+        let onsave = onsave.clone();
         wasm_bindgen_futures::spawn_local(async move {
             save_user(&invite_form, is_saving, &err_msg, &onsave)
                 .await
                 .ok();
         });
     });
-    html! {
+    view! {
         <div class="width-fill height-fill border-box" style="padding:0.25em;">
             <table class="width-fill" style="border-collapse:collapse;table-layout: fixed;">
                 <tr>
                     <td class="align-right" style="width:8em;vertical-align: top;"><span style="color:red;margin-right: 0.25em;">{"*"}</span>{"用户id："}</td>
                     <td>
-                        {
-                            invite_form.user_id.view(move |user_id: UseStateHandle<SharedString>, validator| {
-                                html! {
-                                    <BindingInput value={user_id} onupdate={validator}/>
-                                }
-                            })
-                        }
+                        <ValidateWrapper error={invite_form.user_id.error()}>
+                            <Input value={invite_form.user_id.data()} onupdate={invite_form.user_id.listener()}/>
+                        </ValidateWrapper>
                     </td>
                 </tr>
                 <tr>
                     <td></td>
                     <td>
-                        <Button disabled={*is_saving} onclick={on_save}>{"保存"}</Button>
-                        {
-                            match err_msg.as_ref() {
-                                Some(err_msg) => {
-                                    html!{
-                                        <span class="middle" style="color:red;margin-left: 0.5em;">{err_msg}</span>
-                                    }
-                                },
-                                None => html!{}
-                            }
-                        }
+                        <Button disabled={is_saving} onclick={on_save}>{"保存"}</Button>
+                        <Show
+                            when={ let err_msg = err_msg.clone(); move || { err_msg.read().is_some() } }
+                        >
+                            <span class="middle" style="color:red;margin-left: 0.5em;">{err_msg}</span>
+                        </Show>
                     </td>
                 </tr>
             </table>
@@ -98,9 +83,9 @@ fn chk_form_err(invite_form: &InviteForm) -> Vec<SharedString> {
 
 async fn save_user(
     invite_form: &InviteForm,
-    is_saving: UseStateHandle<bool>,
-    err_msg: &UseStateHandle<Option<SharedString>>,
-    onsave: &Option<Callback<PrimaryKey>>,
+    is_saving: RwSignal<bool>,
+    err_msg: &RwSignal<Option<SharedString>>,
+    onsave: &Option<UnsyncCallback<PrimaryKey>>,
 ) -> Result<(), SharedString> {
     let err_msgs = chk_form_err(invite_form);
     if let Some(first) = err_msgs.first() {
@@ -117,7 +102,7 @@ async fn save_user(
         }
         Ok(_) => {
             if let Some(onsave) = onsave {
-                onsave.emit(PrimaryKey { id: user_id });
+                onsave.run(PrimaryKey { id: user_id });
             }
             utils::success(SharedString::from("保存成功"));
         }

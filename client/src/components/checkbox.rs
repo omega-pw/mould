@@ -1,65 +1,44 @@
-use std::ops::Deref;
-use web_sys::HtmlInputElement;
-use yew::prelude::*;
+use crate::SharedString;
+use leptos::prelude::*;
+use wasm_bindgen::JsCast;
+use web_sys::{Event, HtmlInputElement};
 
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props {
-    pub value: bool,
-    #[prop_or_default]
-    pub label: Option<AttrValue>,
-    #[prop_or_default]
-    pub onchange: Option<Callback<bool>>,
-}
-
-#[function_component]
-pub fn Checkbox(props: &Props) -> Html {
-    let value = props.value;
-    let onchange = props.onchange.clone();
-    let on_change = Callback::from(move |evt: Event| {
-        let input: HtmlInputElement = evt.target_unchecked_into();
-        input.set_checked(value);
-        if let Some(onchange) = onchange.as_ref() {
-            onchange.emit(!value);
+#[component]
+pub fn Checkbox(
+    value: RwSignal<bool>,
+    #[prop(optional)] readonly: bool,
+    #[prop(into, optional)] label: SharedString,
+    #[prop(into, default = None)] onchange: Option<UnsyncCallback<bool>>,
+) -> impl IntoView {
+    let on_change = {
+        let value = value.clone();
+        move |evt: Event| {
+            if let Some(target) = evt.target() {
+                let input: HtmlInputElement = target.unchecked_into();
+                let old_value = value.get();
+                let new_value = !old_value;
+                if !readonly {
+                    value.set(new_value.clone());
+                    input.set_checked(old_value);
+                }
+                if let Some(onchange) = onchange.as_ref() {
+                    onchange.run(new_value);
+                }
+            }
         }
-    });
-    if let Some(label) = props.label.as_ref() {
-        html! {
+    };
+    if !label.is_empty() {
+        view! {
             <label>
-                <input type="checkbox" checked={value} onchange={on_change} />
+                <input type="checkbox" checked={value} on:change={on_change} />
                 {label}
             </label>
         }
+        .into_any()
     } else {
-        html! {
-            <input type="checkbox" checked={value} onchange={on_change} />
+        view! {
+            <input type="checkbox" checked={value} on:change={on_change} />
         }
+        .into_any()
     }
-}
-
-#[derive(Clone, PartialEq, Properties)]
-pub struct BindingProps {
-    pub value: UseStateHandle<bool>,
-    #[prop_or_default]
-    pub label: Option<AttrValue>,
-    #[prop_or_default]
-    pub onchange: Option<Callback<bool>>,
-}
-
-#[function_component]
-pub fn BindingCheckbox(props: &BindingProps) -> Html {
-    let value_clone = props.value.clone();
-    let onchange = props.onchange.clone();
-    let on_change = Callback::from(move |new_value: bool| {
-        value_clone.set(new_value);
-        if let Some(onchange) = onchange.as_ref() {
-            onchange.emit(new_value);
-        }
-    });
-    return html! {
-        <Checkbox
-            value={props.value.deref().clone()}
-            label={props.label.clone()}
-            onchange={on_change}
-        />
-    };
 }

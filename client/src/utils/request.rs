@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
-use std::sync::{Arc, LazyLock};
+use std::sync::{Arc, LazyLock, RwLock};
 use tihu::Api;
 
 static SINGLE_CACHE_MAP: LazyLock<Mutex<HashMap<String, serde_json::Value>>> =
@@ -41,17 +41,18 @@ enum CacheMethod {
 }
 
 pub type HttpRequestor =
-    dyn Handler<(SharedString, SharedString), Result<SharedString, SharedString>>;
+    dyn Handler<(SharedString, SharedString), Result<SharedString, SharedString>> + Send + Sync;
 //请求校验器
 pub type RequestValidator<T> = dyn Fn(&T) -> Result<(), SharedString>;
 //loading展示器
-pub type LoadingHandler = dyn Handler<bool, ()>;
+pub type LoadingHandler = dyn Handler<bool, ()> + Send + Sync;
 //锁处理器，lock参数为true表示加锁，lock参数为false表示解锁，返回true表示执行成功，返回false表示执行失败
 pub type LockHandler = dyn Handler<bool, bool>;
 //数据解包器，输入请求器返回的结果，输出Result<成功结果，业务错误>
-pub type DataUnwrapper = dyn Handler<serde_json::Value, Result<serde_json::Value, SharedString>>;
+pub type DataUnwrapper =
+    dyn Handler<serde_json::Value, Result<serde_json::Value, SharedString>> + Send + Sync;
 //错误处理器
-pub type ErrorHandler = dyn Handler<SharedString, ()>;
+pub type ErrorHandler = dyn Handler<SharedString, ()> + Send + Sync;
 //加锁错误处理器
 pub type LockErrorHandler = dyn Handler<(), ()>;
 
@@ -99,14 +100,18 @@ where
     }
     pub fn http_requestor(
         &mut self,
-        http_requestor: impl Handler<(SharedString, SharedString), Result<SharedString, SharedString>>,
+        http_requestor: impl Handler<(SharedString, SharedString), Result<SharedString, SharedString>>
+            + Send
+            + Sync,
     ) -> &mut Self {
         self.http_requestor = Some(Arc::new(http_requestor));
         return self;
     }
     pub fn data_unwrapper(
         &mut self,
-        data_unwrapper: impl Handler<serde_json::Value, Result<serde_json::Value, SharedString>>,
+        data_unwrapper: impl Handler<serde_json::Value, Result<serde_json::Value, SharedString>>
+            + Send
+            + Sync,
     ) -> &mut Self {
         self.data_unwrapper = Some(Arc::new(data_unwrapper));
         return self;
@@ -122,7 +127,10 @@ where
         self.request_validator = Some(Arc::new(request_validator));
         return self;
     }
-    pub fn loading_handler(&mut self, loading_handler: impl Handler<bool, ()>) -> &mut Self {
+    pub fn loading_handler(
+        &mut self,
+        loading_handler: impl Handler<bool, ()> + Send + Sync,
+    ) -> &mut Self {
         self.loading_handler = Some(Arc::new(loading_handler));
         return self;
     }
@@ -136,14 +144,14 @@ where
     }
     pub fn req_error_handler(
         &mut self,
-        req_error_handler: impl Handler<SharedString, ()>,
+        req_error_handler: impl Handler<SharedString, ()> + Send + Sync,
     ) -> &mut Self {
         self.req_error_handler = Some(Arc::new(req_error_handler));
         return self;
     }
     pub fn unwrap_error_handler(
         &mut self,
-        unwrap_error_handler: impl Handler<SharedString, ()>,
+        unwrap_error_handler: impl Handler<SharedString, ()> + Send + Sync,
     ) -> &mut Self {
         self.unwrap_error_handler = Some(Arc::new(unwrap_error_handler));
         return self;
@@ -159,10 +167,13 @@ where
     pub async fn call(&self, req: &Req) -> Result<Resp, SharedString> {
         if let Some(request_validator) = self.request_validator.as_ref() {
             if let Err(err_msg) = request_validator(req) {
-                if let Some(validate_error_handler) = self
-                    .validate_error_handler
-                    .as_ref()
-                    .or_else(|| unsafe { DEFAULT_VALIDATE_ERROR_HANDLER.as_ref() })
+                if let Some(validate_error_handler) =
+                    self.validate_error_handler.clone().or_else(|| {
+                        LazyLock::force(&DEFAULT_VALIDATE_ERROR_HANDLER)
+                            .read()
+                            .unwrap()
+                            .clone()
+                    })
                 {
                     validate_error_handler.handle(err_msg.clone()).await;
                 }
@@ -174,7 +185,8 @@ where
                 CacheMethod::Url => {
                     let single_cache_map = LazyLock::force(&SINGLE_CACHE_MAP);
                     let single_cache_map = single_cache_map.lock().await;
-                    single_cache_map.get(self.url.as_ref()).map(Clone::clone)
+                    let url: &str = self.url.as_ref();
+                    single_cache_map.get(url).map(Clone::clone)
                 }
                 CacheMethod::UrlAndKey(key) => {
                     let multi_cache_map = LazyLock::force(&MULTI_CACHE_MAP);
@@ -213,11 +225,12 @@ where
 
     async fn call_with_loading(&self, req: &Req) -> Result<Resp, SharedString> {
         if self.show_loading {
-            if let Some(loading_handler) = self
-                .loading_handler
-                .as_ref()
-                .or_else(|| unsafe { DEFAULT_LOADING_HANDLER.as_ref() })
-            {
+            if let Some(loading_handler) = self.loading_handler.clone().or_else(|| {
+                LazyLock::force(&DEFAULT_LOADING_HANDLER)
+                    .read()
+                    .unwrap()
+                    .clone()
+            }) {
                 loading_handler.handle(true).await;
                 let result = self.try_call(req).await;
                 loading_handler.handle(false).await;
@@ -235,11 +248,13 @@ where
             log::error!("Failed to serialize request: {}", err);
             SharedString::from("Failed to serialize request.")
         })?;
-        let http_requestor = if let Some(http_requestor) = self
-            .http_requestor
-            .as_ref()
-            .or_else(|| unsafe { DEFAULT_HTTP_REQUESTOR.as_ref() })
-        {
+        let http_requestor = if let Some(http_requestor) =
+            self.http_requestor.clone().or_else(|| {
+                LazyLock::force(&DEFAULT_HTTP_REQUESTOR)
+                    .read()
+                    .unwrap()
+                    .clone()
+            }) {
             http_requestor.clone()
         } else {
             return Err(SharedString::from("http requestor unimplemented"));
@@ -249,14 +264,15 @@ where
                 let full_resp = serde_json::from_str::<serde_json::Value>(&resp).map_err(
                     |err| -> SharedString {
                         log::error!("响应数据格式不正确：{}", err);
-                        return SharedString::Static("响应数据格式不正确");
+                        return SharedString::from("响应数据格式不正确");
                     },
                 )?;
-                if let Some(data_unwrapper) = self
-                    .data_unwrapper
-                    .as_ref()
-                    .or_else(|| unsafe { DEFAULT_DATA_UNWRAPPER.as_ref() })
-                {
+                if let Some(data_unwrapper) = self.data_unwrapper.clone().or_else(|| {
+                    LazyLock::force(&DEFAULT_DATA_UNWRAPPER)
+                        .read()
+                        .unwrap()
+                        .clone()
+                }) {
                     match data_unwrapper.handle(full_resp).await {
                         Ok(resp) => {
                             if let Some(use_cache) = self.use_cache.as_ref() {
@@ -284,8 +300,11 @@ where
                                     let err_msg =
                                         SharedString::from(format!("响应数据格式不正确：{}", err));
                                     if let Some(unwrap_error_handler) =
-                                        self.unwrap_error_handler.as_ref().or_else(|| unsafe {
-                                            DEFAULT_UNWRAP_ERROR_HANDLER.as_ref()
+                                        self.unwrap_error_handler.clone().or_else(|| {
+                                            LazyLock::force(&DEFAULT_UNWRAP_ERROR_HANDLER)
+                                                .read()
+                                                .unwrap()
+                                                .clone()
                                         })
                                     {
                                         unwrap_error_handler.handle(err_msg.clone()).await;
@@ -295,10 +314,13 @@ where
                             }
                         }
                         Err(err) => {
-                            if let Some(unwrap_error_handler) = self
-                                .unwrap_error_handler
-                                .as_ref()
-                                .or_else(|| unsafe { DEFAULT_UNWRAP_ERROR_HANDLER.as_ref() })
+                            if let Some(unwrap_error_handler) =
+                                self.unwrap_error_handler.clone().or_else(|| {
+                                    LazyLock::force(&DEFAULT_UNWRAP_ERROR_HANDLER)
+                                        .read()
+                                        .unwrap()
+                                        .clone()
+                                })
                             {
                                 unwrap_error_handler.handle(err.clone()).await;
                             }
@@ -326,17 +348,18 @@ where
                     return serde_json::from_value::<Resp>(full_resp).map_err(
                         |err| -> SharedString {
                             log::error!("响应数据格式不正确：{}", err);
-                            return SharedString::Static("响应数据格式不正确");
+                            return SharedString::from("响应数据格式不正确");
                         },
                     );
                 }
             }
             Err(err) => {
-                if let Some(req_error_handler) = self
-                    .req_error_handler
-                    .as_ref()
-                    .or_else(|| unsafe { DEFAULT_REQ_ERROR_HANDLER.as_ref() })
-                {
+                if let Some(req_error_handler) = self.req_error_handler.clone().or_else(|| {
+                    LazyLock::force(&DEFAULT_REQ_ERROR_HANDLER)
+                        .read()
+                        .unwrap()
+                        .clone()
+                }) {
                     req_error_handler.handle(err.clone()).await;
                 }
                 return Err(err);
@@ -350,11 +373,15 @@ pub trait ApiExt {
     type Output;
     fn http_requestor(
         &self,
-        http_requestor: impl Handler<(SharedString, SharedString), Result<SharedString, SharedString>>,
+        http_requestor: impl Handler<(SharedString, SharedString), Result<SharedString, SharedString>>
+            + Send
+            + Sync,
     ) -> Request<Self::Input, Self::Output>;
     fn data_unwrapper(
         &self,
-        data_unwrapper: impl Handler<serde_json::Value, Result<serde_json::Value, SharedString>>,
+        data_unwrapper: impl Handler<serde_json::Value, Result<serde_json::Value, SharedString>>
+            + Send
+            + Sync,
     ) -> Request<Self::Input, Self::Output>;
     fn lock_handler(
         &self,
@@ -362,12 +389,12 @@ pub trait ApiExt {
     ) -> Request<Self::Input, Self::Output>;
     fn loading_handler(
         &self,
-        loading_handler: impl Handler<bool, ()>,
+        loading_handler: impl Handler<bool, ()> + Send + Sync,
     ) -> Request<Self::Input, Self::Output>;
     fn disable_loading(&self) -> Request<Self::Input, Self::Output>;
     fn validate_error_handler(
         &self,
-        validate_error_handler: impl Handler<SharedString, ()>,
+        validate_error_handler: impl Handler<SharedString, ()> + Send + Sync,
     ) -> Request<Self::Input, Self::Output>;
     fn lock_error_handler(
         &self,
@@ -375,11 +402,11 @@ pub trait ApiExt {
     ) -> Request<Self::Input, Self::Output>;
     fn req_error_handler(
         &self,
-        req_error_handler: impl Handler<SharedString, ()>,
+        req_error_handler: impl Handler<SharedString, ()> + Send + Sync,
     ) -> Request<Self::Input, Self::Output>;
     fn unwrap_error_handler(
         &self,
-        unwrap_error_handler: impl Handler<SharedString, ()>,
+        unwrap_error_handler: impl Handler<SharedString, ()> + Send + Sync,
     ) -> Request<Self::Input, Self::Output>;
     fn cache_by_url(&self) -> Request<Self::Input, Self::Output>;
     fn cache_by_url_and_key(&self, key: SharedString) -> Request<Self::Input, Self::Output>;
@@ -397,7 +424,9 @@ where
 
     fn http_requestor(
         &self,
-        http_requestor: impl Handler<(SharedString, SharedString), Result<SharedString, SharedString>>,
+        http_requestor: impl Handler<(SharedString, SharedString), Result<SharedString, SharedString>>
+            + Send
+            + Sync,
     ) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.http_requestor = Some(Arc::new(http_requestor));
@@ -408,7 +437,9 @@ where
     }
     fn data_unwrapper(
         &self,
-        data_unwrapper: impl Handler<serde_json::Value, Result<serde_json::Value, SharedString>>,
+        data_unwrapper: impl Handler<serde_json::Value, Result<serde_json::Value, SharedString>>
+            + Send
+            + Sync,
     ) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.data_unwrapper = Some(Arc::new(data_unwrapper));
@@ -427,7 +458,7 @@ where
     }
     fn loading_handler(
         &self,
-        loading_handler: impl Handler<bool, ()>,
+        loading_handler: impl Handler<bool, ()> + Send + Sync,
     ) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.loading_handler = Some(Arc::new(loading_handler));
@@ -446,7 +477,7 @@ where
     }
     fn validate_error_handler(
         &self,
-        validate_error_handler: impl Handler<SharedString, ()>,
+        validate_error_handler: impl Handler<SharedString, ()> + Send + Sync,
     ) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.validate_error_handler = Some(Arc::new(validate_error_handler));
@@ -468,7 +499,7 @@ where
     }
     fn req_error_handler(
         &self,
-        req_error_handler: impl Handler<SharedString, ()>,
+        req_error_handler: impl Handler<SharedString, ()> + Send + Sync,
     ) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.req_error_handler = Some(Arc::new(req_error_handler));
@@ -479,7 +510,7 @@ where
     }
     fn unwrap_error_handler(
         &self,
-        unwrap_error_handler: impl Handler<SharedString, ()>,
+        unwrap_error_handler: impl Handler<SharedString, ()> + Send + Sync,
     ) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
         request.unwrap_error_handler = Some(Arc::new(unwrap_error_handler));
@@ -516,9 +547,15 @@ where
     }
 }
 
-pub static mut DEFAULT_HTTP_REQUESTOR: Option<Arc<HttpRequestor>> = None;
-pub static mut DEFAULT_LOADING_HANDLER: Option<Arc<LoadingHandler>> = None;
-pub static mut DEFAULT_DATA_UNWRAPPER: Option<Arc<DataUnwrapper>> = None;
-pub static mut DEFAULT_VALIDATE_ERROR_HANDLER: Option<Arc<ErrorHandler>> = None;
-pub static mut DEFAULT_REQ_ERROR_HANDLER: Option<Arc<ErrorHandler>> = None;
-pub static mut DEFAULT_UNWRAP_ERROR_HANDLER: Option<Arc<ErrorHandler>> = None;
+pub static DEFAULT_HTTP_REQUESTOR: LazyLock<RwLock<Option<Arc<HttpRequestor>>>> =
+    LazyLock::new(|| RwLock::new(None));
+pub static DEFAULT_LOADING_HANDLER: LazyLock<RwLock<Option<Arc<LoadingHandler>>>> =
+    LazyLock::new(|| RwLock::new(None));
+pub static DEFAULT_DATA_UNWRAPPER: LazyLock<RwLock<Option<Arc<DataUnwrapper>>>> =
+    LazyLock::new(|| RwLock::new(None));
+pub static DEFAULT_VALIDATE_ERROR_HANDLER: LazyLock<RwLock<Option<Arc<ErrorHandler>>>> =
+    LazyLock::new(|| RwLock::new(None));
+pub static DEFAULT_REQ_ERROR_HANDLER: LazyLock<RwLock<Option<Arc<ErrorHandler>>>> =
+    LazyLock::new(|| RwLock::new(None));
+pub static DEFAULT_UNWRAP_ERROR_HANDLER: LazyLock<RwLock<Option<Arc<ErrorHandler>>>> =
+    LazyLock::new(|| RwLock::new(None));

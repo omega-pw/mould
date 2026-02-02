@@ -1,154 +1,86 @@
 use super::SelectOption;
-use std::ops::Deref;
-use web_sys::HtmlSelectElement;
-use yew::prelude::*;
-use yew::{html, Component, Context, Html};
+use crate::SharedString;
+use leptos::prelude::*;
+use wasm_bindgen::JsCast;
+use web_sys::{Event, HtmlSelectElement};
 
-struct State<O: SelectOption> {
-    value: Option<O::Value>,
-    options: Vec<O>,
-}
-
-pub enum Msg {
-    ChangeValue(Event),
-}
-
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props<O: SelectOption>
+#[component]
+pub fn Selection<O: SelectOption>(
+    value: RwSignal<Option<O::Value>>,
+    #[prop(into)] options: Signal<Vec<O>>,
+    #[prop(optional)] readonly: bool,
+    #[prop(optional)] clearable: bool,
+    #[prop(into, default = None)] placeholder: Option<SharedString>,
+    #[prop(into, default = None)] onchange: Option<UnsyncCallback<Option<O>>>,
+) -> impl IntoView
 where
-    O: Clone + PartialEq,
-    O::Value: Clone + PartialEq,
+    O: Clone + PartialEq + Send + Sync + 'static,
+    O::Value: Clone + PartialEq + Send + Sync + 'static,
 {
-    pub value: Option<O::Value>,
-    pub options: Vec<O>,
-    #[prop_or_default]
-    pub clearable: bool,
-    #[prop_or_default]
-    pub placeholder: Option<AttrValue>,
-    pub onchange: Callback<Option<O>>,
-}
-
-pub struct Selection<O: SelectOption>
-where
-    O: Clone + PartialEq + 'static,
-    O::Value: Clone + PartialEq + 'static,
-{
-    state: State<O>,
-}
-
-impl<O> Component for Selection<O>
-where
-    O: Clone + PartialEq + SelectOption + 'static,
-    O::Value: Clone + PartialEq + 'static,
-{
-    type Message = Msg;
-    type Properties = Props<O>;
-
-    fn create(ctx: &Context<Self>) -> Self {
-        let props = ctx.props();
-        let state = State {
-            value: props.value.clone(),
-            options: props.options.clone(),
-        };
-        Selection { state }
-    }
-
-    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
-        match msg {
-            Msg::ChangeValue(evt) => {
-                let select: HtmlSelectElement = evt.target_unchecked_into();
-                for (index, item) in self.state.options.iter().enumerate() {
+    let on_change = {
+        let value = value.clone();
+        let options = options.clone();
+        move |evt: Event| {
+            if let Some(target) = evt.target() {
+                let select: HtmlSelectElement = target.unchecked_into();
+                let mut new_value = None;
+                for (index, item) in options.read().iter().enumerate() {
                     if select.value() == index.to_string() {
-                        ctx.props().onchange.emit(Some(item.clone()));
-                        return true;
+                        new_value.replace(item.clone());
+                        break;
                     }
                 }
-                ctx.props().onchange.emit(None);
+                if !readonly {
+                    value.set(new_value.as_ref().map(|new_value| new_value.value()));
+                }
+                if let Some(onchange) = onchange.as_ref() {
+                    onchange.run(new_value);
+                }
             }
         }
-        return true;
-    }
-
-    fn changed(&mut self, ctx: &Context<Self>, _old_props: &Self::Properties) -> bool {
-        let props = ctx.props();
-        self.state.value = props.value.clone();
-        self.state.options = props.options.clone();
-        return true;
-    }
-
-    fn view(&self, ctx: &Context<Self>) -> Html {
-        let on_change = ctx.link().callback(|evt: Event| Msg::ChangeValue(evt));
-        let clearable = ctx.props().clearable;
-        let not_match = !self.state.options.is_empty()
-            && self
-                .state
-                .options
-                .iter()
-                .all(|option| Some(option.value()) != self.state.value);
-        html! {
-            <select class="e-select" onchange={on_change}>
+    };
+    let not_match = {
+        let value = value.clone();
+        let options = options.clone();
+        move || {
+            let value = value.read();
+            let options = options.read();
+            !options.is_empty() && options.iter().all(|option| value != Some(option.value()))
+        }
+    };
+    view! {
+        <select class="e-select" on:change={on_change}>
+            <Show
+                when={
+                    let not_match = not_match.clone();
+                    move || { clearable || not_match() }
+                }
+            >
                 {
-                    if clearable || not_match {
-                        let placeholder = ctx.props().placeholder.clone().unwrap_or_else(|| {
-                            AttrValue::from("--请选择--")
-                        });
-                        html! {
-                            <option value="" selected={not_match}>{placeholder}</option>
-                        }
-                    } else {
-                        html! {}
+                    let placeholder = placeholder.clone().unwrap_or_else(|| {
+                        SharedString::from("--请选择--")
+                    });
+                    view! {
+                        <option value="" selected={not_match.clone()}>{placeholder}</option>
                     }
                 }
-                {
-                    for self.state.options.iter().enumerate().map(|(index, item)| {
-                        let selected = Some(item.value()) == self.state.value;
-                        html! {
-                            <option value={index.to_string()} selected={selected}>{item.label()}</option>
+            </Show>
+            <For
+                each=move || { options.get().into_iter().enumerate() }
+                key=|(index, _option)| { *index }
+                children=move |(index, option)| {
+                    let selected = {
+                        let value = value.clone();
+                        let curr_value = option.value();
+                        move || {
+                            value.read().as_ref() == Some(&curr_value)
                         }
-                    })
+                    };
+                    view! {
+                        <option value={index.to_string()} selected={selected}>{option.label()}</option>
+                    }
                 }
-            </select>
-        }
+            />
+        </select>
     }
-}
-
-#[derive(Clone, PartialEq, Properties)]
-pub struct BindingProps<O>
-where
-    O: Clone + PartialEq + SelectOption,
-    O::Value: PartialEq,
-{
-    pub value: UseStateHandle<Option<O::Value>>,
-    pub options: Vec<O>,
-    #[prop_or_default]
-    pub clearable: bool,
-    #[prop_or_default]
-    pub placeholder: Option<AttrValue>,
-    #[prop_or_default]
-    pub onchange: Option<Callback<Option<O>>>,
-}
-
-#[function_component]
-pub fn BindingSelection<O: SelectOption>(props: &BindingProps<O>) -> Html
-where
-    O: Clone + PartialEq + SelectOption + 'static,
-    O::Value: Clone + PartialEq + 'static,
-{
-    let value_clone = props.value.clone();
-    let onchange = props.onchange.clone();
-    let on_change = Callback::from(move |option: Option<O>| {
-        value_clone.set(option.as_ref().map(|option| option.value()));
-        if let Some(onchange) = onchange.as_ref() {
-            onchange.emit(option);
-        }
-    });
-    return html! {
-        <Selection<O>
-            value={props.value.deref().clone()}
-            options={props.options.clone()}
-            clearable={props.clearable}
-            placeholder={props.placeholder.clone()}
-            onchange={on_change}
-        />
-    };
 }

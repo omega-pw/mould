@@ -1,90 +1,97 @@
-use super::r#if::If;
-use yew::prelude::*;
-use yew::virtual_dom::Key;
+use crate::Key;
+use crate::SharedString;
+use leptos::prelude::*;
+use std::sync::Arc;
 
 pub trait Node {
     fn key(&self) -> Key;
-    fn render(&self) -> Html;
-    fn children(&self) -> Option<&[Self]>
+    fn render(&self) -> AnyView;
+    fn children(&self) -> Option<Arc<Vec<Self>>>
     where
         Self: Sized;
     fn active(&self) -> bool {
         true
     }
-    fn children_style(&self) -> Option<AttrValue> {
+    fn children_style(&self) -> Option<SharedString> {
         None
     }
-    fn children_class(&self) -> Option<AttrValue> {
+    fn children_class(&self) -> Option<SharedString> {
         None
     }
-    fn style(&self) -> Option<AttrValue> {
+    fn style(&self) -> Option<SharedString> {
         None
     }
-    fn class(&self) -> Option<AttrValue> {
+    fn class(&self) -> Option<SharedString> {
         None
     }
 }
 
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props<T: Node + Clone + PartialEq> {
-    pub data: T,
-    #[prop_or_default]
-    pub onclick: Option<Callback<T>>,
-}
-
-#[function_component]
-pub fn TreeNode<T: Node + Clone + PartialEq + 'static>(props: &Props<T>) -> Html {
-    html! {
-        <If condition={props.data.active()}>
+#[component]
+pub fn TreeNode<T>(data: T, #[prop(default = None)] onclick: Option<UnsyncCallback<T>>) -> AnyView
+where
+    T: Node + Clone + Send + Sync + 'static,
+{
+    view! {
+        <Show
+            when= {
+                let data = data.clone();
+                move || { data.active() }
+            }
+        >
             {
-                if let Some(children) = props.data.children() {
+                if let Some(children) = data.children() {
                     //有子节点
                     let has_active_children = children.iter().any(|child| child.active());
                     if has_active_children {
-                        let onclick = props.onclick.clone();
-                        let data = props.data.clone();
-                        let on_click = Callback::from(move |_| {
-                            if let Some(onclick) = onclick.as_ref() {
-                                onclick.emit(data.clone());
+                        let on_click = {
+                            let onclick = onclick.clone();
+                            let data = data.clone();
+                            move |_| {
+                                if let Some(onclick) = onclick.as_ref() {
+                                    onclick.run(data.clone());
+                                }
                             }
-                        });
-                        html! {
-                            <li key={props.data.key()} style={props.data.style()} class={props.data.class()}>
-                                <div onclick={on_click}>{ props.data.render() }</div>
-                                <ul style={props.data.children_style()} class={props.data.children_class()}>
-                                    {
-                                        for children.iter().map(|data| {
-                                            html! {
+                        };
+                        view! {
+                            <li style={data.style()} class={data.class()}>
+                                <div on:click={on_click}>{ data.render() }</div>
+                                <ul style={data.children_style()} class={data.children_class()}>
+                                    <For
+                                        each=move || { children.as_ref().clone().into_iter() }
+                                        key=|child| { child.key() }
+                                        children=move |child| {
+                                            view! {
                                                 <TreeNode<T>
-                                                    key={data.key()}
-                                                    data={data.clone()}
-                                                    onclick={props.onclick.clone()}
+                                                    data={child}
+                                                    onclick={onclick.clone()}
                                                 />
                                             }
-                                        })
-                                    }
+                                        }
+                                    />
                                 </ul>
                             </li>
-                        }
+                        }.into_any()
                     } else {
-                        html! {}
+                        view! {}.into_any()
                     }
                 } else {
                     //叶子结点
-                    let onclick = props.onclick.clone();
-                    let data = props.data.clone();
-                    let on_click = Callback::from(move |_| {
-                        if let Some(onclick) = onclick.as_ref() {
-                            onclick.emit(data.clone());
+                    let on_click = {
+                        let data = data.clone();
+                        move |_| {
+                            if let Some(onclick) = onclick.as_ref() {
+                                onclick.run(data.clone());
+                            }
                         }
-                    });
-                    html! {
-                        <li key={props.data.key()} style={props.data.style()} class={props.data.class()}>
-                            <div onclick={on_click}>{ props.data.render() }</div>
+                    };
+                    view! {
+                        <li style={data.style()} class={data.class()}>
+                            <div on:click={on_click}>{ data.render() }</div>
                         </li>
-                    }
+                    }.into_any()
                 }
             }
-        </If>
+        </Show>
     }
+    .into_any()
 }

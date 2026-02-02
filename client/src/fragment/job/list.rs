@@ -6,82 +6,74 @@ use crate::components::button::Button;
 use crate::components::button_group::ButtonGroup;
 use crate::components::drawer::Drawer;
 use crate::components::pagination::Pagination as PaginationComp;
-use crate::components::r#if::If;
 use crate::sdk;
 use crate::utils;
+use crate::utils::fix_page_no;
+use crate::utils::list_exception_view;
 use crate::utils::request::ApiExt;
 use crate::utils::LoadStatus;
 use crate::SharedString;
+use leptos::prelude::*;
 use sdk::job::delete_job::DeleteJobApi;
 use sdk::job::delete_job::DeleteJobReq;
 use sdk::job::query_job::Job;
 use sdk::job::query_job::QueryJobApi;
 use sdk::job::query_job::QueryJobReq;
-use std::ops::Deref;
 use tihu::Id;
 use tihu::Pagination;
 use tihu::PrimaryKey;
-use yew::prelude::*;
 
-#[function_component]
-pub fn JobList() -> Html {
-    let pagination: UseStateHandle<Pagination> = use_state(|| Pagination::new(0, 1, None, None));
-    let list: UseStateHandle<Vec<Job>> = use_state(|| Vec::new());
-    let list_load_status: UseStateHandle<LoadStatus> = use_state(|| LoadStatus::NotStarted);
-    let active_job_id: UseStateHandle<Option<Id>> = use_state(|| None);
-    let detail_active: UseStateHandle<bool> = use_state(|| false);
-    let active_detail_id: UseStateHandle<Option<Id>> = use_state(|| None);
-    let edit_active: UseStateHandle<bool> = use_state(|| false);
-    let start_active: UseStateHandle<bool> = use_state(|| false);
-    let record_list_active: UseStateHandle<bool> = use_state(|| false);
-    let active_start_id: UseStateHandle<Option<Id>> = use_state(|| None);
-    let active_edit_id: UseStateHandle<Option<Id>> = use_state(|| None);
+#[component]
+pub fn JobList() -> impl IntoView {
+    let pagination: RwSignal<Pagination> = RwSignal::new(Pagination::new(0, 1, None, None));
+    let list: RwSignal<Vec<Job>> = RwSignal::new(Vec::new());
+    let list_load_status: RwSignal<LoadStatus> = RwSignal::new(LoadStatus::NotStarted);
+    let active_job_id: RwSignal<Option<Id>> = RwSignal::new(None);
+    let detail_active: RwSignal<bool> = RwSignal::new(false);
+    let active_detail_id: RwSignal<Option<Id>> = RwSignal::new(None);
+    let edit_active: RwSignal<bool> = RwSignal::new(false);
+    let start_active: RwSignal<bool> = RwSignal::new(false);
+    let record_list_active: RwSignal<bool> = RwSignal::new(false);
+    let active_start_id: RwSignal<Option<Id>> = RwSignal::new(None);
+    let active_edit_id: RwSignal<Option<Id>> = RwSignal::new(None);
     let active_edit_id_clone = active_edit_id.clone();
     let edit_active_clone = edit_active.clone();
-    let on_open_insert = Callback::from(move |_: ()| {
+    let on_open_insert = UnsyncCallback::new(move |_: ()| {
         active_edit_id_clone.set(None);
         edit_active_clone.set(true);
     });
     let list_clone = list.clone();
     let list_load_status_clone = list_load_status.clone();
     let pagination_clone = pagination.clone();
-    let on_query = Callback::from(move |_| {
-        let list = list_clone.clone();
-        let list_load_status = list_load_status_clone.clone();
-        let pagination = pagination_clone.clone();
-        wasm_bindgen_futures::spawn_local(async move {
-            query_job_list(1, &list, &list_load_status, &pagination).await;
-        });
-    });
-    let on_query_clone = on_query.clone();
-    use_effect_with((), move |_| {
-        on_query_clone.emit(());
-        || ()
-    });
-    let list_clone = list.clone();
-    let list_load_status_clone = list_load_status.clone();
-    let pagination_clone = pagination.clone();
-    let on_page = Callback::from(move |page: u64| {
+    let query_by_page = move |page: u64| {
         let list = list_clone.clone();
         let list_load_status = list_load_status_clone.clone();
         let pagination = pagination_clone.clone();
         wasm_bindgen_futures::spawn_local(async move {
             query_job_list(page, &list, &list_load_status, &pagination).await;
         });
-    });
+    };
+    let on_query = {
+        let query_by_page = query_by_page.clone();
+        UnsyncCallback::new(move |_| {
+            query_by_page(1);
+        })
+    };
+    query_by_page(1);
+    let on_page = UnsyncCallback::new(query_by_page);
     let edit_active_clone = edit_active.clone();
     let active_edit_id_clone = active_edit_id.clone();
     let list_clone = list.clone();
     let list_load_status_clone = list_load_status.clone();
     let pagination_clone = pagination.clone();
-    let on_finish_save = Callback::from(move |_pri_key: PrimaryKey| {
+    let on_finish_save = UnsyncCallback::new(move |_pri_key: PrimaryKey| {
         edit_active_clone.set(false);
         let active_edit_id = active_edit_id_clone.clone();
         let list = list_clone.clone();
         let list_load_status = list_load_status_clone.clone();
         let pagination = pagination_clone.clone();
         wasm_bindgen_futures::spawn_local(async move {
-            if active_edit_id.is_some() {
+            if active_edit_id.read().is_some() {
                 refresh_list(&list, &list_load_status, &pagination).await;
             } else {
                 query_job_list(1, &list, &list_load_status, &pagination).await;
@@ -90,25 +82,28 @@ pub fn JobList() -> Html {
     });
     let detail_active_clone = detail_active.clone();
     let active_detail_id_clone = active_detail_id.clone();
-    let on_leave_detail = Callback::from(move |_| {
+    let on_leave_detail = UnsyncCallback::new(move |_| {
         detail_active_clone.set(false);
         active_detail_id_clone.set(None);
     });
     let start_active_clone = start_active.clone();
     let active_start_id_clone = active_start_id.clone();
-    let on_leave_start = Callback::from(move |_| {
+    let on_leave_start = UnsyncCallback::new(move |_| {
         start_active_clone.set(false);
         active_start_id_clone.set(None);
     });
     let edit_active_clone = edit_active.clone();
     let active_edit_id_clone = active_edit_id.clone();
-    let on_leave_edit = Callback::from(move |_| {
+    let on_leave_edit = UnsyncCallback::new(move |_| {
         edit_active_clone.set(false);
         active_edit_id_clone.set(None);
     });
-    html! {
+    view! {
         <div class="relative width-fill height-fill" style="overflow:hidden;">
-            <If condition={!*record_list_active}>
+            <Show when={
+                let record_list_active = record_list_active.clone();
+                move || record_list_active.get()
+            }>
                 <div class="width-fill height-fill border-box" style="padding:0.25em;">
                     <div class="width-fill height-fill" style="display: -webkit-box;display: flex;-webkit-box-direction: normal;-webkit-box-orient: vertical;flex-direction: column;">
                         <header style="-webkit-box-flex: 0;flex-basis: auto;flex-grow: 0;">
@@ -122,47 +117,63 @@ pub fn JobList() -> Html {
                         </header>
                         <div style="-webkit-box-flex: 1;flex-basis: auto;flex-grow: 1;overflow-y: auto;">
                             { table_view(&list, &list_load_status, &pagination, &record_list_active, &active_job_id, &detail_active, &active_detail_id, &start_active, &active_start_id, &edit_active, &active_edit_id) }
-                            { list_exception_view(list.is_empty(), list_load_status.deref().clone()) }
+                            { list_exception_view(list, list_load_status) }
                         </div>
                         <div style="-webkit-box-flex: 0;flex-basis: auto;flex-grow: 0;padding-top: 0.25em;">
-                            <PaginationComp pagination={pagination.deref().clone()} onpage={on_page} />
+                            <PaginationComp pagination={pagination} onpage={on_page} />
                         </div>
                     </div>
                 </div>
-            </If>
-            <Drawer active={*detail_active} onclickother={on_leave_detail}>
+            </Show>
+            <Drawer active={detail_active} onclickother={on_leave_detail}>
                 {
-                    match active_detail_id.as_ref() {
-                        Some(active_detail_id) => html! {
-                            <JobDetail id={*active_detail_id} />
-                        },
-                        None => html! {}
-                    }
-                }
-            </Drawer>
-            <Drawer active={*start_active} onclickother={on_leave_start}>
-                {
-                    if let Some(active_start_id) = active_start_id.as_ref() {
-                        html! {
-                            <StartJob id={*active_start_id} />
+                    move || {
+                        match active_detail_id.get() {
+                            Some(active_detail_id) => view! {
+                                <JobDetail id={active_detail_id} />
+                            }.into_any(),
+                            None => view! {}.into_any()
                         }
-                    } else {
-                        html!{}
                     }
                 }
             </Drawer>
-            <Drawer active={*edit_active} onclickother={on_leave_edit}>
-                <JobEdit id={active_edit_id.deref().clone()} onsave={on_finish_save} />
+            <Drawer active={start_active} onclickother={on_leave_start}>
+                {
+                    move || {
+                        if let Some(active_start_id) = active_start_id.get() {
+                            view! {
+                                <StartJob id={active_start_id} />
+                            }.into_any()
+                        } else {
+                            view!{}.into_any()
+                        }
+                    }
+                }
+            </Drawer>
+            <Drawer active={edit_active} onclickother={on_leave_edit}>
+                {
+                    move || {
+                        if let Some(active_edit_id) = active_edit_id.get() {
+                            view! {
+                                <JobEdit id={active_edit_id} onsave={on_finish_save} />
+                            }.into_any()
+                        } else {
+                            view!{}.into_any()
+                        }
+                    }
+                }
             </Drawer>
             {
-                if let (true, Some(active_job_id)) = (*record_list_active, active_job_id.as_ref()) {
-                    html! {
-                        <JobRecordList job_id={*active_job_id} onclose={Callback::from(move |_| {
-                            record_list_active.set(false);
-                        })}/>
+                move || {
+                    if let (true, Some(active_job_id)) = (record_list_active.get(), active_job_id.get()) {
+                        view! {
+                            <JobRecordList job_id={active_job_id} onclose={UnsyncCallback::new(move |_| {
+                                record_list_active.set(false);
+                            })}/>
+                        }.into_any()
+                    } else {
+                        view!{}.into_any()
                     }
-                } else {
-                    html!{}
                 }
             }
         </div>
@@ -170,19 +181,30 @@ pub fn JobList() -> Html {
 }
 
 fn table_view(
-    list: &UseStateHandle<Vec<Job>>,
-    list_load_status: &UseStateHandle<LoadStatus>,
-    pagination: &UseStateHandle<Pagination>,
-    record_list_active: &UseStateHandle<bool>,
-    active_job_id: &UseStateHandle<Option<Id>>,
-    detail_active: &UseStateHandle<bool>,
-    active_detail_id: &UseStateHandle<Option<Id>>,
-    start_active: &UseStateHandle<bool>,
-    active_start_id: &UseStateHandle<Option<Id>>,
-    edit_active: &UseStateHandle<bool>,
-    active_edit_id: &UseStateHandle<Option<Id>>,
-) -> Html {
-    return html! {
+    list: &RwSignal<Vec<Job>>,
+    list_load_status: &RwSignal<LoadStatus>,
+    pagination: &RwSignal<Pagination>,
+    record_list_active: &RwSignal<bool>,
+    active_job_id: &RwSignal<Option<Id>>,
+    detail_active: &RwSignal<bool>,
+    active_detail_id: &RwSignal<Option<Id>>,
+    start_active: &RwSignal<bool>,
+    active_start_id: &RwSignal<Option<Id>>,
+    edit_active: &RwSignal<bool>,
+    active_edit_id: &RwSignal<Option<Id>>,
+) -> impl IntoView + use<> {
+    let list = StoredValue::new(list.clone());
+    let list_load_status = StoredValue::new(list_load_status.clone());
+    let pagination = StoredValue::new(pagination.clone());
+    let record_list_active = StoredValue::new(record_list_active.clone());
+    let active_job_id = StoredValue::new(active_job_id.clone());
+    let detail_active = StoredValue::new(detail_active.clone());
+    let active_detail_id = StoredValue::new(active_detail_id.clone());
+    let start_active = StoredValue::new(start_active.clone());
+    let active_start_id = StoredValue::new(active_start_id.clone());
+    let edit_active = StoredValue::new(edit_active.clone());
+    let active_edit_id = StoredValue::new(active_edit_id.clone());
+    return view! {
         <table class="e-table width-fill">
             <thead>
                 <tr>
@@ -191,62 +213,64 @@ fn table_view(
                     <th class="e-table-hcell">{"操作"}</th>
                 </tr>
             </thead>
-            {
-                if list_load_status.deref() == &LoadStatus::LoadOk || list_load_status.deref() == &LoadStatus::Loading {
-                    html! {
-                        <tbody>
-                            {
-                                for list.iter().map(|item| {
-                                    row_view(list, list_load_status, pagination, item, record_list_active, active_job_id, detail_active, active_detail_id, start_active, active_start_id, edit_active, active_edit_id)
-                                })
-                            }
-                        </tbody>
-                    }
-                } else {
-                    html! {}
-                }
-            }
+            <Show when=move || {
+                let list_load_status = list_load_status.read_value().get();
+                LoadStatus::LoadOk == list_load_status || LoadStatus::Loading == list_load_status
+            }>
+                <tbody>
+                    <For
+                        each={
+                            let list = list.clone();
+                            move || { list.read_value().get() }
+                        }
+                        key=|item| { item.id.clone() }
+                        children=move |item| {
+                            row_view(&list.read_value(), &list_load_status.read_value(), &pagination.read_value(), &item, &record_list_active.read_value(), &active_job_id.read_value(), &detail_active.read_value(), &active_detail_id.read_value(), &start_active.read_value(), &active_start_id.read_value(), &edit_active.read_value(), &active_edit_id.read_value())
+                        }
+                    />
+                </tbody>
+            </Show>
         </table>
     };
 }
 
 fn row_view(
-    list: &UseStateHandle<Vec<Job>>,
-    list_load_status: &UseStateHandle<LoadStatus>,
-    pagination: &UseStateHandle<Pagination>,
+    list: &RwSignal<Vec<Job>>,
+    list_load_status: &RwSignal<LoadStatus>,
+    pagination: &RwSignal<Pagination>,
     job: &Job,
-    record_list_active: &UseStateHandle<bool>,
-    active_job_id: &UseStateHandle<Option<Id>>,
-    detail_active: &UseStateHandle<bool>,
-    active_detail_id: &UseStateHandle<Option<Id>>,
-    start_active: &UseStateHandle<bool>,
-    active_start_id: &UseStateHandle<Option<Id>>,
-    edit_active: &UseStateHandle<bool>,
-    active_edit_id: &UseStateHandle<Option<Id>>,
-) -> Html {
+    record_list_active: &RwSignal<bool>,
+    active_job_id: &RwSignal<Option<Id>>,
+    detail_active: &RwSignal<bool>,
+    active_detail_id: &RwSignal<Option<Id>>,
+    start_active: &RwSignal<bool>,
+    active_start_id: &RwSignal<Option<Id>>,
+    edit_active: &RwSignal<bool>,
+    active_edit_id: &RwSignal<Option<Id>>,
+) -> impl IntoView + use<> {
     let detail_id = job.id;
     let active_job_id = active_job_id.clone();
     let record_list_active = record_list_active.clone();
-    let on_open_record_list = Callback::from(move |_: ()| {
+    let on_open_record_list = UnsyncCallback::new(move |_: ()| {
         active_job_id.set(Some(detail_id));
         record_list_active.set(true);
     });
     let active_detail_id = active_detail_id.clone();
     let detail_active = detail_active.clone();
-    let on_open_detail = Callback::from(move |_: ()| {
+    let on_open_detail = UnsyncCallback::new(move |_: ()| {
         active_detail_id.set(Some(detail_id));
         detail_active.set(true);
     });
     let start_active = start_active.clone();
     let active_start_id = active_start_id.clone();
-    let on_start = Callback::from(move |_: ()| {
+    let on_start = UnsyncCallback::new(move |_: ()| {
         active_start_id.set(Some(detail_id));
         start_active.set(true);
     });
     let update_id = job.id;
     let active_edit_id = active_edit_id.clone();
     let edit_active = edit_active.clone();
-    let on_open_update = Callback::from(move |_: ()| {
+    let on_open_update = UnsyncCallback::new(move |_: ()| {
         active_edit_id.set(Some(update_id));
         edit_active.set(true);
     });
@@ -254,7 +278,7 @@ fn row_view(
     let list = list.clone();
     let list_load_status = list_load_status.clone();
     let pagination = pagination.clone();
-    let on_confirm_delete = Callback::from(move |_: ()| {
+    let on_confirm_delete = UnsyncCallback::new(move |_: ()| {
         let list = list.clone();
         let list_load_status = list_load_status.clone();
         let pagination = pagination.clone();
@@ -270,7 +294,7 @@ fn row_view(
             }
         });
     });
-    return html! {
+    return view! {
         <tr class="e-table-row">
             <td class="e-table-cell align-center">{job.name.clone()}</td>
             <td class="e-table-cell align-center">{job.environment_schema_name.clone()}</td>
@@ -287,38 +311,16 @@ fn row_view(
     };
 }
 
-fn list_exception_view(is_empty: bool, list_load_status: LoadStatus) -> Html {
-    return html! {
-        match list_load_status {
-            LoadStatus::LoadFailed => {
-                html! {
-                    <p class="align-center">{"列表加载失败"}</p>
-                }
-            },
-            LoadStatus::LoadOk => {
-                if is_empty {
-                    html! {
-                        <p class="align-center">{"列表数据为空"}</p>
-                    }
-                } else {
-                    html! {}
-                }
-            },
-            _ => html! {}
-        }
-    };
-}
-
-fn clear_list(list: &UseStateHandle<Vec<Job>>, pagination: &UseStateHandle<Pagination>) {
+fn clear_list(list: &RwSignal<Vec<Job>>, pagination: &RwSignal<Pagination>) {
     pagination.set(Pagination::new(0, 1, None, None));
     list.set(Vec::new());
 }
 
 async fn query_job_list(
     page_no: u64,
-    list: &UseStateHandle<Vec<Job>>,
-    list_load_status: &UseStateHandle<LoadStatus>,
-    pagination: &UseStateHandle<Pagination>,
+    list: &RwSignal<Vec<Job>>,
+    list_load_status: &RwSignal<LoadStatus>,
+    pagination: &RwSignal<Pagination>,
 ) {
     let params = QueryJobReq {
         page_no: Some(page_no),
@@ -341,23 +343,19 @@ async fn query_job_list(
 }
 
 async fn refresh_list(
-    list: &UseStateHandle<Vec<Job>>,
-    list_load_status: &UseStateHandle<LoadStatus>,
-    pagination: &UseStateHandle<Pagination>,
+    list: &RwSignal<Vec<Job>>,
+    list_load_status: &RwSignal<LoadStatus>,
+    pagination: &RwSignal<Pagination>,
 ) {
-    let page_no = if list.is_empty() {
-        pagination.page_no - 1
-    } else {
-        pagination.page_no
-    };
-    query_job_list(page_no.max(1), list, list_load_status, pagination).await;
+    let new_page_no = fix_page_no(pagination, list);
+    query_job_list(new_page_no, list, list_load_status, pagination).await;
 }
 
 async fn delete_job(
     id: Id,
-    list: &UseStateHandle<Vec<Job>>,
-    list_load_status: &UseStateHandle<LoadStatus>,
-    pagination: &UseStateHandle<Pagination>,
+    list: &RwSignal<Vec<Job>>,
+    list_load_status: &RwSignal<LoadStatus>,
+    pagination: &RwSignal<Pagination>,
 ) -> Result<(), SharedString> {
     let params = DeleteJobReq { id: id };
     DeleteJobApi.call(&params).await?;
@@ -372,16 +370,8 @@ async fn delete_job(
     return Ok(());
 }
 
-fn remove_job(id: Id, list: &UseStateHandle<Vec<Job>>) {
-    let new_list: Vec<_> = list
-        .iter()
-        .filter_map(|item| {
-            if item.id == id {
-                None
-            } else {
-                Some(item.clone())
-            }
-        })
-        .collect();
-    list.set(new_list);
+fn remove_job(id: Id, list: &RwSignal<Vec<Job>>) {
+    list.write().retain(|item| {
+        return item.id != id;
+    });
 }

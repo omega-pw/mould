@@ -1,22 +1,20 @@
 use crate::components::button::Button;
-use crate::components::checkbox::BindingCheckbox;
-use crate::components::checkbox_group::BindingCheckboxGroup;
-use crate::components::file_upload::BindingFileUpload;
-use crate::components::files_upload::BindingFilesUpload;
-use crate::components::input::BindingInput;
+use crate::components::checkbox::Checkbox;
+use crate::components::checkbox_group::CheckboxGroup;
+use crate::components::file_upload::FileUpload;
+use crate::components::files_upload::FilesUpload;
 use crate::components::input::Input;
-use crate::components::monaco_editor::BindingMonacoEditor;
-use crate::components::r#if::If;
-use crate::components::radio_group::BindingRadioGroup;
+use crate::components::monaco_editor::MonacoEditor;
+use crate::components::radio_group::RadioGroup;
 use crate::components::required::Required;
+use crate::components::validate_wrapper::ValidateWrapper;
 // use crate::components::rich_text::render_rich_rext;
-// use crate::components::rich_text::BindingRichText;
-use crate::components::textarea::BindingTextarea;
+// use crate::components::rich_text::RichText;
+use crate::components::textarea::Textarea;
 use crate::components::validate_wrapper::ValidateData;
 use crate::components::Resource;
 use crate::components::ResourceMetadata;
 use crate::sdk;
-use crate::utils::binding::Binding;
 use crate::utils::gen_id;
 use crate::utils::validator::RequiredValidator;
 use crate::utils::validator::Validators;
@@ -27,28 +25,24 @@ use sdk::extension::AttributeType;
 use sdk::extension::Extension;
 use sdk::extension::Operation;
 use serde_json::Value;
-use std::ops::Deref;
 // use wasm_bindgen::prelude::*;
+use crate::Key;
+use leptos::prelude::*;
 use web_sys::DocumentFragment;
-use yew::prelude::*;
-use yew::virtual_dom::Key;
 
-type EnumRadioGroup = BindingRadioGroup<(SharedString, String)>;
-type EnumCheckboxGroup = BindingCheckboxGroup<(SharedString, String)>;
-
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone)]
 pub enum AttributeValue {
     String(ValidateData<SharedString>),
-    StringList(ValidateData<Vec<(Key, SharedString)>>),
+    StringList(ValidateData<Vec<(Key, RwSignal<SharedString>)>>),
     LongString(ValidateData<SharedString>),
     // RichText(ValidateData<JsValue>),
     Code(ValidateData<SharedString>),
     Password(ValidateData<SharedString>),
-    Enum(ValidateData<SharedString>),
+    Enum(ValidateData<Option<SharedString>>),
     EnumList(ValidateData<Vec<SharedString>>),
-    Bool(Binding<bool>),
-    File(ValidateData<Option<Resource>>),
-    FileList(ValidateData<Vec<(Key, Resource, ())>>),
+    Bool(RwSignal<bool>),
+    File(ValidateData<Option<Resource>, LocalStorage>),
+    FileList(ValidateData<Vec<(Key, RwSignal<Resource, LocalStorage>, ())>, LocalStorage>),
 }
 
 impl AttributeValue {
@@ -69,704 +63,773 @@ impl AttributeValue {
     }
 }
 
-pub fn config_view(attributes: &[(Key, Attribute, AttributeValue)]) -> Html {
-    html! {
-        for attributes.iter().map(|(key, attribute, value)| {
-            match &attribute.r#type {
-                AttributeType::String => {
-                    let title = if let Some(description) = attribute.description.as_ref() {
-                        format!("{}({})", attribute.name, description)
-                    } else {
-                        format!("{}", attribute.name)
-                    };
-                    html! {
-                        <div key={key.clone()}>
+#[component]
+pub fn ConfigView(
+    #[prop(into)] attributes: Signal<Vec<(Key, Attribute, AttributeValue)>>,
+) -> impl IntoView {
+    view! {
+        <For
+            each={
+                let attributes = attributes.clone();
+                move || { attributes.get().into_iter() }
+            }
+            key=|(key, _attribute, _value)| { key.clone() }
+            children=move |(_key, attribute, value)| {
+                match &attribute.r#type {
+                    AttributeType::String => {
+                        let title = if let Some(description) = attribute.description.as_ref() {
+                            format!("{}({})", attribute.name, description)
+                        } else {
+                            format!("{}", attribute.name)
+                        };
+                        view! {
                             <div>
-                                <If condition={attribute.required}><Required/></If>
-                                { title }
-                            </div>
-                            <div>
-                                {
-                                    match value {
-                                        AttributeValue::String(value) => {
-                                            value.view(move |value, validator| {
-                                                html! {
-                                                    <BindingInput value={value} onupdate={validator}/>
-                                                }
-                                            })
-                                        },
-                                        _ => html!{}
+                                <div>
+                                    <Show when={
+                                        let required = attribute.required;
+                                        move || required
+                                    }>
+                                        <Required/>
+                                    </Show>
+                                    { title }
+                                </div>
+                                <div>
+                                    {
+                                        match value {
+                                            AttributeValue::String(value) => {
+                                                view! {
+                                                    <ValidateWrapper error={value.error()}>
+                                                        <Input value={value.data()} onupdate={value.listener()}/>
+                                                    </ValidateWrapper>
+                                                }.into_any()
+                                            },
+                                            _ => view!{}.into_any()
+                                        }
                                     }
-                                }
+                                </div>
                             </div>
-                        </div>
-                    }
-                },
-                AttributeType::StringList => {
-                    let title = if let Some(description) = attribute.description.as_ref() {
-                        format!("{}({})", attribute.name, description)
-                    } else {
-                        format!("{}", attribute.name)
-                    };
-                    html! {
-                        <div key={key.clone()}>
+                        }.into_any()
+                    },
+                    AttributeType::StringList => {
+                        let title = if let Some(description) = attribute.description.as_ref() {
+                            format!("{}({})", attribute.name, description)
+                        } else {
+                            format!("{}", attribute.name)
+                        };
+                        view! {
                             <div>
-                                <If condition={attribute.required}><Required/></If>
-                                { title }
-                            </div>
-                            <div>
-                                {
-                                    match value {
-                                        AttributeValue::StringList(value_list) => {
-                                            value_list.view(move |value_list: UseStateHandle<Vec<(Key, SharedString)>>, validator: Callback<Vec<(Key, SharedString)>>| {
-                                                let value_list_clone = value_list.clone();
-                                                let validator_clone = validator.clone();
-                                                html! {
+                                <div>
+                                    <Show when={
+                                        let required = attribute.required;
+                                        move || required
+                                    }>
+                                        <Required/>
+                                    </Show>
+                                    { title }
+                                </div>
+                                <div>
+                                    {
+                                        match value {
+                                            AttributeValue::StringList(value_list) => {
+                                                let validator = value_list.listener();
+                                                let value_list_clone = value_list.data();
+                                                view! {
                                                     <div>
-                                                        {
-                                                            for value_list.iter().enumerate().map(|(index, (key, value))| {
-                                                                let value_list = value_list_clone.clone();
-                                                                let validator = validator_clone.clone();
-                                                                let on_update = Callback::from(move |new_value: AttrValue| {
-                                                                    let mut new_items = value_list.deref().clone();
-                                                                    new_items[index].1 = new_value;
-                                                                    value_list.set(new_items.clone());
-                                                                    validator.emit(new_items);
-                                                                });
-                                                                let value_list = value_list_clone.clone();
-                                                                let validator = validator_clone.clone();
-                                                                let on_remove = Callback::from(move |_| {
-                                                                    let mut new_items = value_list.deref().clone();
-                                                                    new_items.remove(index);
-                                                                    value_list.set(new_items.clone());
-                                                                    validator.emit(new_items);
-                                                                });
-                                                                html! {
-                                                                    <div key={key.clone()}>
+                                                        <For
+                                                            each={
+                                                                let value_list = value_list.data();
+                                                                move || { value_list.get().into_iter().enumerate() }
+                                                            }
+                                                            key=|(_index, (key, _value))| { key.clone() }
+                                                            children=move |(index, (_key, value))| {
+                                                                let on_update = {
+                                                                    let value_list = value_list_clone.clone();
+                                                                    let validator = validator.clone();
+                                                                    UnsyncCallback::new(move |new_value: SharedString| {
+                                                                        value.set(new_value);
+                                                                        validator.run(value_list.get());
+                                                                    })
+                                                                };
+                                                                let on_remove = {
+                                                                    let value_list = value_list_clone.clone();
+                                                                    let validator = validator.clone();
+                                                                    UnsyncCallback::new(move |_| {
+                                                                        value_list.write().remove(index);
+                                                                        validator.run(value_list.get());
+                                                                    })
+                                                                };
+                                                                view! {
+                                                                    <div>
                                                                         <Input value={value.clone()} onupdate={on_update}/>
                                                                         <Button onclick={on_remove}>{"Remove"}</Button>
                                                                     </div>
                                                                 }
-                                                            })
-                                                        }
-                                                        <Button onclick={Callback::from(move |_| {
-                                                            let mut new_items = value_list_clone.deref().clone();
-                                                            new_items.push((gen_id().into(), SharedString::from("")));
-                                                            value_list_clone.set(new_items.clone());
-                                                            validator_clone.emit(new_items);
+                                                            }
+                                                        />
+                                                        <Button onclick={UnsyncCallback::new(move |_| {
+                                                            value_list_clone.write().push((gen_id().into(), RwSignal::new(SharedString::from(""))));
+                                                            validator.run(value_list_clone.get());
                                                         })}>{"Add"}</Button>
                                                     </div>
-                                                }
-                                            })
-                                        },
-                                        _ => html!{}
+                                                }.into_any()
+                                            },
+                                            _ => view!{}.into_any()
+                                        }
                                     }
-                                }
+                                </div>
                             </div>
-                        </div>
-                    }
-                },
-                AttributeType::LongString => {
-                    let title = if let Some(description) = attribute.description.as_ref() {
-                        format!("{}({})", attribute.name, description)
-                    } else {
-                        format!("{}", attribute.name)
-                    };
-                    html! {
-                        <div key={key.clone()}>
+                        }.into_any()
+                    },
+                    AttributeType::LongString => {
+                        let title = if let Some(description) = attribute.description.as_ref() {
+                            format!("{}({})", attribute.name, description)
+                        } else {
+                            format!("{}", attribute.name)
+                        };
+                        view! {
                             <div>
-                                <If condition={attribute.required}><Required/></If>
-                                { title }
-                            </div>
-                            <div>
-                                {
-                                    match value {
-                                        AttributeValue::LongString(value) => {
-                                            value.view(move |value, validator| {
-                                                html! {
-                                                    <BindingTextarea value={value} onupdate={validator} style="width:100%;"/>
-                                                }
-                                            })
-                                        },
-                                        _ => html!{}
+                                <div>
+                                    <Show when={
+                                        let required = attribute.required;
+                                        move || required
+                                    }>
+                                        <Required/>
+                                    </Show>
+                                    { title }
+                                </div>
+                                <div>
+                                    {
+                                        match value {
+                                            AttributeValue::LongString(value) => {
+                                                view! {
+                                                    <ValidateWrapper error={value.error()}>
+                                                        <Textarea value={value.data()} onupdate={value.listener()} style="width:100%;"/>
+                                                    </ValidateWrapper>
+                                                }.into_any()
+                                            },
+                                            _ => view!{}.into_any()
+                                        }
                                     }
-                                }
+                                </div>
                             </div>
-                        </div>
-                    }
-                },
-                // AttributeType::RichText => {
-                //     let title = if let Some(description) = attribute.description.as_ref() {
-                //         format!("{}({})", attribute.name, description)
-                //     } else {
-                //         format!("{}", attribute.name)
-                //     };
-                //     html! {
-                //         <div key={key.clone()}>
-                //             <div>
-                //                 <If condition={attribute.required}><Required/></If>
-                //                 { title }
-                //             </div>
-                //             <div>
-                //                 {
-                //                     match value {
-                //                         AttributeValue::RichText(value) => {
-                //                             value.view(move |value, validator: Callback<JsValue>| {
-                //                                 html! {
-                //                                     <BindingRichText value={value} onchange={validator} style="border: 1px solid rgba(0, 0, 0, 0.2);padding: 0.25em 0;min-height: 8em;"/>
-                //                                 }
-                //                             })
-                //                         },
-                //                         _ => html!{}
-                //                     }
-                //                 }
-                //             </div>
-                //         </div>
-                //     }
-                // },
-                AttributeType::Code { language } => {
-                    let title = if let Some(description) = attribute.description.as_ref() {
-                        format!("{}({})", attribute.name, description)
-                    } else {
-                        format!("{}", attribute.name)
-                    };
-                    html! {
-                        <div key={key.clone()}>
+                        }.into_any()
+                    },
+                    // AttributeType::RichText => {
+                    //     let title = if let Some(description) = attribute.description.as_ref() {
+                    //         format!("{}({})", attribute.name, description)
+                    //     } else {
+                    //         format!("{}", attribute.name)
+                    //     };
+                    //     view! {
+                    //         <div>
+                    //             <div>
+                    //                 <If condition={attribute.required}><Required/></If>
+                    //                 { title }
+                    //             </div>
+                    //             <div>
+                    //                 {
+                    //                     match value {
+                    //                         AttributeValue::RichText(value) => {
+                    //                             value.view(move |value, validator: UnsyncCallback<JsValue>| {
+                    //                                 view! {
+                    //                                     <RichText value={value} onchange={validator} style="border: 1px solid rgba(0, 0, 0, 0.2);padding: 0.25em 0;min-height: 8em;"/>
+                    //                                 }
+                    //                             })
+                    //                         },
+                    //                         _ => view!{}
+                    //                     }
+                    //                 }
+                    //             </div>
+                    //         </div>
+                    //     }
+                    // },
+                    AttributeType::Code { language } => {
+                        let title = if let Some(description) = attribute.description.as_ref() {
+                            format!("{}({})", attribute.name, description)
+                        } else {
+                            format!("{}", attribute.name)
+                        };
+                        view! {
                             <div>
-                                <If condition={attribute.required}><Required/></If>
-                                { title }
-                            </div>
-                            <div>
-                                {
-                                    match value {
-                                        AttributeValue::Code(value) => {
-                                            let language = language.clone();
-                                            value.view(move |value, validator: Callback<SharedString>| {
+                                <div>
+                                    <Show when={
+                                        let required = attribute.required;
+                                        move || required
+                                    }>
+                                        <Required/>
+                                    </Show>
+                                    { title }
+                                </div>
+                                <div>
+                                    {
+                                        match value {
+                                            AttributeValue::Code(value) => {
                                                 let language = SharedString::from(language.clone());
-                                                html! {
-                                                    <BindingMonacoEditor value={value} language={language} width="100%" height="16em" onchange={validator}/>
-                                                }
-                                            })
-                                        },
-                                        _ => html!{}
+                                                view! {
+                                                    <ValidateWrapper error={value.error()}>
+                                                        <MonacoEditor value={value.data()} language={language} width=SharedString::from("100%") height=SharedString::from("16em") onchange={value.listener()}/>
+                                                    </ValidateWrapper>
+                                                }.into_any()
+                                            },
+                                            _ => view!{}.into_any()
+                                        }
                                     }
-                                }
+                                </div>
                             </div>
-                        </div>
-                    }
-                },
-                AttributeType::Password => {
-                    let title = if let Some(description) = attribute.description.as_ref() {
-                        format!("{}({})", attribute.name, description)
-                    } else {
-                        format!("{}", attribute.name)
-                    };
-                    html! {
-                        <div key={key.clone()}>
+                        }.into_any()
+                    },
+                    AttributeType::Password => {
+                        let title = if let Some(description) = attribute.description.as_ref() {
+                            format!("{}({})", attribute.name, description)
+                        } else {
+                            format!("{}", attribute.name)
+                        };
+                        view! {
                             <div>
-                                <If condition={attribute.required}><Required/></If>
-                                { title }
-                            </div>
-                            <div>
-                                {
-                                    match value {
-                                        AttributeValue::Password(value) => {
-                                            value.view(move |value, validator| {
-                                                html! {
-                                                    <BindingInput r#type="password" disable_trim={true} value={value} onupdate={validator}/>
-                                                }
-                                            })
-                                        },
-                                        _ => html!{}
+                                <div>
+                                    <Show when={
+                                        let required = attribute.required;
+                                        move || required
+                                    }>
+                                        <Required/>
+                                    </Show>
+                                    { title }
+                                </div>
+                                <div>
+                                    {
+                                        match value {
+                                            AttributeValue::Password(value) => {
+                                                view! {
+                                                    <ValidateWrapper error={value.error()}>
+                                                        <Input r#type="password" disable_trim={true} value={value.data()} onupdate={value.listener()}/>
+                                                    </ValidateWrapper>
+                                                }.into_any()
+                                            },
+                                            _ => view!{}.into_any()
+                                        }
                                     }
-                                }
+                                </div>
                             </div>
-                        </div>
-                    }
-                },
-                AttributeType::Enum { options } => {
-                    let title = if let Some(description) = attribute.description.as_ref() {
-                        format!("{}({})", attribute.name, description)
-                    } else {
-                        format!("{}", attribute.name)
-                    };
-                    html! {
-                        <div key={key.clone()}>
+                        }.into_any()
+                    },
+                    AttributeType::Enum { options } => {
+                        let title = if let Some(description) = attribute.description.as_ref() {
+                            format!("{}({})", attribute.name, description)
+                        } else {
+                            format!("{}", attribute.name)
+                        };
+                        view! {
                             <div>
-                                <If condition={attribute.required}><Required/></If>
-                                { title }
-                            </div>
-                            <div>
-                                {
-                                    match value {
-                                        AttributeValue::Enum(value) => {
-                                            let options = options.clone();
-                                            value.view(move |value, validator: Callback<SharedString>| {
+                                <div>
+                                    <Show when={
+                                        let required = attribute.required;
+                                        move || required
+                                    }>
+                                        <Required/>
+                                    </Show>
+                                    { title }
+                                </div>
+                                <div>
+                                    {
+                                        match value {
+                                            AttributeValue::Enum(value) => {
+                                                let options = options.clone();
                                                 let options: Vec<_> = options.iter().map(|option| {
                                                     (option.value.clone().into(), option.label.clone())
                                                 }).collect();
-                                                let onchange = validator.reform(|(value, _label): (SharedString, String)| {
-                                                    value
-                                                });
-                                                html! {
-                                                    <EnumRadioGroup value={value} options={options} onchange={onchange}/>
-                                                }
-                                            })
-                                        },
-                                        _ => html!{}
-                                    }
-                                }
-                            </div>
-                        </div>
-                    }
-                },
-                AttributeType::EnumList { options } => {
-                    let title = if let Some(description) = attribute.description.as_ref() {
-                        format!("{}({})", attribute.name, description)
-                    } else {
-                        format!("{}", attribute.name)
-                    };
-                    html! {
-                        <div key={key.clone()}>
-                            <div>
-                                <If condition={attribute.required}><Required/></If>
-                                { title }
-                            </div>
-                            <div>
-                                {
-                                    match value {
-                                        AttributeValue::EnumList(values) => {
-                                            let options = options.clone();
-                                            values.view(move |values, validator: Callback<Vec<SharedString>>| {
-                                                let options: Vec<_> = options.iter().map(|option| {
-                                                    (option.value.clone().into(), option.label.clone())
-                                                }).collect();
-                                                html! {
-                                                    <EnumCheckboxGroup value={values} options={options} onchange={validator}/>
-                                                }
-                                            })
-                                        },
-                                        _ => html!{}
-                                    }
-                                }
-                            </div>
-                        </div>
-                    }
-                },
-                AttributeType::Bool => {
-                    let name = attribute.name.clone();
-                    let description = if let Some(description) = attribute.description.as_ref() {
-                        format!("({})", description)
-                    } else {
-                        String::from("")
-                    };
-                    html! {
-                        <div key={key.clone()}>
-                            {
-                                match value {
-                                    AttributeValue::Bool(value) => {
-                                        value.view(move |value| {
-                                            html! {
-                                                <>
-                                                    <BindingCheckbox value={value} label={name.clone()} />
-                                                    { description.clone() }
-                                                </>
-                                            }
-                                        })
-                                    },
-                                    _ => html!{}
-                                }
-                            }
-                        </div>
-                    }
-                }
-                AttributeType::File => {
-                    let title = if let Some(description) = attribute.description.as_ref() {
-                        format!("{}({})", attribute.name, description)
-                    } else {
-                        format!("{}", attribute.name)
-                    };
-                    html! {
-                        <div key={key.clone()}>
-                            <div>
-                                <If condition={attribute.required}><Required/></If>
-                                { title }
-                            </div>
-                            <div>
-                                {
-                                    match value {
-                                        AttributeValue::File(file) => {
-                                            file.view(move |file, validator| {
-                                                html! {
-                                                    <BindingFileUpload file={file} onchange={validator}/>
-                                                }
-                                            })
-                                        },
-                                        _ => html!{}
-                                    }
-                                }
-                            </div>
-                        </div>
-                    }
-                }
-                AttributeType::FileList => {
-                    let title = if let Some(description) = attribute.description.as_ref() {
-                        format!("{}({})", attribute.name, description)
-                    } else {
-                        format!("{}", attribute.name)
-                    };
-                    html! {
-                        <div key={key.clone()}>
-                            <div>
-                                <If condition={attribute.required}><Required/></If>
-                                { title }
-                            </div>
-                            <div>
-                                {
-                                    match value {
-                                        AttributeValue::FileList(files) => {
-                                            files.view(move |files, validator| {
-                                                html! {
-                                                    <BindingFilesUpload<()> files={files} onchange={validator}/>
-                                                }
-                                            })
-                                        },
-                                        _ => html!{}
-                                    }
-                                }
-                            </div>
-                        </div>
-                    }
-                }
-            }
-        })
-    }
-}
-
-pub fn config_detail_view(attributes: &[(Key, Attribute, AttributeValue)]) -> Html {
-    html! {
-        for attributes.iter().map(|(key, attribute, value)| {
-            match &attribute.r#type {
-                AttributeType::String => {
-                    let title = if let Some(description) = attribute.description.as_ref() {
-                        format!("{}({})", attribute.name, description)
-                    } else {
-                        format!("{}", attribute.name)
-                    };
-                    html! {
-                        <div key={key.clone()}>
-                            <div>{ title }</div>
-                            <div>
-                                {
-                                    match value {
-                                        AttributeValue::String(value) => {
-                                            value.view(move |value: UseStateHandle<SharedString>, _validator| {
-                                                html! { value.deref().clone() }
-                                            })
-                                        },
-                                        _ => html!{}
-                                    }
-                                }
-                            </div>
-                        </div>
-                    }
-                },
-                AttributeType::StringList => {
-                    let title = if let Some(description) = attribute.description.as_ref() {
-                        format!("{}({})", attribute.name, description)
-                    } else {
-                        format!("{}", attribute.name)
-                    };
-                    html! {
-                        <div key={key.clone()}>
-                            <div>{ title }</div>
-                            <div>
-                                {
-                                    match value {
-                                        AttributeValue::StringList(value) => {
-                                            value.view(move |value_list: UseStateHandle<Vec<(Key, SharedString)>>, _validator| {
-                                                html! {
-                                                    for value_list.iter().map(|(key, value)| {
-                                                        html! {
-                                                            <div key={key.clone()}>{value}</div>
-                                                        }
+                                                let onchange = {
+                                                    let value = value.clone();
+                                                    UnsyncCallback::new(move |_| {
+                                                        value.validate(true);
                                                     })
-                                                }
-                                            })
-                                        },
-                                        _ => html!{}
+                                                };
+                                                view! {
+                                                    <ValidateWrapper error={value.error()}>
+                                                        <RadioGroup value={value.data()} options={options} onchange={onchange}/>
+                                                    </ValidateWrapper>
+                                                }.into_any()
+                                            },
+                                            _ => view!{}.into_any()
+                                        }
                                     }
-                                }
+                                </div>
                             </div>
-                        </div>
-                    }
-                },
-                AttributeType::LongString => {
-                    let title = if let Some(description) = attribute.description.as_ref() {
-                        format!("{}({})", attribute.name, description)
-                    } else {
-                        format!("{}", attribute.name)
-                    };
-                    html! {
-                        <div key={key.clone()}>
-                            <div>{ title }</div>
+                        }.into_any()
+                    },
+                    AttributeType::EnumList { options } => {
+                        let title = if let Some(description) = attribute.description.as_ref() {
+                            format!("{}({})", attribute.name, description)
+                        } else {
+                            format!("{}", attribute.name)
+                        };
+                        view! {
                             <div>
-                                {
-                                    match value {
-                                        AttributeValue::LongString(value) => {
-                                            value.view(move |value: UseStateHandle<SharedString>, _validator| {
-                                                html! { value.deref().clone() }
-                                            })
-                                        },
-                                        _ => html!{}
+                                <div>
+                                    <Show when={
+                                        let required = attribute.required;
+                                        move || required
+                                    }>
+                                        <Required/>
+                                    </Show>
+                                    { title }
+                                </div>
+                                <div>
+                                    {
+                                        match value {
+                                            AttributeValue::EnumList(values) => {
+                                                let options: Vec<_> = options.iter().map(|option| {
+                                                    (option.value.clone().into(), option.label.clone())
+                                                }).collect();
+                                                view! {
+                                                    <ValidateWrapper error={values.error()}>
+                                                        <CheckboxGroup value={values.data()} options={options} onchange={values.listener()}/>
+                                                    </ValidateWrapper>
+                                                }.into_any()
+                                            },
+                                            _ => view!{}.into_any()
+                                        }
                                     }
-                                }
+                                </div>
                             </div>
-                        </div>
-                    }
-                },
-                // AttributeType::RichText => {
-                //     let title = if let Some(description) = attribute.description.as_ref() {
-                //         format!("{}({})", attribute.name, description)
-                //     } else {
-                //         format!("{}", attribute.name)
-                //     };
-                //     html! {
-                //         <div key={key.clone()}>
-                //             <div>{ title }</div>
-                //             <div>
-                //                 {
-                //                     match value {
-                //                         AttributeValue::RichText(value) => {
-                //                             value.view(move |value: UseStateHandle<JsValue>, _validator: Callback<JsValue>| {
-                //                                 let content = render_rich_rext(&value).unwrap();
-                //                                 wrap_content(content)
-                //                             })
-                //                         },
-                //                         _ => html!{}
-                //                     }
-                //                 }
-                //             </div>
-                //         </div>
-                //     }
-                // },
-                AttributeType::Code { language } => {
-                    let title = if let Some(description) = attribute.description.as_ref() {
-                        format!("{}({})", attribute.name, description)
-                    } else {
-                        format!("{}", attribute.name)
-                    };
-                    html! {
-                        <div key={key.clone()}>
-                            <div>{ title }</div>
-                            <div>
-                                {
-                                    match value {
-                                        AttributeValue::Code(value) => {
-                                            let language = language.clone();
-                                            value.view(move |value, validator: Callback<SharedString>| {
-                                                let language = SharedString::from(language.clone());
-                                                html! {
-                                                    <BindingMonacoEditor value={value} language={language} readonly={true} width="100%" height="16em" onchange={validator}/>
-                                                }
-                                            })
-                                        },
-                                        _ => html!{}
-                                    }
-                                }
-                            </div>
-                        </div>
-                    }
-                },
-                AttributeType::Password => {
-                    let title = if let Some(description) = attribute.description.as_ref() {
-                        format!("{}({})", attribute.name, description)
-                    } else {
-                        format!("{}", attribute.name)
-                    };
-                    html! {
-                        <div key={key.clone()}>
-                            <div>{ title }</div>
-                            <div>
-                                {
-                                    match value {
-                                        AttributeValue::Password(value) => {
-                                            value.view(move |value: UseStateHandle<SharedString>, _validator| {
-                                                let len = value.deref().chars().count();
-                                                Html::from("*".repeat(len))
-                                            })
-                                        },
-                                        _ => html!{}
-                                    }
-                                }
-                            </div>
-                        </div>
-                    }
-                },
-                AttributeType::Enum { options } => {
-                    let title = if let Some(description) = attribute.description.as_ref() {
-                        format!("{}({})", attribute.name, description)
-                    } else {
-                        format!("{}", attribute.name)
-                    };
-                    html! {
-                        <div key={key.clone()}>
-                            <div>{ title }</div>
-                            <div>
-                                {
-                                    match value {
-                                        AttributeValue::Enum(value) => {
-                                            let options = options.clone();
-                                            value.view(move |value: UseStateHandle<SharedString>, _validator: Callback<SharedString>| {
-                                                let label = options.iter().find(|option| {
-                                                    value.deref() == &option.value
-                                                }).map(|option| option.label.clone()).unwrap_or_default();
-                                                html! { label }
-                                            })
-                                        },
-                                        _ => html!{}
-                                    }
-                                }
-                            </div>
-                        </div>
-                    }
-                },
-                AttributeType::EnumList { options } => {
-                    let title = if let Some(description) = attribute.description.as_ref() {
-                        format!("{}({})", attribute.name, description)
-                    } else {
-                        format!("{}", attribute.name)
-                    };
-                    html! {
-                        <div key={key.clone()}>
-                            <div>{ title }</div>
-                            <div>
-                                {
-                                    match value {
-                                        AttributeValue::EnumList(values) => {
-                                            let options = options.clone();
-                                            values.view(move |values: UseStateHandle<Vec<SharedString>>, _validator: Callback<Vec<SharedString>>| {
-                                                let labels: Vec<&str> = options.iter().filter(|option| {
-                                                    values.iter().any(|value| value == &option.value)
-                                                }).map(|option| option.label.as_ref()).collect();
-                                                let labels = labels.join(",");
-                                                html! { labels }
-                                            })
-                                        },
-                                        _ => html!{}
-                                    }
-                                }
-                            </div>
-                        </div>
-                    }
-                },
-                AttributeType::Bool => {
-                    let title = if let Some(description) = attribute.description.as_ref() {
-                        format!("{}({})", attribute.name, description)
-                    } else {
-                        format!("{}", attribute.name)
-                    };
-                    html! {
-                        <div key={key.clone()}>
-                            <div>{ title }</div>
+                        }.into_any()
+                    },
+                    AttributeType::Bool => {
+                        let name = attribute.name.clone();
+                        let description = if let Some(description) = attribute.description.as_ref() {
+                            format!("({})", description)
+                        } else {
+                            String::from("")
+                        };
+                        view! {
                             <div>
                                 {
                                     match value {
                                         AttributeValue::Bool(value) => {
-                                            value.view(move |value: UseStateHandle<bool>| {
-                                                let value = if *value {
-                                                    "是"
-                                                } else {
-                                                    "否"
-                                                };
-                                                html! { value }
-                                            })
+                                            view! {
+                                                <Checkbox value={value} label={name} />
+                                                { description }
+                                            }.into_any()
                                         },
-                                        _ => html!{}
+                                        _ => view!{}.into_any()
                                     }
                                 }
                             </div>
-                        </div>
+                        }.into_any()
+                    }
+                    AttributeType::File => {
+                        let title = if let Some(description) = attribute.description.as_ref() {
+                            format!("{}({})", attribute.name, description)
+                        } else {
+                            format!("{}", attribute.name)
+                        };
+                        view! {
+                            <div>
+                                <div>
+                                    <Show when={
+                                        let required = attribute.required;
+                                        move || required
+                                    }>
+                                        <Required/>
+                                    </Show>
+                                    { title }
+                                </div>
+                                <div>
+                                    {
+                                        match value {
+                                            AttributeValue::File(file) => {
+                                                view! {
+                                                    <FileUpload file={file.data()} onchange={file.listener()}/>
+                                                }.into_any()
+                                            },
+                                            _ => view!{}.into_any()
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        }.into_any()
+                    }
+                    AttributeType::FileList => {
+                        let title = if let Some(description) = attribute.description.as_ref() {
+                            format!("{}({})", attribute.name, description)
+                        } else {
+                            format!("{}", attribute.name)
+                        };
+                        view! {
+                            <div>
+                                <div>
+                                    <Show when={
+                                        let required = attribute.required;
+                                        move || required
+                                    }>
+                                        <Required/>
+                                    </Show>
+                                    { title }
+                                </div>
+                                <div>
+                                    {
+                                        match value {
+                                            AttributeValue::FileList(files) => {
+                                                view! {
+                                                    <FilesUpload files={files.data()} onchange={files.listener()}/>
+                                                }.into_any()
+                                            },
+                                            _ => view!{}.into_any()
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        }.into_any()
                     }
                 }
-                AttributeType::File => {
-                    let title = if let Some(description) = attribute.description.as_ref() {
-                        format!("{}({})", attribute.name, description)
-                    } else {
-                        format!("{}", attribute.name)
-                    };
-                    html! {
-                        <div key={key.clone()}>
-                            <div>{ title }</div>
+            }
+        />
+    }
+}
+
+#[component]
+pub fn ConfigDetailView(
+    #[prop(into)] attributes: Signal<Vec<(Key, Attribute, AttributeValue)>>,
+) -> impl IntoView {
+    view! {
+        <For
+            each={
+                let attributes = attributes.clone();
+                move || { attributes.get().into_iter() }
+            }
+            key=|(key, _attribute, _value)| { key.clone() }
+            children=move |(_key, attribute, value)| {
+                match &attribute.r#type {
+                    AttributeType::String => {
+                        let title = if let Some(description) = attribute.description.as_ref() {
+                            format!("{}({})", attribute.name, description)
+                        } else {
+                            format!("{}", attribute.name)
+                        };
+                        view! {
                             <div>
-                                {
-                                    match value {
-                                        AttributeValue::File(file) => {
-                                            file.view(move |file: UseStateHandle<Option<Resource>>, _validator| {
-                                                if let Some(file) = file.as_ref() {
-                                                    match file {
-                                                        Resource::Remote(metadata) => {
-                                                            let url = format!("/{}", metadata.key);
-                                                            html! {
-                                                                <a href={url} target="_blank">{metadata.name.clone()}</a>
+                                <div>{ title }</div>
+                                <div>
+                                    {
+                                        match value {
+                                            AttributeValue::String(value) => {
+                                                value.data().into_any()
+                                            },
+                                            _ => view!{}.into_any()
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        }
+                    },
+                    AttributeType::StringList => {
+                        let title = if let Some(description) = attribute.description.as_ref() {
+                            format!("{}({})", attribute.name, description)
+                        } else {
+                            format!("{}", attribute.name)
+                        };
+                        view! {
+                            <div>
+                                <div>{ title }</div>
+                                <div>
+                                    {
+                                        match value {
+                                            AttributeValue::StringList(value) => {
+                                                view! {
+                                                    <For
+                                                        each={
+                                                            let value_list = value.data();
+                                                            move || { value_list.get() }
+                                                        }
+                                                        key=|(key, _value)| { key.clone() }
+                                                        children=move |(_key, value)| {
+                                                            view! {
+                                                                <div>{value}</div>
                                                             }
                                                         }
-                                                        Resource::Local(hashing_file) => {
-                                                            html! { hashing_file.file.name() }
-                                                        }
-                                                    }
-                                                } else {
-                                                    html! {}
-                                                }
-                                            })
-                                        },
-                                        _ => html!{}
+                                                    />
+                                                }.into_any()
+                                            },
+                                            _ => view!{}.into_any()
+                                        }
                                     }
-                                }
+                                </div>
                             </div>
-                        </div>
-                    }
-                },
-                AttributeType::FileList => {
-                    let title = if let Some(description) = attribute.description.as_ref() {
-                        format!("{}({})", attribute.name, description)
-                    } else {
-                        format!("{}", attribute.name)
-                    };
-                    html! {
-                        <div key={key.clone()}>
-                            <div>{ title }</div>
+                        }
+                    },
+                    AttributeType::LongString => {
+                        let title = if let Some(description) = attribute.description.as_ref() {
+                            format!("{}({})", attribute.name, description)
+                        } else {
+                            format!("{}", attribute.name)
+                        };
+                        view! {
                             <div>
-                                {
-                                    match value {
-                                        AttributeValue::FileList(files) => {
-                                            files.view(move |files: UseStateHandle<Vec<(Key, Resource, ())>>, _validator| {
-                                                html! {
-                                                    for files.iter().map(|(_key, file, _)| {
+                                <div>{ title }</div>
+                                <div>
+                                    {
+                                        match value {
+                                            AttributeValue::LongString(value) => {
+                                                value.data().into_any()
+                                            },
+                                            _ => view!{}.into_any()
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        }
+                    },
+                    // AttributeType::RichText => {
+                    //     let title = if let Some(description) = attribute.description.as_ref() {
+                    //         format!("{}({})", attribute.name, description)
+                    //     } else {
+                    //         format!("{}", attribute.name)
+                    //     };
+                    //     view! {
+                    //         <div>
+                    //             <div>{ title }</div>
+                    //             <div>
+                    //                 {
+                    //                     match value {
+                    //                         AttributeValue::RichText(value) => {
+                    //                             value.view(move |value: RwSignal<JsValue>, _validator: UnsyncCallback<JsValue>| {
+                    //                                 let content = render_rich_rext(&value).unwrap();
+                    //                                 wrap_content(content)
+                    //                             })
+                    //                         },
+                    //                         _ => view!{}
+                    //                     }
+                    //                 }
+                    //             </div>
+                    //         </div>
+                    //     }
+                    // },
+                    AttributeType::Code { language } => {
+                        let title = if let Some(description) = attribute.description.as_ref() {
+                            format!("{}({})", attribute.name, description)
+                        } else {
+                            format!("{}", attribute.name)
+                        };
+                        view! {
+                            <div>
+                                <div>{ title }</div>
+                                <div>
+                                    {
+                                        match value {
+                                            AttributeValue::Code(value) => {
+                                                let language = SharedString::from(language.clone());
+                                                view! {
+                                                    <MonacoEditor value={value.data()} language={language} readonly={true} width={SharedString::from("100%")} height={SharedString::from("16em")}/>
+                                                }.into_any()
+                                            },
+                                            _ => view!{}.into_any()
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        }
+                    },
+                    AttributeType::Password => {
+                        let title = if let Some(description) = attribute.description.as_ref() {
+                            format!("{}({})", attribute.name, description)
+                        } else {
+                            format!("{}", attribute.name)
+                        };
+                        view! {
+                            <div>
+                                <div>{ title }</div>
+                                <div>
+                                    {
+                                        match value {
+                                            AttributeValue::Password(value) => {
+                                                let value = value.data();
+                                                (move || {
+                                                    let len = value.read().chars().count();
+                                                    "*".repeat(len).into_any()
+                                                }).into_any()
+                                            },
+                                            _ => view!{}.into_any()
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        }
+                    },
+                    AttributeType::Enum { options } => {
+                        let title = if let Some(description) = attribute.description.as_ref() {
+                            format!("{}({})", attribute.name, description)
+                        } else {
+                            format!("{}", attribute.name)
+                        };
+                        view! {
+                            <div>
+                                <div>{ title }</div>
+                                <div>
+                                    {
+                                        match value {
+                                            AttributeValue::Enum(value) => {
+                                                let options = options.clone();
+                                                let value = value.data();
+                                                (move || {
+                                                    let value = value.read();
+                                                    let label = options.iter().find(|option| {
+                                                        value.as_deref() == Some(option.value.as_str())
+                                                    }).map(|option| option.label.clone()).unwrap_or_default();
+                                                    label
+                                                }).into_any()
+                                            },
+                                            _ => view!{}.into_any()
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        }
+                    },
+                    AttributeType::EnumList { options } => {
+                        let title = if let Some(description) = attribute.description.as_ref() {
+                            format!("{}({})", attribute.name, description)
+                        } else {
+                            format!("{}", attribute.name)
+                        };
+                        view! {
+                            <div>
+                                <div>{ title }</div>
+                                <div>
+                                    {
+                                        match value {
+                                            AttributeValue::EnumList(values) => {
+                                                let options = options.clone();
+                                                let values = values.data();
+                                                (move || {
+                                                    let values = values.read();
+                                                    let labels: Vec<&str> = options.iter().filter(|option| {
+                                                        values.iter().any(|value| value == &option.value)
+                                                    }).map(|option| option.label.as_ref()).collect();
+                                                    labels.join(",")
+                                                }).into_any()
+                                            },
+                                            _ => view!{}.into_any()
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        }
+                    },
+                    AttributeType::Bool => {
+                        let title = if let Some(description) = attribute.description.as_ref() {
+                            format!("{}({})", attribute.name, description)
+                        } else {
+                            format!("{}", attribute.name)
+                        };
+                        view! {
+                            <div>
+                                <div>{ title }</div>
+                                <div>
+                                    {
+                                        match value {
+                                            AttributeValue::Bool(value) => {
+                                                (move || {
+                                                    if value.get() {
+                                                        "是"
+                                                    } else {
+                                                        "否"
+                                                    }
+                                                }).into_any()
+                                            },
+                                            _ => view!{}.into_any()
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                    AttributeType::File => {
+                        let title = if let Some(description) = attribute.description.as_ref() {
+                            format!("{}({})", attribute.name, description)
+                        } else {
+                            format!("{}", attribute.name)
+                        };
+                        view! {
+                            <div>
+                                <div>{ title }</div>
+                                <div>
+                                    {
+                                        match value {
+                                            AttributeValue::File(file) => {
+                                                let file = file.data();
+                                                (move || {
+                                                    if let Some(file) = file.get() {
                                                         match file {
                                                             Resource::Remote(metadata) => {
                                                                 let url = format!("/{}", metadata.key);
-                                                                html! {
-                                                                    <a href={url} target="_blank">{metadata.name.clone()}</a>
-                                                                }
+                                                                view! {
+                                                                    <a href={url} target="_blank">{metadata.name}</a>
+                                                                }.into_any()
                                                             }
                                                             Resource::Local(hashing_file) => {
-                                                                html! { hashing_file.file.name() }
+                                                                hashing_file.file.name().into_any()
                                                             }
                                                         }
-                                                    })
-                                                }
-                                            })
-                                        },
-                                        _ => html!{}
+                                                    } else {
+                                                        view! {}.into_any()
+                                                    }
+                                                }).into_any()
+                                            },
+                                            _ => view!{}.into_any()
+                                        }
                                     }
-                                }
+                                </div>
                             </div>
-                        </div>
-                    }
-                },
+                        }
+                    },
+                    AttributeType::FileList => {
+                        let title = if let Some(description) = attribute.description.as_ref() {
+                            format!("{}({})", attribute.name, description)
+                        } else {
+                            format!("{}", attribute.name)
+                        };
+                        view! {
+                            <div>
+                                <div>{ title }</div>
+                                <div>
+                                    {
+                                        match value {
+                                            AttributeValue::FileList(files) => {
+                                                let files = files.data();
+                                                view! {
+                                                    <For
+                                                        each={
+                                                            let files = files.clone();
+                                                            move || { files.get() }
+                                                        }
+                                                        key=|(key, _file, _)| { key.clone() }
+                                                        children=move |(_key, file, _)| {
+                                                            (move || {
+                                                                match file.get() {
+                                                                    Resource::Remote(metadata) => {
+                                                                        let url = format!("/{}", metadata.key);
+                                                                        view! {
+                                                                            <a href={url} target="_blank">{metadata.name}</a>
+                                                                        }.into_any()
+                                                                    }
+                                                                    Resource::Local(hashing_file) => {
+                                                                        hashing_file.file.name().into_any()
+                                                                    }
+                                                                }
+                                                            }).into_any()
+                                                        }
+                                                    />
+                                                }.into_any()
+                                            },
+                                            _ => view!{}.into_any()
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        }
+                    },
+                }
             }
-        })
+        />
     }
 }
 
@@ -816,7 +879,7 @@ pub fn serialize_config(attributes: &[(Key, Attribute, AttributeValue)]) -> Stri
                 value
                     .get()
                     .into_iter()
-                    .map(|(_, value)| Value::String(value.to_string()))
+                    .map(|(_, value)| Value::String(value.read().to_string()))
                     .collect(),
             ),
             AttributeValue::LongString(value) => Value::String(value.get().to_string()),
@@ -825,7 +888,13 @@ pub fn serialize_config(attributes: &[(Key, Attribute, AttributeValue)]) -> Stri
             // }
             AttributeValue::Code(value) => Value::String(value.get().to_string()),
             AttributeValue::Password(value) => Value::String(value.get().to_string()),
-            AttributeValue::Enum(value) => Value::String(value.get().to_string()),
+            AttributeValue::Enum(value) => {
+                if let Some(value) = value.get() {
+                    Value::String(value.to_string())
+                } else {
+                    Value::Null
+                }
+            }
             AttributeValue::EnumList(values) => Value::Array(
                 values
                     .get()
@@ -861,7 +930,7 @@ pub fn serialize_config(attributes: &[(Key, Attribute, AttributeValue)]) -> Stri
                 value
                     .get()
                     .into_iter()
-                    .map(|(_, file, _)| match file {
+                    .map(|(_, file, _)| match file.get() {
                         Resource::Remote(metadata) => {
                             let mut map = serde_json::Map::new();
                             map.insert(String::from("key"), Value::String(metadata.key));
@@ -900,7 +969,7 @@ fn get_string_validators(attribute: &Attribute) -> Option<Validators<SharedStrin
 
 fn get_string_list_validators(
     attribute: &Attribute,
-) -> Option<Validators<Vec<(Key, SharedString)>>> {
+) -> Option<Validators<Vec<(Key, RwSignal<SharedString>)>>> {
     return if attribute.required && AttributeType::Bool != attribute.r#type {
         Some(Validators::new().add(RequiredValidator::new(format!("请输入{}", attribute.name))))
     } else {
@@ -908,7 +977,9 @@ fn get_string_list_validators(
     };
 }
 
-fn get_file_list_validators(attribute: &Attribute) -> Option<Validators<Vec<(Key, Resource, ())>>> {
+fn get_file_list_validators(
+    attribute: &Attribute,
+) -> Option<Validators<Vec<(Key, RwSignal<Resource, LocalStorage>, ())>>> {
     return if attribute.required && AttributeType::Bool != attribute.r#type {
         Some(Validators::new().add(RequiredValidator::new(format!(
             "请上传文件{}",
@@ -983,12 +1054,12 @@ fn get_default_value(attribute: &Attribute) -> AttributeValue {
                 None
             },
         )),
-        AttributeType::Bool => AttributeValue::Bool(Binding::new(Default::default())),
-        AttributeType::File => AttributeValue::File(ValidateData::new(
+        AttributeType::Bool => AttributeValue::Bool(RwSignal::new(Default::default())),
+        AttributeType::File => AttributeValue::File(ValidateData::new_local(
             Default::default(),
             get_file_validators(&attribute),
         )),
-        AttributeType::FileList => AttributeValue::FileList(ValidateData::new(
+        AttributeType::FileList => AttributeValue::FileList(ValidateData::new_local(
             Default::default(),
             get_file_list_validators(attribute),
         )),
@@ -1006,7 +1077,7 @@ fn get_value(attribute: &Attribute, value: Value) -> AttributeValue {
             AttributeValue::String(ValidateData::new(value.into(), validators))
         }
         AttributeType::StringList => {
-            let value: Vec<(Key, SharedString)> = value
+            let value: Vec<(Key, RwSignal<SharedString>)> = value
                 .as_array()
                 .map(|value| {
                     value
@@ -1014,8 +1085,12 @@ fn get_value(attribute: &Attribute, value: Value) -> AttributeValue {
                         .map(|value| {
                             value
                                 .as_str()
-                                .map(|value| (gen_id().into(), value.to_string().into()))
-                                .unwrap_or_else(|| (gen_id().into(), Default::default()))
+                                .map(|value| {
+                                    (gen_id().into(), RwSignal::new(value.to_string().into()))
+                                })
+                                .unwrap_or_else(|| {
+                                    (gen_id().into(), RwSignal::new(Default::default()))
+                                })
                         })
                         .collect()
                 })
@@ -1068,10 +1143,9 @@ fn get_value(attribute: &Attribute, value: Value) -> AttributeValue {
         AttributeType::Enum { .. } => {
             let value = value
                 .as_str()
-                .map(|value| value.to_string())
-                .unwrap_or_default();
+                .map(|value| SharedString::from(value.to_string()));
             AttributeValue::Enum(ValidateData::new(
-                value.into(),
+                value,
                 if attribute.required {
                     Some(
                         Validators::new()
@@ -1111,7 +1185,7 @@ fn get_value(attribute: &Attribute, value: Value) -> AttributeValue {
         }
         AttributeType::Bool => {
             let value = value.as_bool().unwrap_or_default();
-            AttributeValue::Bool(Binding::new(value))
+            AttributeValue::Bool(RwSignal::new(value))
         }
         AttributeType::File => {
             let value = match value {
@@ -1145,13 +1219,13 @@ fn get_value(attribute: &Attribute, value: Value) -> AttributeValue {
                 }
                 _ => unreachable!(),
             };
-            AttributeValue::File(ValidateData::new(
+            AttributeValue::File(ValidateData::new_local(
                 value.into(),
                 get_file_validators(&attribute),
             ))
         }
         AttributeType::FileList => {
-            let value: Vec<(Key, Resource, ())> = value
+            let value: Vec<(Key, RwSignal<Resource, LocalStorage>, ())> = value
                 .as_array()
                 .map(|value| {
                     value
@@ -1185,14 +1259,14 @@ fn get_value(attribute: &Attribute, value: Value) -> AttributeValue {
                                         size: size,
                                         mime_type: mime_type,
                                     });
-                                    (gen_id().into(), file, ())
+                                    (gen_id().into(), RwSignal::new_local(file), ())
                                 })
                                 .unwrap()
                         })
                         .collect()
                 })
                 .unwrap_or_default();
-            AttributeValue::FileList(ValidateData::new(
+            AttributeValue::FileList(ValidateData::new_local(
                 value.into(),
                 get_file_list_validators(attribute),
             ))
@@ -1220,19 +1294,16 @@ pub fn get_parameter_schema<'a>(
         .map(|operation| &operation.parameter_schema);
 }
 
-pub fn wrap_content(content: DocumentFragment) -> Html {
+pub fn wrap_content(content: DocumentFragment) -> impl IntoView {
     let container = web_sys::window()
         .unwrap()
         .document()
         .unwrap()
         .create_element("div")
         .unwrap();
-    container.set_attribute("class", "rich-text").unwrap();
-    container
-        .set_attribute("style", "padding-left:0.25em;padding-right:0.25em;")
-        .unwrap();
     container.append_child(&content).unwrap();
-    return html! {
-        { Html::VRef(container.into()) }
+    let inner_html = container.inner_html();
+    return view! {
+        <div inner_html={inner_html} class="rich-text" style="padding-left:0.25em;padding-right:0.25em;"/>
     };
 }

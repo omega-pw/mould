@@ -1,107 +1,43 @@
 use crate::SharedString;
-use yew::html::Scope;
-use yew::prelude::*;
-use yew::{html, Component, Context, Html};
+use leptos::prelude::*;
 
-struct State {
-    title: SharedString,
+#[component]
+pub fn Dialog(
+    #[prop(into)] title: Signal<SharedString>,
     closable: bool,
-    style: SharedString,
-    content_style: SharedString,
-}
-
-pub enum Msg {
-    Close,
-}
-
-#[derive(Clone, PartialEq, Properties)]
-pub struct Props {
-    pub title: SharedString,
-    pub closable: bool,
-    #[prop_or_default]
-    pub style: SharedString,
-    #[prop_or_default]
-    pub content_style: SharedString,
-    #[prop_or_default]
-    pub onclose: Option<Callback<()>>,
-    pub children: Children,
-}
-
-pub struct Dialog {
-    state: State,
+    #[prop(into, optional)] style: SharedString,
+    #[prop(into, optional)] content_style: SharedString,
+    #[prop(into, default = None)] onclose: Option<UnsyncCallback<()>>,
     children: Children,
-}
-
-impl Component for Dialog {
-    type Message = Msg;
-    type Properties = Props;
-
-    fn create(ctx: &Context<Self>) -> Self {
-        let props = ctx.props();
-        let state = State {
-            title: props.title.clone(),
-            closable: props.closable,
-            style: props.style.clone(),
-            content_style: props.content_style.clone(),
-        };
-        Dialog {
-            state,
-            children: props.children.clone(),
-        }
+) -> impl IntoView {
+    let mut actual_content_style = String::from("background-color:#FFF;");
+    if !content_style.is_empty() {
+        actual_content_style.push_str(&content_style);
     }
-
-    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
-        match msg {
-            Msg::Close => match ctx.props().onclose.as_ref() {
-                Some(onclose) => {
-                    onclose.emit(());
-                }
-                None => (),
-            },
-        }
-        return true;
-    }
-
-    fn changed(&mut self, ctx: &Context<Self>, _old_props: &Self::Properties) -> bool {
-        let props = ctx.props();
-        self.state.title = props.title.clone();
-        self.state.closable = props.closable.clone();
-        self.state.style = props.style.clone();
-        self.state.content_style = props.content_style.clone();
-        self.children = props.children.clone();
-        return true;
-    }
-
-    fn view(&self, ctx: &Context<Self>) -> Html {
-        let mut content_style = String::from("background-color:#FFF;");
-        if !self.state.content_style.is_empty() {
-            content_style.push_str(&self.state.content_style);
-        }
-        html! {
-            <div style={self.state.style.clone()}>
-                <div class="e-title-bar" style="height: 2em;line-height: 2em;position: relative;font-weight: normal;margin: 0;padding-left: 0.5em;">
-                    {&self.state.title}
-                    {self.close_view(ctx.link())}
-                </div>
-                <div style={content_style}>
-                    { self.children.clone() }
-                </div>
+    view! {
+        <div style={style.to_string()}>
+            <div class="e-title-bar" style="height: 2em;line-height: 2em;position: relative;font-weight: normal;margin: 0;padding-left: 0.5em;">
+                {title}
+                <Show
+                    when=move || { closable }
+                >
+                    {
+                        let on_close = move |_| {
+                            if let Some(onclose) = onclose.as_ref() {
+                                onclose.run(());
+                            }
+                        };
+                        view! {
+                            <span class="btn-close" on:click={on_close} style="position: absolute;top: 0;right: 0;width: 2em;height: 2em;text-align: center;cursor: pointer;">
+                                <i class="fas fa-times"></i>
+                            </span>
+                        }
+                    }
+                </Show>
             </div>
-        }
-    }
-}
-
-impl Dialog {
-    fn close_view(&self, link: &Scope<Self>) -> Html {
-        if self.state.closable {
-            let on_close = link.callback(|_| Msg::Close);
-            html! {
-                <span class="btn-close" onclick={on_close} style="position: absolute;top: 0;right: 0;width: 2em;height: 2em;text-align: center;cursor: pointer;">
-                    <i class="fas fa-times"></i>
-                </span>
-            }
-        } else {
-            html! {}
-        }
+            <div style={actual_content_style}>
+                { children() }
+            </div>
+        </div>
     }
 }

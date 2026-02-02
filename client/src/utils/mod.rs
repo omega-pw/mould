@@ -1,7 +1,5 @@
 pub mod ajax;
-pub mod binding;
 pub mod handle;
-pub mod list;
 pub mod request;
 pub mod result;
 pub mod validator;
@@ -11,6 +9,7 @@ use crate::components::Resource;
 use crate::components::ResourceMetadata;
 use crate::js;
 use crate::sdk;
+use crate::Key;
 use crate::SharedString;
 use base64::engine::Engine;
 use base64::prelude::BASE64_STANDARD;
@@ -32,11 +31,13 @@ use js_sys::Function;
 use js_sys::Math::random;
 use js_sys::Promise;
 use js_sys::Uint8Array;
+use leptos::prelude::*;
 use log;
 use request::ApiExt;
 use sdk::storage::UPLOAD_API;
 use sdk::system::get_system_info::GetSystemInfoApi;
 use sdk::system::get_system_info::GetSystemInfoReq;
+use send_wrapper::SendWrapper;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::future::Future;
@@ -44,16 +45,16 @@ use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::atomic::AtomicI64;
 use std::sync::atomic::Ordering;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 use tihu::api::Response as CommonResponse;
 use tihu::client_id::ClientId;
 use tihu::Id;
+use tihu::Pagination;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
+use web_sys::HtmlElement;
 use web_sys::{FormData, Request, RequestInit, Response};
-use yew::prelude::*;
-use yew::virtual_dom::Key;
 
 static TIME_DIFF: AtomicI64 = AtomicI64::new(0);
 
@@ -106,10 +107,7 @@ async fn build_request(api: &str, body: &str) -> Request {
     let mut opts = RequestInit::new();
     opts.method("POST");
     let mut headers: HashMap<&str, String> = HashMap::new();
-    headers.insert(
-        "Content-Type",
-        "application/json".to_string(),
-    );
+    headers.insert("Content-Type", "application/json".to_string());
     headers.insert("X-Client-Id", client_id);
     let body_hash: String = BASE64_STANDARD.encode(&body_hash);
     headers.insert("X-Hash", body_hash);
@@ -156,26 +154,26 @@ fn get_or_init_client_key_pair() -> Result<(RsaPubKey2048, RsaPriKey2048), Share
 async fn ajax_inner(request: &Request) -> Result<SharedString, SharedString> {
     let window = web_sys::window().ok_or_else(|| -> SharedString {
         log::error!("获取窗口对象失败");
-        return SharedString::Static("获取窗口对象失败");
+        return SharedString::from("获取窗口对象失败");
     })?;
     let resp_value = JsFuture::from(window.fetch_with_request(request))
         .await
         .map_err(|err| -> SharedString {
             log::error!("请求接口错误: {:?}", err);
-            return SharedString::Static("请求接口错误");
+            return SharedString::from("请求接口错误");
         })?;
     let response: Response = resp_value.dyn_into().unwrap();
     if !response.ok() {
         log::error!("响应状态码错误：{}", response.status());
-        return Err(SharedString::Static("响应状态码错误"));
+        return Err(SharedString::from("响应状态码错误"));
     } else {
         let text = response.text().map_err(|err| -> SharedString {
             log::error!("响应数据编码格式不正确: {:?}", err);
-            return SharedString::Static("响应数据编码格式不正确");
+            return SharedString::from("响应数据编码格式不正确");
         })?;
         let body = JsFuture::from(text).await.map_err(|err| -> SharedString {
             log::error!("响应数据编码格式不正确: {:?}", err);
-            return SharedString::Static("响应数据编码格式不正确");
+            return SharedString::from("响应数据编码格式不正确");
         })?;
         return Ok(body.as_string().unwrap().into());
     }
@@ -188,10 +186,10 @@ pub async fn default_http_requestor(
     return ajax_inner(&request).await;
 }
 
-impl request::Handler<bool, bool> for UseStateHandle<bool> {
+impl request::Handler<bool, bool> for RwSignal<bool> {
     fn handle(&self, lock: bool) -> Pin<Box<dyn Future<Output = bool>>> {
         let result = if lock {
-            if *self.deref() {
+            if self.get() {
                 false
             } else {
                 self.set(true);
@@ -256,13 +254,16 @@ pub enum LoadStatus {
 }
 
 pub fn gen_id() -> String {
-    unsafe {
-        return super::ID_GEN.as_mut().unwrap().generate();
-    }
+    LazyLock::force(&super::ID_GEN)
+        .lock()
+        .unwrap()
+        .as_mut()
+        .map(|id_gen| id_gen.generate())
+        .unwrap()
 }
 
-pub fn empty_html() -> Html {
-    html! {}
+pub fn empty_html() -> impl IntoView {
+    view! {}
 }
 
 pub fn fill_random_bytes(data: &mut [u8]) {
@@ -331,25 +332,27 @@ pub async fn upload_file(
 pub fn add_upload_tasks(
     tasks: &mut Vec<(
         HashingFile,
-        Callback<Result<ResourceMetadata, SharedString>>,
+        UnsyncCallback<Result<ResourceMetadata, SharedString>>,
     )>,
-    handle: &UseStateHandle<Vec<(Key, Resource, Option<Id>)>>,
+    handle: &RwSignal<Vec<(Key, RwSignal<Resource, LocalStorage>, Option<Id>)>, LocalStorage>,
 ) -> Result<
     Vec<oneshot::Receiver<(Key, Result<ResourceMetadata, SharedString>, Option<Id>)>>,
     SharedString,
 > {
+    let handle = handle.read();
     let mut receivers = Vec::with_capacity(handle.len());
     for (key, resource, id) in handle.iter() {
         let (sender, receiver) =
             oneshot::channel::<(Key, Result<ResourceMetadata, SharedString>, Option<Id>)>();
-        match resource {
+        let resource = resource.read();
+        match resource.deref() {
             Resource::Local(hashing_file) => {
                 let key = key.clone();
                 let sender = Mutex::new(Some(sender));
                 let id = id.clone();
                 tasks.push((
                     hashing_file.clone(),
-                    Callback::from(move |result: Result<ResourceMetadata, SharedString>| {
+                    UnsyncCallback::new(move |result: Result<ResourceMetadata, SharedString>| {
                         if let Err(err) = result.as_ref() {
                             log::error!("上传资源文件失败: {:?}", err);
                         }
@@ -373,12 +376,13 @@ pub fn add_upload_tasks(
 pub fn add_upload_task(
     tasks: &mut Vec<(
         HashingFile,
-        Callback<Result<ResourceMetadata, SharedString>>,
+        UnsyncCallback<Result<ResourceMetadata, SharedString>>,
     )>,
-    handle: UseStateHandle<Option<Resource>>,
+    handle: RwSignal<Option<Resource>, LocalStorage>,
 ) -> Result<oneshot::Receiver<Result<ResourceMetadata, SharedString>>, SharedString> {
+    let handle_guard = handle.read();
     let (sender, receiver) = oneshot::channel::<Result<ResourceMetadata, SharedString>>();
-    let resource = handle
+    let resource = handle_guard
         .deref()
         .as_ref()
         .ok_or_else(|| SharedString::from("没有选择资源文件"))?;
@@ -388,7 +392,7 @@ pub fn add_upload_task(
             let sender = Mutex::new(Some(sender));
             tasks.push((
                 hashing_file,
-                Callback::from(move |result: Result<ResourceMetadata, SharedString>| {
+                UnsyncCallback::new(move |result: Result<ResourceMetadata, SharedString>| {
                     match result.as_ref() {
                         Ok(metadata) => {
                             handle.set(Some(Resource::Remote(metadata.clone())));
@@ -410,19 +414,21 @@ pub fn add_upload_task(
     return Ok(receiver);
 }
 
-static mut LAST_DOM: Option<(web_sys::HtmlInputElement, js_sys::Function)> = None;
+static LAST_DOM: LazyLock<
+    Mutex<Option<SendWrapper<(web_sys::HtmlInputElement, js_sys::Function)>>>,
+> = LazyLock::new(|| Mutex::new(None));
 
 fn clean_last_dom() {
-    if let Some((file_dom, on_change)) = unsafe { &LAST_DOM } {
+    let last_dom = LazyLock::force(&LAST_DOM);
+    let last_dom = last_dom.lock().unwrap().take();
+    if let Some(wrapper) = last_dom {
+        let (file_dom, on_change) = wrapper.take();
         file_dom
-            .remove_event_listener_with_callback("change", on_change)
+            .remove_event_listener_with_callback("change", &on_change)
             .unwrap();
         let document = web_sys::window().unwrap().document().unwrap();
         //如果上一次上传用户点击了取消，则没有执行change回调，把上一次生成的节点移除掉
-        document.body().unwrap().remove_child(file_dom).unwrap();
-        unsafe {
-            LAST_DOM.take();
-        }
+        document.body().unwrap().remove_child(&file_dom).unwrap();
     }
 }
 
@@ -434,7 +440,9 @@ pub fn choose_file(cb: impl Fn(Option<web_sys::FileList>) + 'static, accept: Opt
         .unwrap()
         .dyn_into()
         .unwrap();
-    file_dom.style().set_property("display", "none").unwrap();
+    HtmlElement::style(&file_dom)
+        .set_property("display", "none")
+        .unwrap();
     file_dom.set_attribute("type", "file").unwrap();
     if let Some(accept) = accept {
         file_dom.set_attribute("accept", &accept).unwrap();
@@ -450,9 +458,11 @@ pub fn choose_file(cb: impl Fn(Option<web_sys::FileList>) + 'static, accept: Opt
         .unwrap();
     //如果不添加到文档里，IE下不能弹出选择文件的对话框
     document.body().unwrap().append_child(&file_dom).unwrap();
-    unsafe {
-        LAST_DOM.replace((file_dom.clone(), on_change));
-    }
+    let last_dom = LazyLock::force(&LAST_DOM);
+    last_dom
+        .lock()
+        .unwrap()
+        .replace(SendWrapper::new((file_dom.clone(), on_change)));
     file_dom.click();
 }
 
@@ -465,35 +475,77 @@ pub fn trigger_resize() {
     window.dispatch_event(&event).unwrap();
 }
 
-pub fn move_up<T: Clone>(list: &UseStateHandle<Vec<T>>, index: usize) -> bool {
+pub fn move_up<T>(list: &RwSignal<Vec<T>>, index: usize) -> bool
+where
+    T: Send + Sync + 'static,
+{
+    let mut list = list.write();
     if 0 < index && index < list.len() {
-        let mut new_list = list.deref().clone();
-        new_list.swap(index - 1, index);
-        list.set(new_list);
+        list.swap(index - 1, index);
         return true;
     } else {
         return false;
     }
 }
 
-pub fn move_down<T: Clone>(list: &UseStateHandle<Vec<T>>, index: usize) -> bool {
+pub fn move_down<T>(list: &RwSignal<Vec<T>>, index: usize) -> bool
+where
+    T: Send + Sync + 'static,
+{
+    let mut list = list.write();
     if index + 1 < list.len() {
-        let mut new_list = list.deref().clone();
-        new_list.swap(index, index + 1);
-        list.set(new_list);
+        list.swap(index, index + 1);
         return true;
     } else {
         return false;
     }
 }
 
-pub fn remove_item<T: Clone>(list: &UseStateHandle<Vec<T>>, index: usize) -> bool {
+pub fn remove_item<T>(list: &RwSignal<Vec<T>>, index: usize) -> bool
+where
+    T: Send + Sync + 'static,
+{
+    let mut list = list.write();
     if index < list.len() {
-        let mut new_list = list.deref().clone();
-        new_list.remove(index);
-        list.set(new_list);
+        list.remove(index);
         return true;
     } else {
         return false;
     }
+}
+
+pub fn fix_page_no<T>(pagination: &RwSignal<Pagination>, list: &RwSignal<Vec<T>>) -> u64
+where
+    T: Send + Sync + 'static,
+{
+    let mut page_no = pagination.read().page_no;
+    page_no = if list.read().is_empty() && 0 < page_no {
+        page_no - 1
+    } else {
+        page_no
+    };
+    page_no = page_no.max(1);
+    return page_no;
+}
+
+pub fn list_exception_view<T>(
+    list: RwSignal<Vec<T>, SyncStorage>,
+    list_load_status: RwSignal<LoadStatus>,
+) -> impl IntoView
+where
+    T: Send + Sync + 'static,
+{
+    return move || match list_load_status.get() {
+        LoadStatus::LoadFailed => view! {
+            <p class="align-center">{"列表加载失败"}</p>
+        }
+        .into_any(),
+        LoadStatus::LoadOk => view! {
+            <Show when={ move || list.read().is_empty() }>
+                <p class="align-center">{"列表数据为空"}</p>
+            </Show>
+        }
+        .into_any(),
+        _ => view! {}.into_any(),
+    };
 }
