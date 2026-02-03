@@ -1,3 +1,4 @@
+use crate::context::RPC_TIMEOUT;
 use crate::get_context;
 use crate::log;
 use crate::middleware::auth::Guest;
@@ -160,6 +161,7 @@ pub async fn send_email_captcha(
                 &send_email_captcha_req.email,
                 "欢迎注册",
                 mail_content,
+                Some(Duration::from_secs(RPC_TIMEOUT)),
             )
             .await
             .map_err(|err| {
@@ -204,6 +206,7 @@ pub async fn send_email_captcha(
                 &send_email_captcha_req.email,
                 "重置密码",
                 mail_content,
+                Some(Duration::from_secs(RPC_TIMEOUT)),
             )
             .await
             .map_err(|err| {

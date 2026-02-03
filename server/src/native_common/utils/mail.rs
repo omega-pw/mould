@@ -5,6 +5,7 @@ use lettre::message::Mailbox;
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
 use std::str::FromStr;
+use std::time::Duration;
 
 pub async fn send_mail<S: Into<String>, T: IntoBody>(
     mail_host: &str,
@@ -18,6 +19,7 @@ pub async fn send_mail<S: Into<String>, T: IntoBody>(
     to_addr: &str,
     subject: S,
     body: T,
+    timeout: Option<Duration>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let email = Message::builder()
         .from(Mailbox {
@@ -37,8 +39,11 @@ pub async fn send_mail<S: Into<String>, T: IntoBody>(
     } else {
         AsyncSmtpTransport::<Tokio1Executor>::relay(mail_host)?
     };
-    let mailer: AsyncSmtpTransport<Tokio1Executor> =
-        builder.port(mail_port).credentials(credentials).build();
+    let mailer: AsyncSmtpTransport<Tokio1Executor> = builder
+        .port(mail_port)
+        .credentials(credentials)
+        .timeout(timeout)
+        .build();
     mailer.send(email).await?;
     return Ok(());
 }
