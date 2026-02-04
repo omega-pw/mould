@@ -17,6 +17,7 @@ use native_common::cache::AsyncCache;
 use native_common::cache::EliminateType;
 use native_common::utils::fill_random;
 use native_common::utils::send_mail;
+use native_common::utils::turnstile::validate_token;
 use native_common::utils::DEFAULT_SEED;
 use sdk::auth::send_email_captcha::Scene as SdkScene;
 use sdk::auth::send_email_captcha::SendEmailCaptchaReq;
@@ -54,10 +55,19 @@ pub async fn send_email_captcha(
     guest: Guest,
     send_email_captcha_req: SendEmailCaptchaReq,
 ) -> Result<SendEmailCaptchaResp, ErrNo> {
+    let context = get_context()?;
+    if let Some(turnstile) = context.config.turnstile.as_ref() {
+        let token = send_email_captcha_req
+            .token
+            .ok_or_else(|| ErrNo::CommonError(SharedString::from_static("token不能为空！")))?;
+        let ok = validate_token(turnstile.secret_key.clone(), token, None, RPC_TIMEOUT).await?;
+        if !ok {
+            return Err(ErrNo::TokenInvalid);
+        }
+    }
     let mut captcha = vec!['0'; 8];
     fill_random(&mut captcha, DEFAULT_SEED);
     let mut captcha: String = captcha.into_iter().collect();
-    let context = get_context()?;
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
     let email_existed =

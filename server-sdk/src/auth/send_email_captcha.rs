@@ -13,6 +13,7 @@ pub enum Scene {
 
 #[derive(Serialize, Deserialize, Debug, Validate)]
 pub struct SendEmailCaptchaReq {
+    pub token: Option<String>,
     pub scene: Scene,
     #[validate(email)]
     pub email: String,

@@ -1,3 +1,5 @@
+use super::super::common::turnstile::TokenResult;
+use super::super::common::turnstile::Turnstile;
 use crate::components::button::Button;
 use crate::components::center_middle::CenterMiddle;
 use crate::components::input::Input;
@@ -36,6 +38,7 @@ struct RegisterForm {
 
 #[component]
 pub fn Register(ondone: UnsyncCallback<GetCurrUserResp>) -> impl IntoView {
+    let token_result: RwSignal<Option<TokenResult>> = RwSignal::new(None);
     let form = RegisterForm {
         account: RwSignal::new("".into()),
         password: RwSignal::new("".into()),
@@ -57,8 +60,25 @@ pub fn Register(ondone: UnsyncCallback<GetCurrUserResp>) -> impl IntoView {
     let account = form.account.clone();
     let on_send_captcha = UnsyncCallback::new(move |_| {
         let account = account.clone();
+        let token_result = token_result.clone();
         wasm_bindgen_futures::spawn_local(async move {
-            start_send_captcha(account.read().to_string()).await.ok();
+            if let Some(token_result) = token_result.get() {
+                match token_result {
+                    TokenResult::NotRequired => {
+                        start_send_captcha(account.read().to_string(), None)
+                            .await
+                            .ok();
+                    }
+                    TokenResult::Success(token) => {
+                        start_send_captcha(account.read().to_string(), Some(token.to_string()))
+                            .await
+                            .ok();
+                    }
+                    TokenResult::Failure(error) => {
+                        err_msg.set(Some(error));
+                    }
+                }
+            }
         });
     });
     let is_registering_clone = is_registering.clone();
@@ -98,8 +118,16 @@ pub fn Register(ondone: UnsyncCallback<GetCurrUserResp>) -> impl IntoView {
                 <tr>
                     <td class="align-right" style="width:6em;padding-bottom: 1em;">{"验证码："}</td>
                     <td style="padding-bottom: 1em;">
-                        <Input value={form.captcha.clone()} onfocus={clear_err_msg} onenter={on_submit.clone()} style="width:9em;"/>
-                        <Button onclick={on_send_captcha}>{"发送验证码"}</Button>
+                        <Turnstile ondone={
+                            let token_result = token_result.clone();
+                            UnsyncCallback::new(move |result| {
+                                token_result.set(Some(result));
+                            })
+                        }/>
+                        <div>
+                            <Input value={form.captcha.clone()} onfocus={clear_err_msg} onenter={on_submit.clone()} style="width:9em;"/>
+                            <Button disabled={move || token_result.get().is_none()} onclick={on_send_captcha}>{"发送验证码"}</Button>
+                        </div>
                     </td>
                 </tr>
                 <tr>
@@ -151,8 +179,9 @@ fn chk_form_err(form: &RegisterForm) -> Vec<SharedString> {
     return err_msgs;
 }
 
-async fn start_send_captcha(account: String) -> Result<(), SharedString> {
+async fn start_send_captcha(account: String, token: Option<String>) -> Result<(), SharedString> {
     let params = SendEmailCaptchaReq {
+        token: token,
         scene: Scene::Register,
         email: account,
     };

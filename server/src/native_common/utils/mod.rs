@@ -4,6 +4,7 @@ mod mail;
 pub mod set;
 mod snowflake;
 mod sql;
+pub mod turnstile;
 pub use encrypt::*;
 pub use mail::*;
 pub use snowflake::LazySnowflake;

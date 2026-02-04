@@ -2,6 +2,7 @@ pub mod ajax;
 pub mod handle;
 pub mod request;
 pub mod result;
+pub mod script_loader;
 pub mod validator;
 use crate::components;
 use crate::components::HashingFile;

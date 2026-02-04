@@ -13,6 +13,7 @@ pub use origin::EmailAccount;
 pub use origin::EmailTemplate;
 pub use origin::Oauth2Server;
 pub use origin::OpenidServer;
+pub use origin::Turnstile;
 use rsa::{RsaPrivateKey, RsaPublicKey};
 use std::collections::HashMap;
 use std::fs::read_to_string;
@@ -83,6 +84,7 @@ pub struct Config {
     pub openid_servers: HashMap<String, OpenidServer>,
     pub email_account: Arc<EmailAccount>,
     pub email_template: EmailTemplate,
+    pub turnstile: Option<Turnstile>,
 }
 
 impl Config {
@@ -144,6 +146,7 @@ impl Config {
             openid_servers: config.openid_servers,
             email_account: Arc::new(config.email_account),
             email_template: email_template,
+            turnstile: config.turnstile,
         });
     }
 }

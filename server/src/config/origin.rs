@@ -68,6 +68,12 @@ pub struct EmailTemplate {
     pub reset_password_captcha: String,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Turnstile {
+    pub site_key: String,
+    pub secret_key: String,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     pub host: Option<IpAddr>,
@@ -91,6 +97,7 @@ pub struct Config {
     pub openid_servers: HashMap<String, OpenidServer>,
     pub email_account: EmailAccount,
     pub email_template: EmailTemplate,
+    pub turnstile: Option<Turnstile>,
 }
 
 impl Config {
