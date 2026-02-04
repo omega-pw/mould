@@ -1,25 +1,26 @@
-const path = require('path');
-const WasmPackPlugin = require('@wasm-tool/wasm-pack-plugin');
+const path = require("path");
+const WasmPackPlugin = require("@wasm-tool/wasm-pack-plugin");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
-const CopyWebpackPlugin = require('copy-webpack-plugin');
+const CopyWebpackPlugin = require("copy-webpack-plugin");
+const CompressionPlugin = require("compression-webpack-plugin");
 
 const distPath = path.resolve(__dirname, "dist");
 module.exports = (env, argv) => {
     return {
         devServer: {
-            compress: argv.mode === 'production',
+            compress: argv.mode === "production",
             port: 8000,
             historyApiFallback: true,
             devMiddleware: {
                 writeToDisk: true,
             },
             proxy: {
-                '/': {
+                "/": {
                     target: "http://127.0.0.1:8080",
                     changeOrigin: true,
                     bypass: function (req, res, proxyOptions) {
                         if (
-                            ['/api/', '/blob/', '/file/', '/oauth2/login/', '/oidc/login/'].every((prefix) => {
+                            ["/api/", "/blob/", "/file/", "/oauth2/login/", "/oidc/login/"].every((prefix) => {
                                 return !req.url.startsWith(prefix);
                             })
                         ) {
@@ -30,7 +31,7 @@ module.exports = (env, argv) => {
             }
         },
         entry: {
-            index: './index.js',
+            index: "./index.js",
         },
         output: {
             path: distPath,
@@ -42,8 +43,8 @@ module.exports = (env, argv) => {
             extensions: [".js", ".ts"]
         },
         externals: {
-            "crypto-js": 'CryptoJS',
-            "jsencrypt": 'JSEncrypt',
+            "crypto-js": "CryptoJS",
+            "jsencrypt": "JSEncrypt",
         },
         experiments: {
             asyncWebAssembly: true
@@ -62,9 +63,9 @@ module.exports = (env, argv) => {
                 {
                     test: /\.js$/,
                     use: {
-                        loader: 'babel-loader',
+                        loader: "babel-loader",
                         options: {
-                            presets: ['@babel/preset-env']
+                            presets: ["@babel/preset-env"]
                         }
                     }
                 },
@@ -87,7 +88,7 @@ module.exports = (env, argv) => {
         plugins: [
             new CopyWebpackPlugin({
                 patterns: [
-                    { from: './static', to: distPath }
+                    { from: "./static", to: distPath }
                 ],
             }),
             new MiniCssExtractPlugin({
@@ -96,8 +97,9 @@ module.exports = (env, argv) => {
             new WasmPackPlugin({
                 crateDirectory: ".",
                 extraArgs: "--no-typescript",
-            })
+            }),
+            new CompressionPlugin()
         ],
-        watch: argv.mode !== 'production'
+        watch: argv.mode !== "production"
     };
 };
