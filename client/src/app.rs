@@ -89,23 +89,25 @@ pub fn RootApp() -> impl IntoView {
             when=move || { inited.get() }
             fallback=|| view!{ <Loading center_middle={true} /> }
         >
-            <Routes fallback=|| view!{ <Redirect path="/"/> }>
-                <Route path=LOGIN view=move || view! { <LoginOrRegister ondone={on_login_done.clone()}/> }/>
-                <Route path=OAUTH2_AUTHORIZE view=move || view! { <Oauth2AuthorizePage ondone={on_login_done.clone()}/> }/>
-                <Route path=OIDC_AUTHORIZE view=move || view! { <OidcAuthorizePage ondone={on_login_done}/> }/>
-                <Route path=RESET_PASSWORD view=move || view! { <ResetPassword/> }/>
-                <Route path=LOGOUT view=move || view! { <Logout/> }/>
-                <ParentRoute path=INDEX view=move || view! { <DefaultLayout/> }>
-                    <Route path=path!("") view=move || view! { <Index/> }/>
-                    <Route path=ENVIRONMENT_SCHEMA_LIST view=move || view! { <EnvironmentSchemaList/> }/>
-                    <Route path=ENVIRONMENT_LIST view=move || view! { <EnvironmentList /> }/>
-                    <Route path=JOB_LIST view=move || view! { <JobList /> }/>
-                    <Route path=JOB_RECORD_LIST_BY_JOB view=move || view! { <JobRecordListByJob /> }/>
-                    <Route path=JOB_RECORD_LIST_BY_ENVIRONMENT view=move || view! { <JobRecordListByEnvironment /> }/>
-                    <Route path=JOB_RECORD view=move || view! { <JobRecordDetailPage /> }/>
-                    <Route path=USER_LIST view=move || view! { <UserList /> }/>
-                </ParentRoute>
-            </Routes>
+            <Router>
+                <Routes fallback=|| view!{ <Redirect path="/"/> }>
+                    <Route path=LOGIN view=move || view! { <LoginOrRegister ondone={on_login_done.clone()}/> }/>
+                    <Route path=OAUTH2_AUTHORIZE view=move || view! { <Oauth2AuthorizePage ondone={on_login_done.clone()}/> }/>
+                    <Route path=OIDC_AUTHORIZE view=move || view! { <OidcAuthorizePage ondone={on_login_done}/> }/>
+                    <Route path=RESET_PASSWORD view=move || view! { <ResetPassword/> }/>
+                    <Route path=LOGOUT view=move || view! { <Logout/> }/>
+                    <ParentRoute path=INDEX view=move || view! { <DefaultLayout/> }>
+                        <Route path=path!("") view=move || view! { <Index/> }/>
+                        <Route path=ENVIRONMENT_SCHEMA_LIST view=move || view! { <EnvironmentSchemaList/> }/>
+                        <Route path=ENVIRONMENT_LIST view=move || view! { <EnvironmentList /> }/>
+                        <Route path=JOB_LIST view=move || view! { <JobList /> }/>
+                        <Route path=JOB_RECORD_LIST_BY_JOB view=move || view! { <JobRecordListByJob /> }/>
+                        <Route path=JOB_RECORD_LIST_BY_ENVIRONMENT view=move || view! { <JobRecordListByEnvironment /> }/>
+                        <Route path=JOB_RECORD view=move || view! { <JobRecordDetailPage /> }/>
+                        <Route path=USER_LIST view=move || view! { <UserList /> }/>
+                    </ParentRoute>
+                </Routes>
+            </Router>
         </Show>
     }
 }
