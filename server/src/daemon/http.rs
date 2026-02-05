@@ -14,9 +14,11 @@ use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::tokio::TokioIo;
 use hyper_util::rt::TokioExecutor;
 use hyper_util::server::conn::auto;
+use mime_guess::Mime;
 use native_common::errno::result_to_json_resp;
 use native_common::utils::HexStr;
 use oauth2::{CsrfToken, PkceCodeChallenge};
+use rust_embed::EmbeddedFile;
 use rust_embed::RustEmbed;
 use sdk::system::get_system_info::GET_SYSTEM_INFO_API;
 use std::net::SocketAddr;
@@ -86,7 +88,43 @@ fn response_not_found() -> Response<Body> {
     return response;
 }
 
+struct ReadResult {
+    content: EmbeddedFile,
+    content_type: Mime,
+    content_encoding: Option<&'static str>,
+}
+
+fn read_by_file<B: RustEmbed>(path: &str, accepts_gzip: bool) -> Option<ReadResult> {
+    let mut read_result = None;
+    if accepts_gzip {
+        let gz_path = format!("{}.gz", path);
+        if let Some(content) = B::get(&gz_path) {
+            read_result.replace(ReadResult {
+                content: content,
+                content_type: mime_guess::from_path(path).first_or_octet_stream(),
+                content_encoding: Some("gzip"),
+            });
+        }
+    }
+    if read_result.is_none() {
+        if let Some(content) = B::get(path) {
+            read_result.replace(ReadResult {
+                content: content,
+                content_type: mime_guess::from_path(path).first_or_octet_stream(),
+                content_encoding: None,
+            });
+        }
+    }
+    return read_result;
+}
+
 fn handle_embed<B: RustEmbed>(req: Request<Incoming>) -> Response<Body> {
+    let accepts_gzip = req
+        .headers()
+        .get(header::ACCEPT_ENCODING)
+        .and_then(|h| h.to_str().ok())
+        .map(|s| s.to_lowercase().contains("gzip"))
+        .unwrap_or(false);
     let mut path = req
         .uri()
         .path()
@@ -96,38 +134,39 @@ fn handle_embed<B: RustEmbed>(req: Request<Incoming>) -> Response<Body> {
     if path.is_empty() {
         path = index_page;
     }
-    let (content, actual_path) = B::get(path)
-        .map(|content| (Some(content), path))
-        .unwrap_or_else(|| (B::get(index_page), index_page));
-    match content {
-        Some(content) => {
-            let hash = HexStr(&content.metadata.sha256_hash()).to_string();
-            if req
-                .headers()
-                .get(header::IF_NONE_MATCH)
-                .map(|etag| etag.to_str().unwrap_or("000000").eq(&hash))
-                .unwrap_or(false)
-            {
-                let mut response = Response::new(Body::empty());
-                *response.status_mut() = StatusCode::NOT_MODIFIED;
-                return response;
-            }
-            let body = content.data.clone();
-            let mime = mime_guess::from_path(actual_path).first_or_octet_stream();
-            return Response::builder()
-                .header(header::CONTENT_TYPE, mime.as_ref())
-                .header(header::CONTENT_LENGTH, body.len())
-                .header(
-                    header::CACHE_CONTROL,
-                    "public, must-revalidate, max-age=300",
-                )
-                .header(header::ETAG, hash)
-                .body(Body::from(body))
-                .unwrap();
+    let mut read_result = read_by_file::<B>(path, accepts_gzip);
+    if read_result.is_none() {
+        read_result = read_by_file::<B>(index_page, accepts_gzip);
+    }
+    if let Some(read_result) = read_result {
+        let hash = HexStr(&read_result.content.metadata.sha256_hash()).to_string();
+        if req
+            .headers()
+            .get(header::IF_NONE_MATCH)
+            .map(|etag| etag.to_str().ok() == Some(&hash))
+            .unwrap_or(false)
+        {
+            let mut response = Response::new(Body::empty());
+            *response.status_mut() = StatusCode::NOT_MODIFIED;
+            return response;
         }
-        None => {
-            return response_not_found();
+        let body = read_result.content.data.clone();
+        let mut builder = Response::builder();
+        if let Some(content_encoding) = read_result.content_encoding {
+            builder = builder.header(header::CONTENT_ENCODING, content_encoding);
         }
+        return builder
+            .header(header::CONTENT_TYPE, read_result.content_type.as_ref())
+            .header(header::CONTENT_LENGTH, body.len())
+            .header(
+                header::CACHE_CONTROL,
+                "public, must-revalidate, max-age=300",
+            )
+            .header(header::ETAG, hash)
+            .body(Body::from(body))
+            .unwrap();
+    } else {
+        return response_not_found();
     }
 }
 
