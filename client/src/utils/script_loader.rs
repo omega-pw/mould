@@ -60,5 +60,7 @@ fn add_script(url: &str) -> Result<Promise, JsValue> {
         script.set_onload(Some(&resolve));
         script.set_onerror(Some(&reject));
     });
+    let head = document.head().ok_or("No head found")?;
+    head.append_child(&script)?;
     return Ok(promise);
 }

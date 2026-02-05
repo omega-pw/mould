@@ -29,9 +29,7 @@ use tokio::net::TcpListener;
 
 fn json_response<T: Into<Body>>(body: T) -> Response<Body> {
     let mut response = Response::new(body.into());
-    response
-        .headers_mut()
-        .typed_insert(ContentType::json());
+    response.headers_mut().typed_insert(ContentType::json());
     return response;
 }
 
@@ -119,7 +117,10 @@ fn handle_embed<B: RustEmbed>(req: Request<Incoming>) -> Response<Body> {
             return Response::builder()
                 .header(header::CONTENT_TYPE, mime.as_ref())
                 .header(header::CONTENT_LENGTH, body.len())
-                .header(header::CACHE_CONTROL, "public, must-revalidate, max-age=300")
+                .header(
+                    header::CACHE_CONTROL,
+                    "public, must-revalidate, max-age=300",
+                )
                 .header(header::ETAG, hash)
                 .body(Body::from(body))
                 .unwrap();
@@ -264,7 +265,9 @@ async fn try_dispatch(
     } else if Method::POST == req.method() {
         let route = route.to_string();
         if GET_SYSTEM_INFO_API == route {
-            return Ok(json_response(result_to_json_resp(get_system_info().await)));
+            return Ok(json_response(result_to_json_resp(
+                get_system_info(context).await,
+            )));
         }
         return handler.handle((req, remote_addr, RequestData::new())).await;
     } else {

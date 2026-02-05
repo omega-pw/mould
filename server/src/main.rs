@@ -13,7 +13,6 @@ use context::Context;
 use headers::{ContentType, HeaderMapExt};
 use http_body_util::BodyExt;
 use hyper::body::Incoming;
-use hyper::header::HeaderValue;
 use hyper::Request;
 use hyper::Response;
 use hyper::StatusCode;
@@ -121,9 +120,7 @@ fn text_response<T: Into<Body>>(body: T) -> Response<Body> {
 
 fn json_response<T: Into<Body>>(body: T) -> Response<Body> {
     let mut response = Response::new(body.into());
-    response
-        .headers_mut()
-        .typed_insert(ContentType::json());
+    response.headers_mut().typed_insert(ContentType::json());
     return response;
 }
 
