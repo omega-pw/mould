@@ -70,7 +70,7 @@ pub fn MonacoEditor(
                     });
                 }
             },
-            false,
+            true,
         );
     }
     {

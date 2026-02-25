@@ -391,7 +391,7 @@ pub fn RichText(
                         });
                     }
                 },
-                false,
+                true,
             );
         }
         {

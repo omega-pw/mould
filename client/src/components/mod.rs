@@ -36,12 +36,13 @@ pub mod uploading_files;
 pub mod validate_wrapper;
 pub mod visable;
 pub mod word_limit_wrapper;
-use futures::channel::oneshot;
 use js_sys::Promise;
 use leptos::prelude::*;
+use send_wrapper::SendWrapper;
 use std::fmt;
 use std::ops::Deref;
 use std::sync::Arc;
+use std::sync::Mutex;
 use tihu::Handler;
 use web_sys::File;
 
@@ -179,34 +180,32 @@ impl<In, Out> fmt::Debug for ArcHandler<In, Out> {
     }
 }
 
-pub fn on_cleanup_unsync(fun: impl FnOnce() + 'static) {
-    let (sender, receiver) = oneshot::channel::<()>();
-    wasm_bindgen_futures::spawn_local(async move {
-        if receiver.await.is_ok() {
-            fun();
-        }
-    });
+pub fn on_cleanup_unsync<F>(fun: F)
+where
+    F: FnOnce() + 'static,
+{
+    let fun = SendWrapper::new(fun);
     on_cleanup(move || {
-        sender.send(()).ok();
+        fun.take()();
     });
 }
 
 #[derive(Clone)]
-struct LatestDestroy(RwSignal<Option<Box<dyn FnOnce()>>, LocalStorage>);
+struct LatestDestroy(Arc<Mutex<Option<Box<dyn FnOnce()>>>>);
 
 impl LatestDestroy {
     pub fn new() -> Self {
-        Self(RwSignal::new_local(None))
+        Self(Arc::new(Mutex::new(None)))
     }
     pub fn replace(&self, destroy: impl FnOnce() + 'static) {
-        let mut curr_destroy = self.0.write();
+        let mut curr_destroy = self.0.lock().unwrap();
         if let Some(curr_destroy) = curr_destroy.take() {
             curr_destroy();
         }
         curr_destroy.replace(Box::new(destroy));
     }
     pub fn clear(&self) {
-        let mut curr_destroy = self.0.write();
+        let mut curr_destroy = self.0.lock().unwrap();
         if let Some(curr_destroy) = curr_destroy.take() {
             curr_destroy();
         }
