@@ -1,4 +1,6 @@
 use super::SelectOption;
+use crate::utils::gen_id;
+use crate::SharedString;
 use leptos::prelude::*;
 use std::hash::Hash;
 
@@ -13,6 +15,7 @@ where
     O: Clone + PartialEq + Send + Sync + 'static,
     O::Value: Clone + Eq + Hash + Send + Sync + 'static,
 {
+    let group_name = SharedString::from(format!("radio-group-{}", gen_id()));
     view! {
         <span>
             <For
@@ -40,7 +43,7 @@ where
                     };
                     view! {
                         <label class="e-radio-label">
-                            <input type="radio" checked={checked} on:click={on_click} />
+                            <input type="radio" name={group_name.clone()} checked={checked} on:click={on_click} />
                             {option.label()}
                         </label>
                     }
