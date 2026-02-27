@@ -39,7 +39,8 @@ struct ResetPasswordForm {
 #[component]
 pub fn ResetPassword() -> impl IntoView {
     let navigate = use_navigate();
-    let token_result: RwSignal<Option<TokenResult>> = RwSignal::new(None);
+    let turnstile_token_callback: RwSignal<Option<UnsyncCallback<TokenResult>>> =
+        RwSignal::new(None);
     let form = ResetPasswordForm {
         account: RwSignal::new("".into()),
         password: RwSignal::new("".into()),
@@ -60,27 +61,36 @@ pub fn ResetPassword() -> impl IntoView {
     });
     let account = form.account.clone();
     let on_send_captcha = UnsyncCallback::new(move |_| {
+        if turnstile_token_callback.read().is_some() {
+            return;
+        }
         let account = account.clone();
-        let token_result = token_result.clone();
-        wasm_bindgen_futures::spawn_local(async move {
-            if let Some(token_result) = token_result.get() {
-                match token_result {
-                    TokenResult::NotRequired => {
-                        start_send_captcha(account.read().to_string(), None)
-                            .await
-                            .ok();
+        let token_callback = turnstile_token_callback.clone();
+        turnstile_token_callback.set(Some(UnsyncCallback::new(
+            move |token_result: TokenResult| {
+                //把回调清空，让人机验证的UI消失，以支持下次重新创建组件实例
+                token_callback.set(None);
+                let account = account.clone();
+                let token_result = token_result.clone();
+                wasm_bindgen_futures::spawn_local(async move {
+                    match token_result {
+                        TokenResult::NotRequired => {
+                            start_send_captcha(account.read().to_string(), None)
+                                .await
+                                .ok();
+                        }
+                        TokenResult::Success(token) => {
+                            start_send_captcha(account.read().to_string(), Some(token.to_string()))
+                                .await
+                                .ok();
+                        }
+                        TokenResult::Failure(error) => {
+                            err_msg.set(Some(error));
+                        }
                     }
-                    TokenResult::Success(token) => {
-                        start_send_captcha(account.read().to_string(), Some(token.to_string()))
-                            .await
-                            .ok();
-                    }
-                    TokenResult::Failure(error) => {
-                        err_msg.set(Some(error));
-                    }
-                }
-            }
-        });
+                });
+            },
+        )));
     });
     let is_resetting_clone = is_resetting.clone();
     let form_clone = form.clone();
@@ -121,15 +131,28 @@ pub fn ResetPassword() -> impl IntoView {
                 <tr>
                     <td class="align-right" style="width:6em;padding-bottom: 1em;">{"验证码："}</td>
                     <td style="padding-bottom: 1em;">
-                        <Turnstile ondone={
-                            let token_result = token_result.clone();
-                            UnsyncCallback::new(move |result| {
-                                token_result.set(Some(result));
-                            })
-                        }/>
+                        {
+                            let turnstile_token_callback = turnstile_token_callback.clone();
+                            move || {
+                                if let Some(token_callback) = turnstile_token_callback.get() {
+                                    view! {
+                                        <Turnstile ondone=token_callback/>
+                                    }.into_any()
+                                } else {
+                                    view! {}.into_any()
+                                }
+                            }
+                        }
                         <div>
                             <Input value={form.captcha.clone()} onfocus={clear_err_msg} onenter={on_submit.clone()} style="width:9em;"/>
-                            <Button disabled={move || token_result.get().is_none()} onclick={on_send_captcha}>{"发送验证码"}</Button>
+                            <Button disabled={
+                                let account = form.account.clone();
+                                move || {
+                                    let account = account.read();
+                                    let account: &str = account.as_ref();
+                                    account.is_empty() || !ValidateEmail::validate_email(&account) || turnstile_token_callback.read().is_some()
+                                }
+                            } onclick={on_send_captcha}>{"发送验证码"}</Button>
                         </div>
                     </td>
                 </tr>
