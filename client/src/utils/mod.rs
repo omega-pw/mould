@@ -88,10 +88,10 @@ pub fn get_server_time() -> DateTime<Utc> {
     return Utc::now() + Duration::milliseconds(TIME_DIFF.load(Ordering::Relaxed));
 }
 
-fn calc_client_id(api: &[u8], body_hash: &[u8]) -> String {
+fn calc_client_id(client_id: String, api: &[u8], body_hash: &[u8]) -> String {
     let (pub_key, pri_key) = get_or_init_client_key_pair().unwrap();
     let expire_time = get_server_time() + Duration::seconds(10);
-    let client_id = ClientId::new(pub_key.get_string().into(), expire_time);
+    let client_id = ClientId::new(client_id.into(), pub_key.get_string().into(), expire_time);
     let client_id = client_id
         .encode(|client_id_data| {
             let sign_source = [api, body_hash, &client_id_data].concat();
@@ -102,18 +102,19 @@ fn calc_client_id(api: &[u8], body_hash: &[u8]) -> String {
     return client_id;
 }
 
-async fn build_request(api: &str, body: &str) -> Request {
+async fn build_request(client_id: String, api: &str, body: &str) -> Request {
     let body_hash = sha512(body.as_bytes());
-    let client_id = calc_client_id(api.as_bytes(), &body_hash);
-    let mut opts = RequestInit::new();
-    opts.method("POST");
-    let mut headers: HashMap<&str, String> = HashMap::new();
-    headers.insert("Content-Type", "application/json".to_string());
-    headers.insert("X-Client-Id", client_id);
+    let client_data = calc_client_id(client_id.clone(), api.as_bytes(), &body_hash);
+    let opts = RequestInit::new();
+    opts.set_method("POST");
+    let mut headers = HashMap::new();
+    headers.insert("Content-Type", "application/json");
+    headers.insert("X-Client-Id", &client_id);
+    headers.insert("X-Client-Data", &client_data);
     let body_hash: String = BASE64_STANDARD.encode(&body_hash);
-    headers.insert("X-Hash", body_hash);
-    opts.headers(&serde_wasm_bindgen::to_value(&headers).expect("Failed to serialize headers."));
-    opts.body(Some(&JsValue::from_str(body)));
+    headers.insert("X-Hash", &body_hash);
+    opts.set_headers(&serde_wasm_bindgen::to_value(&headers).expect("Failed to serialize headers."));
+    opts.set_body(&JsValue::from_str(body));
     let request = Request::new_with_str_and_init(api, &opts).expect("Failed to build request.");
     return request;
 }
@@ -183,8 +184,43 @@ async fn ajax_inner(request: &Request) -> Result<SharedString, SharedString> {
 pub async fn default_http_requestor(
     (url, req): (SharedString, SharedString),
 ) -> Result<SharedString, SharedString> {
-    let request = build_request(&url, &req).await;
+    let client_id = get_client_id().await?;
+    let request = build_request(client_id, &url, &req).await;
     return ajax_inner(&request).await;
+}
+
+async fn get_client_id_inner() -> Result<String, JsValue> {
+    let fingerprint_js = js_sys::Reflect::get(
+        &web_sys::window().unwrap(),
+        &JsValue::from_str("FingerprintJS"),
+    )?;
+    let load_method: js_sys::Function =
+        js_sys::Reflect::get(&fingerprint_js, &JsValue::from_str("load"))?.dyn_into()?;
+    let fp_promise = load_method.call0(&fingerprint_js)?;
+    let fp_promise: Promise = fp_promise.dyn_into()?;
+    let fp = JsFuture::from(fp_promise).await?;
+    let get_method: js_sys::Function =
+        js_sys::Reflect::get(&fp, &JsValue::from_str("get"))?.dyn_into()?;
+    let result_promise = get_method.call0(&fp)?;
+    let result_promise: Promise = result_promise.dyn_into()?;
+    let result = JsFuture::from(result_promise).await?;
+    let visitor_id = js_sys::Reflect::get(&result, &JsValue::from_str("visitorId"))?;
+    let visitor_id = visitor_id.as_string().ok_or_else(|| {
+        web_sys::console::error_2(
+            &JsValue::from("\"visitorId\" is not a string!"),
+            &visitor_id,
+        );
+        visitor_id
+    })?;
+    return Ok(visitor_id);
+}
+
+pub async fn get_client_id() -> Result<String, SharedString> {
+    return get_client_id_inner().await.map_err(|error| {
+        let err_msg = "get client id failed!";
+        web_sys::console::error_2(&JsValue::from(err_msg), &error);
+        SharedString::from(err_msg)
+    });
 }
 
 impl request::Handler<bool, bool> for RwSignal<bool> {
@@ -297,7 +333,8 @@ pub async fn upload_file(
     let sha512: Uint8Array = get_raw_method.call0(&sha512).unwrap().dyn_into().unwrap();
     let body_hash = sha512.to_vec();
     let api = UPLOAD_API;
-    let client_id = calc_client_id(api.as_bytes(), &body_hash);
+    let client_id = get_client_id().await?;
+    let client_data = calc_client_id(client_id.clone(), api.as_bytes(), &body_hash);
     let form = FormData::new().map_err(|_err| SharedString::from("Failed to create FormData."))?;
     form.append_with_str("size", &file.size().to_string())
         .expect("Failed to add field \"size\".");
@@ -305,6 +342,7 @@ pub async fn upload_file(
         .expect("Failed to add field \"file\".");
     let mut headers: HashMap<String, Vec<String>> = HashMap::new();
     headers.insert("X-Client-Id".to_string(), vec![client_id]);
+    headers.insert("X-Client-Data".to_string(), vec![client_data]);
     let body_hash: String = BASE64_STANDARD.encode(&body_hash);
     headers.insert("X-Hash".to_string(), vec![body_hash]);
     let resp = ajax::ajax::<(), ajax::Json<CommonResponse<UploadResp>>>(

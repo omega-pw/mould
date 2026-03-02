@@ -14,10 +14,8 @@ use log;
 use native_common::cookie::format_cookie;
 use native_common::cookie::CookieAttr;
 use native_common::utils::decrypt_by_base64;
-use native_common::utils::encrypt_by_base64;
 use native_common::utils::new_rsa_pub_key;
 use native_common::utils::sha1;
-use native_common::utils::sha256;
 use native_common::utils::verify_by_pub_pri_key;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -253,8 +251,7 @@ impl FromRequest for SessionState {
         let signature_result = request_data
             .try_get::<SignatureResult>(&request, remote_addr)
             .await?;
-        let hash = sha256(signature_result.client_id.rsa_pub_key().as_bytes());
-        let client_id = encrypt_by_base64(&hash).map_err(ErrNo::CommonError)?;
+        let client_id = signature_result.client_id.client_id().clone();
         let cookie = request_data
             .try_get::<Option<Cookie>>(&request, remote_addr)
             .await?;
@@ -270,11 +267,11 @@ impl FromRequest for SessionState {
         let (session, is_new) = if let Some(session_data) = session_data {
             match Session::try_decode(session_data, &session_signer) {
                 Ok(session) => {
-                    if session.client_id().as_ref() == client_id {
+                    if session.client_id().as_ref() == client_id.as_ref() {
                         (session, false)
                     } else {
                         (
-                            Session::new(Uuid::new_v4().as_u128(), client_id.into(), Utc::now()),
+                            Session::new(Uuid::new_v4().as_u128(), client_id, Utc::now()),
                             true,
                         )
                     }
@@ -282,7 +279,7 @@ impl FromRequest for SessionState {
                 Err(err) => {
                     log::error!("解码会话数据失败: {}", err);
                     (
-                        Session::new(Uuid::new_v4().as_u128(), client_id.into(), Utc::now()),
+                        Session::new(Uuid::new_v4().as_u128(), client_id, Utc::now()),
                         true,
                     )
                 }
@@ -290,7 +287,7 @@ impl FromRequest for SessionState {
         } else {
             //cookie里没有sessionId
             (
-                Session::new(Uuid::new_v4().as_u128(), client_id.into(), Utc::now()),
+                Session::new(Uuid::new_v4().as_u128(), client_id, Utc::now()),
                 true,
             )
         };
@@ -383,8 +380,8 @@ impl FromRequest for SignatureResult {
         _remote_addr: SocketAddr,
         _request_data: &mut RequestData,
     ) -> Result<Self, anyhow::Error> {
-        let client_id_data = get_header(request.headers(), "X-Client-Id").ok_or_else(|| {
-            return SharedString::from_static("请求没有X-Client-Id请求头！");
+        let client_id_data = get_header(request.headers(), "X-Client-Data").ok_or_else(|| {
+            return SharedString::from_static("请求没有X-Client-Data请求头！");
         })?;
         let request_context = get_header(request.headers(), "X-Context")
             .map(|request_context| request_context.to_string());

@@ -6721,9 +6721,9 @@ dependencies = [
 
 [[package]]
 name = "tihu"
-version = "0.1.8"
+version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "725882d3b650ee59e53d67ff3aca0e0fbda33dc15805ac77f511afd104138d96"
+checksum = "8887241bcd4c841779f5f75c44da65958fadaa7d173e3a212baf0ac297a82405"
 dependencies = [
  "anyhow",
  "async-trait",
