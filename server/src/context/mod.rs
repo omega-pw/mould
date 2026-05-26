@@ -455,7 +455,7 @@ fn init_console_log() -> Result<(), anyhow::Error> {
     return Ok(());
 }
 
-pub fn init_cache_pool(cache_server: &CacheServer) -> Result<deadpool_redis::Pool, RedisError> {
+fn init_cache_pool(cache_server: &CacheServer) -> Result<deadpool_redis::Pool, anyhow::Error> {
     let addr = if cache_server.tls {
         ConnectionAddr::TcpTls {
             host: cache_server.host.clone(),
@@ -478,8 +478,7 @@ pub fn init_cache_pool(cache_server: &CacheServer) -> Result<deadpool_redis::Poo
     let max_size = cache_server.max_size.unwrap_or(10).max(1);
     let cache_pool = deadpool_redis::Pool::builder(cache_mgr)
         .max_size(max_size)
-        .build()
-        .unwrap();
+        .build()?;
     return Ok(cache_pool);
 }
 
@@ -519,10 +518,10 @@ fn init_db_pool(data_source: &DataSource) -> Result<Pool, anyhow::Error> {
             .with_no_client_auth();
         let connector = MakeRustlsConnect::new(config);
         let mgr = Manager::new(cfg, connector);
-        Pool::builder(mgr).max_size(max_size).build().unwrap()
+        Pool::builder(mgr).max_size(max_size).build()?
     } else {
         let mgr = Manager::new(cfg, NoTls);
-        Pool::builder(mgr).max_size(max_size).build().unwrap()
+        Pool::builder(mgr).max_size(max_size).build()?
     };
     return Ok(pool);
 }
