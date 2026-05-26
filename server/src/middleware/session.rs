@@ -14,8 +14,10 @@ use log;
 use native_common::cookie::format_cookie;
 use native_common::cookie::CookieAttr;
 use native_common::utils::decrypt_by_base64;
+use native_common::utils::encrypt_by_base64;
 use native_common::utils::new_rsa_pub_key;
 use native_common::utils::sha1;
+use native_common::utils::sha256;
 use native_common::utils::verify_by_pub_pri_key;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -370,7 +372,6 @@ impl SessionMiddleware {
 pub struct SignatureResult {
     pub client_id: ClientId,
     pub body_hash: Vec<u8>,
-    pub request_context: Option<String>,
 }
 
 #[async_trait]
@@ -383,22 +384,15 @@ impl FromRequest for SignatureResult {
         let client_id_data = get_header(request.headers(), "X-Client-Data").ok_or_else(|| {
             return SharedString::from_static("请求没有X-Client-Data请求头！");
         })?;
-        let request_context = get_header(request.headers(), "X-Context")
-            .map(|request_context| request_context.to_string());
         let body_hash = get_header(request.headers(), "X-Hash").ok_or_else(|| {
             return SharedString::from_static("请求没有X-Hash请求头！");
         })?;
         let body_hash = decrypt_by_base64(body_hash)?;
-        let client_id = try_decode_client_id(
-            client_id_data,
-            request.uri().path().as_bytes(),
-            &request_context,
-            &body_hash,
-        )?;
+        let client_id =
+            try_decode_client_id(client_id_data, request.uri().path().as_bytes(), &body_hash)?;
         return Ok(SignatureResult {
             client_id,
             body_hash,
-            request_context,
         });
     }
 }
@@ -443,7 +437,6 @@ where
 fn try_decode_client_id(
     client_id_data: &str,
     route: &[u8],
-    context: &Option<String>,
     body_hash: &[u8],
 ) -> Result<ClientId, SharedString> {
     return ClientId::try_decode(
@@ -451,16 +444,7 @@ fn try_decode_client_id(
         |rsa_pub_key: &str, client_id_data: &[u8], signature: &[u8]| {
             let rsa_pub_key = new_rsa_pub_key(rsa_pub_key)?;
             verify_by_pub_pri_key(
-                &[
-                    route,
-                    context
-                        .as_ref()
-                        .map(|context| context.as_bytes())
-                        .unwrap_or(b""),
-                    body_hash,
-                    &client_id_data,
-                ]
-                .concat(),
+                &[route, body_hash, &client_id_data].concat(),
                 &signature,
                 &rsa_pub_key,
             )

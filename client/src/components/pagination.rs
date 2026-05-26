@@ -38,14 +38,29 @@ pub fn Pagination(
     view! {
         <div class="pagination" style="display:inline-block;">
             <button on:click={on_first_page.clone()}>{"首页"}</button>
-            <button disabled={!pagination.read().has_pre_page} class={get_pre_page_class(&pagination.read())} on:click={on_pre_page}><span></span></button>
+            <button disabled={
+                let pagination = pagination.clone();
+                move || {
+                    !pagination.read().has_pre_page
+                }
+            } class={
+                let pagination = pagination.clone();
+                move || {
+                    get_pre_page_class(&pagination.read())
+                }
+            } on:click={on_pre_page}><span></span></button>
             <Show
                 when={
                     let pagination = pagination.clone();
                     move || { !calc_start_at_first(&pagination.read()) }
                 }
             >
-                <button class={get_page_class(&pagination.read(), 1)} on:click={on_first_page}>{1}</button>
+                <button class={
+                    let pagination = pagination.clone();
+                    move || {
+                        get_page_class(&pagination.read(), 1)
+                    }
+                } on:click={on_first_page}>{1}</button>
             </Show>
             <Show
                 when={
@@ -68,7 +83,12 @@ pub fn Pagination(
                             onpage.run(page);
                         };
                         view! {
-                            <button class={get_page_class(&pagination.read(), page)} on:click={on_middle_page}>{page}</button>
+                            <button class={
+                                let pagination = pagination.clone();
+                                move || {
+                                    get_page_class(&pagination.read(), page)
+                                }
+                            } on:click={on_middle_page}>{page}</button>
                         }
                     }
                 }
@@ -87,9 +107,24 @@ pub fn Pagination(
                     move || { !calc_end_at_last(&pagination.read()) }
                 }
             >
-                <button class={get_page_class(&pagination.read(), pagination.read().page_count)} on:click={on_last_page.clone()}>{pagination.read().page_count}</button>
+                <button class={
+                    let pagination = pagination.clone();
+                    move || {
+                        get_page_class(&pagination.read(), pagination.read().page_count)
+                    }
+                } on:click={on_last_page.clone()}>{pagination.read().page_count}</button>
             </Show>
-            <button disabled={!pagination.read().has_next_page} class={get_next_page_class(&pagination.read())} on:click={on_next_page}><span></span></button>
+            <button disabled={
+                let pagination = pagination.clone();
+                move || {
+                    !pagination.read().has_next_page
+                }
+            } class={
+                let pagination = pagination.clone();
+                move || {
+                    get_next_page_class(&pagination.read())
+                }
+            } on:click={on_next_page}><span></span></button>
             <button on:click={on_last_page}>{"尾页"}</button>
         </div>
     }

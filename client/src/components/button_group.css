@@ -1,12 +1,12 @@
-.button-group>button {
+.button-group>* {
     margin-left: 0.25em;
     margin-right: 0.25em;
 }
 
-.button-group>button:first-child {
+.button-group>*:first-child {
     margin-left: 0;
 }
 
-.button-group>button:last-child {
+.button-group>*:last-child {
     margin-right: 0;
 }

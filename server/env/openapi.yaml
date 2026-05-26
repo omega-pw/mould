@@ -1,0 +1,61 @@
+swagger: "2.0"
+info:
+  title: "Mould Gateway"
+  description: "Mould是一个简单的任务编排工具"
+  version: "1.0.0"
+
+# 1. 定义安全方案（API Key 校验）
+securityDefinitions:
+  api_key:
+    type: "apiKey"
+    name: "X-Api-Key"
+    in: "header"
+
+x-google-backend:
+  address: https://mould-demo-57239000179.asia-southeast1.run.app
+  path_translation: APPEND_PATH_TO_ADDRESS
+
+# 2. 全局默认开启安全校验
+# 这意味着除非在具体 Path 下面覆盖这个设置，否则所有请求都必须带 X-Api-Key
+security:
+  - api_key: []
+
+paths:
+  # 使用通配符变量 {path=**} 匹配以上两个白名单之外的所有请求
+  "/{path=**}":
+    parameters:
+      - name: "path"
+        in: "path"
+        required: true
+        type: "string"
+        pattern: "^.*$"
+    get: # 你可以根据需要添加 post, put 等，或者为每个方法定义
+      summary: "其他所有路径的get请求"
+      operationId: "other_get_paths"
+      security:
+        - api_key: [] # 强制校验 X-Api-Key
+      responses:
+        '200':
+          description: "成功"
+        '401':
+          description: "未授权：缺少有效的 X-Api-Key"
+    post:
+      summary: "其他所有路径的post请求"
+      operationId: "other_post_paths"
+      security:
+        - api_key: [] # 强制校验 X-Api-Key
+      responses:
+        '200':
+          description: "成功"
+        '401':
+          description: "未授权：缺少有效的 X-Api-Key"
+    options:
+      summary: "其他所有路径的options请求"
+      operationId: "other_options_paths"
+      security:
+        - api_key: [] # 强制校验 X-Api-Key
+      responses:
+        '200':
+          description: "成功"
+        '401':
+          description: "未授权：缺少有效的 X-Api-Key"

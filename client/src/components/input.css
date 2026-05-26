@@ -1,0 +1,18 @@
+.e-input {
+    font-size: inherit;
+    font-family: inherit;
+    padding: 0.25em;
+    width: 16em;
+    box-sizing: border-box;
+    border-width: 1px;
+    border-style: solid;
+    outline-style: none;
+}
+
+.e-input {
+    border-color: #CCCCCC;
+}
+
+.e-input:focus {
+    border-color: #6699FF;
+}

@@ -1,0 +1,38 @@
+.e-btn {
+    padding: 0.25em 0.5em;
+    cursor: pointer;
+    font-size: inherit;
+    line-height: 1em;
+    vertical-align: middle;
+    user-select: none;
+    border-width: 1px;
+    border-style: solid;
+    outline-style: none;
+    -moz-user-select: none;
+    /*火狐*/
+    -webkit-user-select: none;
+    /*webkit浏览器*/
+    -ms-user-select: none;
+    /*IE10*/
+    -khtml-user-select: none;
+    /*早期浏览器*/
+}
+
+.e-btn {
+    color: inherit;
+    border-color: #DDDDDD;
+    background-color: transparent;
+}
+
+.e-btn:focus,
+.e-btn:hover {
+    border-color: #CCEEFF;
+    background-color: #EEFFFF;
+}
+
+.e-btn[disabled] {
+    color: #CCCCCC;
+    cursor: not-allowed;
+    border-color: #DDDDDD;
+    background-color: #FFFFFF;
+}

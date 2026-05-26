@@ -17,7 +17,6 @@ use base64::prelude::BASE64_STANDARD;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Local;
-use chrono::NaiveDateTime;
 use chrono::Utc;
 pub use components::popup_message::error;
 pub use components::popup_message::success;
@@ -70,8 +69,13 @@ pub fn set_panic_hook() {
     console_error_panic_hook::set_once();
 }
 
-pub fn format_time_local(date_time: &DateTime<Utc>) -> NaiveDateTime {
-    return date_time.with_timezone(&Local).naive_local();
+pub const DATETIME_FORMAT: &'static str = "%Y-%m-%d %H:%M:%S";
+pub fn format_time_local(date_time: &DateTime<Utc>) -> String {
+    return date_time
+        .with_timezone(&Local)
+        .naive_local()
+        .format(DATETIME_FORMAT)
+        .to_string();
 }
 
 pub async fn init_time_diff() -> Result<(), SharedString> {
@@ -113,7 +117,9 @@ async fn build_request(client_id: String, api: &str, body: &str) -> Request {
     headers.insert("X-Client-Data", &client_data);
     let body_hash: String = BASE64_STANDARD.encode(&body_hash);
     headers.insert("X-Hash", &body_hash);
-    opts.set_headers(&serde_wasm_bindgen::to_value(&headers).expect("Failed to serialize headers."));
+    opts.set_headers(
+        &serde_wasm_bindgen::to_value(&headers).expect("Failed to serialize headers."),
+    );
     opts.set_body(&JsValue::from_str(body));
     let request = Request::new_with_str_and_init(api, &opts).expect("Failed to build request.");
     return request;
@@ -167,7 +173,7 @@ async fn ajax_inner(request: &Request) -> Result<SharedString, SharedString> {
     let response: Response = resp_value.dyn_into().unwrap();
     if !response.ok() {
         log::error!("响应状态码错误：{}", response.status());
-        return Err(SharedString::from("响应状态码错误"));
+        return Err(SharedString::from("请求服务器失败"));
     } else {
         let text = response.text().map_err(|err| -> SharedString {
             log::error!("响应数据编码格式不正确: {:?}", err);
@@ -244,7 +250,7 @@ pub async fn wait(millis: u32) {
     let mut timeout = None;
     let mut promise_fn = |resolve: Function, _reject: Function| {
         timeout.replace(Timeout::new(millis, move || {
-            resolve.call0(&wasm_bindgen::JsValue::UNDEFINED).unwrap();
+            resolve.call0(&JsValue::UNDEFINED).unwrap();
         }));
     };
     let promise = Promise::new(&mut promise_fn);
@@ -258,7 +264,7 @@ pub async fn alert(content: SharedString, title: Option<SharedString>) {
             content.clone(),
             title.clone(),
             Some(move || {
-                resolve.call0(&wasm_bindgen::JsValue::UNDEFINED).unwrap();
+                resolve.call0(&JsValue::UNDEFINED).unwrap();
             }),
         );
     };
@@ -270,10 +276,7 @@ pub async fn confirm(content: SharedString, title: Option<SharedString>) -> bool
     let mut promise_fn = move |resolve: Function, _reject: Function| {
         components::confirm::confirm(content.clone(), title.clone(), move |confirm| {
             resolve
-                .call1(
-                    &wasm_bindgen::JsValue::UNDEFINED,
-                    &wasm_bindgen::JsValue::from_bool(confirm),
-                )
+                .call1(&JsValue::UNDEFINED, &JsValue::from_bool(confirm))
                 .unwrap();
         });
     };

@@ -183,8 +183,8 @@ fn row_view(
                     }
                 }
             </td>
-            <td class="e-table-cell align-center">{ format_time_local(&user.created_time).to_string() }</td>
-            <td class="e-table-cell align-center">{ format_time_local(&user.last_modified_time).to_string() }</td>
+            <td class="e-table-cell align-center">{ format_time_local(&user.created_time) }</td>
+            <td class="e-table-cell align-center">{ format_time_local(&user.last_modified_time) }</td>
             <td class="e-table-cell align-center">
                 <ButtonGroup>
                     <Button onclick={on_open_detail}>{"详情"}</Button>

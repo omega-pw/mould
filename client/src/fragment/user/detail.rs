@@ -99,7 +99,7 @@ pub fn UserDetail(#[prop(optional)] id: Id) -> impl IntoView {
                     <td>
                         {
                             let detail = detail.clone();
-                            move || detail.read().as_ref().map(|user| format_time_local(&user.created_time).to_string())
+                            move || detail.read().as_ref().map(|user| format_time_local(&user.created_time))
                         }
                     </td>
                 </tr>
@@ -108,7 +108,7 @@ pub fn UserDetail(#[prop(optional)] id: Id) -> impl IntoView {
                     <td>
                         {
                             let detail = detail.clone();
-                            move || detail.read().as_ref().map(|user| format_time_local(&user.last_modified_time).to_string())
+                            move || detail.read().as_ref().map(|user| format_time_local(&user.last_modified_time))
                         }
                     </td>
                 </tr>

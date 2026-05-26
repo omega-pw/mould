@@ -117,14 +117,14 @@ pub fn JobRecordDetail(#[prop(optional)] id: Id) -> impl IntoView {
                     <td>
                         {
                             let detail = detail.clone();
-                            move || detail.read().as_ref().map(|job_record| format_time_local(&job_record.created_time).to_string())
+                            move || detail.read().as_ref().map(|job_record| format_time_local(&job_record.created_time))
                         }
                     </td>
                     <td class="align-right" style="width:8em;vertical-align: top;">{"更新时间："}</td>
                     <td>
                         {
                             let detail = detail.clone();
-                            move || detail.read().as_ref().map(|job_record| format_time_local(&job_record.last_modified_time).to_string())
+                            move || detail.read().as_ref().map(|job_record| format_time_local(&job_record.last_modified_time))
                         }
                     </td>
                 </tr>

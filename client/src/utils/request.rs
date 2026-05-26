@@ -1,18 +1,38 @@
 use crate::SharedString;
 use futures::lock::Mutex;
+use gloo::timers::callback::Timeout;
+use js_sys::Date;
+use js_sys::Function;
+use js_sys::Promise;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::future::Future;
 use std::marker::PhantomData;
+use std::num::NonZeroU32;
 use std::pin::Pin;
 use std::sync::{Arc, LazyLock, RwLock};
+use tihu::api::CacheMeta;
 use tihu::Api;
+use wasm_bindgen_futures::JsFuture;
 
-static SINGLE_CACHE_MAP: LazyLock<Mutex<HashMap<String, serde_json::Value>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
+struct CacheData<D> {
+    data: D,
+    time: f64,
+    timeout: Option<u64>,
+}
 
-static MULTI_CACHE_MAP: LazyLock<Mutex<HashMap<(String, String), serde_json::Value>>> =
+impl<D> CacheData<D> {
+    fn expired(&self) -> bool {
+        if let Some(timeout) = self.timeout {
+            Date::now() > self.time + timeout as f64
+        } else {
+            false
+        }
+    }
+}
+
+static CACHE_MAP: LazyLock<Mutex<HashMap<String, CacheData<serde_json::Value>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 pub trait Handler<In, Out>: 'static {
@@ -35,11 +55,6 @@ pub enum Method {
     Delete,
 }
 
-enum CacheMethod {
-    Url,
-    UrlAndKey(SharedString),
-}
-
 pub type HttpRequestor =
     dyn Handler<(SharedString, SharedString), Result<SharedString, SharedString>> + Send + Sync;
 //请求校验器
@@ -56,6 +71,51 @@ pub type ErrorHandler = dyn Handler<SharedString, ()> + Send + Sync;
 //加锁错误处理器
 pub type LockErrorHandler = dyn Handler<(), ()>;
 
+pub async fn wait(millis: u32) {
+    let mut timeout = None;
+    let mut promise_fn = |resolve: Function, _reject: Function| {
+        timeout.replace(Timeout::new(millis, move || {
+            resolve.call0(&wasm_bindgen::JsValue::UNDEFINED).unwrap();
+        }));
+    };
+    let promise = Promise::new(&mut promise_fn);
+    JsFuture::from(promise).await.unwrap();
+    timeout.take();
+}
+
+pub async fn try_max_times<D, E, F, T>(
+    task: T,
+    max_times: NonZeroU32,
+    interval: Option<u32>,
+) -> Result<D, E>
+where
+    F: Future<Output = Result<D, E>>,
+    T: Fn(Option<E>) -> F,
+{
+    let extra_times = max_times.get() as usize - 1;
+    match task(None).await {
+        Ok(ret) => {
+            return Ok(ret);
+        }
+        Err(mut error) => {
+            for _ in 0..extra_times {
+                if let Some(interval) = interval {
+                    wait(interval).await;
+                }
+                match task(Some(error)).await {
+                    Ok(ret) => {
+                        return Ok(ret);
+                    }
+                    Err(latest_err) => {
+                        error = latest_err;
+                    }
+                }
+            }
+            return Err(error);
+        }
+    }
+}
+
 pub struct Request<Req, Resp> {
     url: SharedString,
     method: Method,
@@ -69,7 +129,9 @@ pub struct Request<Req, Resp> {
     lock_error_handler: Option<Arc<LockErrorHandler>>,
     req_error_handler: Option<Arc<ErrorHandler>>,
     unwrap_error_handler: Option<Arc<ErrorHandler>>,
-    use_cache: Option<CacheMethod>,
+    get_cache_meta: Option<Box<dyn Fn(&Req) -> Option<CacheMeta>>>,
+    max_times: Option<NonZeroU32>,
+    interval: Option<u32>,
     phantom1: PhantomData<Req>,
     phantom2: PhantomData<Resp>,
 }
@@ -93,7 +155,9 @@ where
             lock_error_handler: None,
             req_error_handler: None,
             unwrap_error_handler: None,
-            use_cache: None,
+            get_cache_meta: None,
+            max_times: None,
+            interval: None,
             phantom1: PhantomData,
             phantom2: PhantomData,
         }
@@ -156,12 +220,23 @@ where
         self.unwrap_error_handler = Some(Arc::new(unwrap_error_handler));
         return self;
     }
-    pub fn cache_by_url(&mut self) -> &mut Self {
-        self.use_cache.replace(CacheMethod::Url);
+    pub fn cache_by_key(
+        &mut self,
+        key: impl Into<tihu::SharedString>,
+        ttl: Option<u64>,
+    ) -> &mut Self {
+        let key: tihu::SharedString = key.into();
+        self.get_cache_meta.replace(Box::new(move |_req: &Req| {
+            Some(CacheMeta {
+                key: key.clone(),
+                ttl: ttl,
+            })
+        }));
         return self;
     }
-    pub fn cache_by_url_and_key(&mut self, key: SharedString) -> &mut Self {
-        self.use_cache.replace(CacheMethod::UrlAndKey(key));
+    pub fn try_max_times(&mut self, max_times: u32, interval: Option<u32>) -> &mut Self {
+        self.max_times = NonZeroU32::new(max_times);
+        self.interval = interval;
         return self;
     }
     pub async fn call(&self, req: &Req) -> Result<Resp, SharedString> {
@@ -180,32 +255,29 @@ where
                 return Err(err_msg);
             }
         }
-        if let Some(use_cache) = self.use_cache.as_ref() {
-            let cache = match use_cache {
-                CacheMethod::Url => {
-                    let single_cache_map = LazyLock::force(&SINGLE_CACHE_MAP);
-                    let single_cache_map = single_cache_map.lock().await;
-                    let url: &str = self.url.as_ref();
-                    single_cache_map.get(url).map(Clone::clone)
-                }
-                CacheMethod::UrlAndKey(key) => {
-                    let multi_cache_map = LazyLock::force(&MULTI_CACHE_MAP);
-                    let multi_cache_map = multi_cache_map.lock().await;
-                    multi_cache_map
-                        .get(&(self.url.to_string(), key.to_string()))
-                        .map(Clone::clone)
-                }
-            };
-            if let Some(cache) = cache {
-                if let Ok(resp) = serde_json::from_value::<Resp>(cache) {
-                    return Ok(resp);
+        let mut cache_meta = None;
+        if let Some(get_cache_meta) = self.get_cache_meta.as_ref() {
+            cache_meta = get_cache_meta(req);
+        }
+        if let Some(cache_meta) = cache_meta.as_ref() {
+            let cache_map = LazyLock::force(&CACHE_MAP);
+            let cache_map = cache_map.lock().await;
+            if let Some(cache) = cache_map.get(cache_meta.key.as_str()) {
+                if !cache.expired() {
+                    if let Ok(resp) = serde_json::from_value::<Resp>(cache.data.clone()) {
+                        return Ok(resp);
+                    }
                 }
             }
         }
-        return self.call_with_lock(req).await;
+        return self.call_with_lock(req, cache_meta).await;
     }
 
-    async fn call_with_lock(&self, req: &Req) -> Result<Resp, SharedString> {
+    async fn call_with_lock(
+        &self,
+        req: &Req,
+        cache_meta: Option<CacheMeta>,
+    ) -> Result<Resp, SharedString> {
         if let Some(lock_handler) = self.lock_handler.as_ref() {
             let ret = lock_handler.handle(true).await;
             if !ret {
@@ -215,15 +287,19 @@ where
                 }
                 return Err(SharedString::from("lock failed before requesting"));
             }
-            let result = self.call_with_loading(req).await;
+            let result = self.call_with_loading(req, cache_meta).await;
             lock_handler.handle(false).await;
             return result;
         } else {
-            return self.call_with_loading(req).await;
+            return self.call_with_loading(req, cache_meta).await;
         }
     }
 
-    async fn call_with_loading(&self, req: &Req) -> Result<Resp, SharedString> {
+    async fn call_with_loading(
+        &self,
+        req: &Req,
+        cache_meta: Option<CacheMeta>,
+    ) -> Result<Resp, SharedString> {
         if self.show_loading {
             if let Some(loading_handler) = self.loading_handler.clone().or_else(|| {
                 LazyLock::force(&DEFAULT_LOADING_HANDLER)
@@ -232,18 +308,22 @@ where
                     .clone()
             }) {
                 loading_handler.handle(true).await;
-                let result = self.try_call(req).await;
+                let result = self.try_call(req, cache_meta).await;
                 loading_handler.handle(false).await;
                 return result;
             } else {
-                return self.try_call(req).await;
+                return self.try_call(req, cache_meta).await;
             }
         } else {
-            return self.try_call(req).await;
+            return self.try_call(req, cache_meta).await;
         }
     }
 
-    async fn try_call(&self, req: &Req) -> Result<Resp, SharedString> {
+    async fn try_call(
+        &self,
+        req: &Req,
+        cache_meta: Option<CacheMeta>,
+    ) -> Result<Resp, SharedString> {
         let req = serde_json::to_string(&req).map_err(|err| {
             log::error!("Failed to serialize request: {}", err);
             SharedString::from("Failed to serialize request.")
@@ -259,7 +339,16 @@ where
         } else {
             return Err(SharedString::from("http requestor unimplemented"));
         };
-        match http_requestor.handle((self.url.clone(), req.into())).await {
+        let url = self.url.clone();
+        let req = SharedString::from(req);
+        match try_max_times(
+            async |_last_error| http_requestor.handle((url.clone(), req.clone())).await,
+            self.max_times
+                .unwrap_or_else(|| NonZeroU32::new(1).unwrap()),
+            self.interval,
+        )
+        .await
+        {
             Ok(resp) => {
                 let full_resp = serde_json::from_str::<serde_json::Value>(&resp).map_err(
                     |err| -> SharedString {
@@ -275,22 +364,17 @@ where
                 }) {
                     match data_unwrapper.handle(full_resp).await {
                         Ok(resp) => {
-                            if let Some(use_cache) = self.use_cache.as_ref() {
-                                match use_cache {
-                                    CacheMethod::Url => {
-                                        let single_cache_map = LazyLock::force(&SINGLE_CACHE_MAP);
-                                        let mut single_cache_map = single_cache_map.lock().await;
-                                        single_cache_map.insert(self.url.to_string(), resp.clone());
-                                    }
-                                    CacheMethod::UrlAndKey(key) => {
-                                        let multi_cache_map = LazyLock::force(&MULTI_CACHE_MAP);
-                                        let mut multi_cache_map = multi_cache_map.lock().await;
-                                        multi_cache_map.insert(
-                                            (self.url.to_string(), key.to_string()),
-                                            resp.clone(),
-                                        );
-                                    }
-                                }
+                            if let Some(cache_meta) = cache_meta.as_ref() {
+                                let cache_map = LazyLock::force(&CACHE_MAP);
+                                let mut cache_map = cache_map.lock().await;
+                                cache_map.insert(
+                                    cache_meta.key.to_string(),
+                                    CacheData {
+                                        data: resp.clone(),
+                                        time: Date::now(),
+                                        timeout: cache_meta.ttl,
+                                    },
+                                );
                             }
                             match serde_json::from_value::<Resp>(resp) {
                                 Ok(resp) => {
@@ -328,22 +412,17 @@ where
                         }
                     }
                 } else {
-                    if let Some(use_cache) = self.use_cache.as_ref() {
-                        match use_cache {
-                            CacheMethod::Url => {
-                                let single_cache_map = LazyLock::force(&SINGLE_CACHE_MAP);
-                                let mut single_cache_map = single_cache_map.lock().await;
-                                single_cache_map.insert(self.url.to_string(), full_resp.clone());
-                            }
-                            CacheMethod::UrlAndKey(key) => {
-                                let multi_cache_map = LazyLock::force(&MULTI_CACHE_MAP);
-                                let mut multi_cache_map = multi_cache_map.lock().await;
-                                multi_cache_map.insert(
-                                    (self.url.to_string(), key.to_string()),
-                                    full_resp.clone(),
-                                );
-                            }
-                        }
+                    if let Some(cache_meta) = cache_meta.as_ref() {
+                        let cache_map = LazyLock::force(&CACHE_MAP);
+                        let mut cache_map = cache_map.lock().await;
+                        cache_map.insert(
+                            cache_meta.key.to_string(),
+                            CacheData {
+                                data: full_resp.clone(),
+                                time: Date::now(),
+                                timeout: cache_meta.ttl,
+                            },
+                        );
                     }
                     return serde_json::from_value::<Resp>(full_resp).map_err(
                         |err| -> SharedString {
@@ -408,8 +487,12 @@ pub trait ApiExt {
         &self,
         unwrap_error_handler: impl Handler<SharedString, ()> + Send + Sync,
     ) -> Request<Self::Input, Self::Output>;
-    fn cache_by_url(&self) -> Request<Self::Input, Self::Output>;
-    fn cache_by_url_and_key(&self, key: SharedString) -> Request<Self::Input, Self::Output>;
+    fn use_cache(&self) -> Request<Self::Input, Self::Output>;
+    fn try_max_times(
+        &self,
+        max_times: u32,
+        interval: Option<u32>,
+    ) -> Request<Self::Input, Self::Output>;
     async fn call(&self, req: &Self::Input) -> Result<Self::Output, SharedString>;
 }
 
@@ -520,18 +603,22 @@ where
         request
     }
 
-    fn cache_by_url(&self) -> Request<T::Input, T::Output> {
+    fn use_cache(&self) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
-        request.use_cache.replace(CacheMethod::Url);
+        request
+            .get_cache_meta
+            .replace(Box::new(move |req: &T::Input| T::get_cache_meta(req)));
         request.request_validator(|req: &T::Input| {
             T::validate_input(req).map_err(|error| SharedString::from(error.to_string()))
         });
         request
     }
 
-    fn cache_by_url_and_key(&self, key: SharedString) -> Request<T::Input, T::Output> {
+    fn try_max_times(&self, max_times: u32, interval: Option<u32>) -> Request<T::Input, T::Output> {
         let mut request = Request::new(Self::namespace().to_string().into());
-        request.use_cache.replace(CacheMethod::UrlAndKey(key));
+        if Self::retryable() {
+            request.try_max_times(max_times, interval);
+        }
         request.request_validator(|req: &T::Input| {
             T::validate_input(req).map_err(|error| SharedString::from(error.to_string()))
         });

@@ -52,7 +52,7 @@ http-body-util = "0.1"
 multer = "3"
 hyper-util = { version = "0.1", features = ["tokio", "server", "http1", "http2"] }
 hyper = { version = "1", features = ["http1", "http2", "server"] }
-tihu = "0.1.9"
+tihu = "0.1.12"
 tihu-native = "0.1.16"
 lettre = {version = "0.11", default-features = false, features = ["builder", "smtp-transport", "tokio1-rustls-tls"]}
 aws-types = "1"

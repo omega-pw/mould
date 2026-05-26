@@ -1,7 +1,6 @@
 use crate::SharedString;
 use leptos::prelude::*;
-use wasm_bindgen::JsCast;
-use web_sys::{Event, HtmlInputElement};
+use web_sys::Event;
 
 #[component]
 pub fn Checkbox(
@@ -12,18 +11,14 @@ pub fn Checkbox(
 ) -> impl IntoView {
     let on_change = {
         let value = value.clone();
-        move |evt: Event| {
-            if let Some(target) = evt.target() {
-                let input: HtmlInputElement = target.unchecked_into();
-                let old_value = value.get();
-                let new_value = !old_value;
-                if !readonly {
-                    value.set(new_value.clone());
-                    input.set_checked(old_value);
-                }
-                if let Some(onchange) = onchange.as_ref() {
-                    onchange.run(new_value);
-                }
+        move |_evt: Event| {
+            let old_value = value.get();
+            let new_value = !old_value;
+            if !readonly {
+                value.set(new_value.clone());
+            }
+            if let Some(onchange) = onchange.as_ref() {
+                onchange.run(new_value);
             }
         }
     };

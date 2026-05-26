@@ -21,14 +21,13 @@ pub fn Drawer(
             }
         }
     };
-    let children = StoredValue::new(children);
     view! {
         <div class={edit_page_class} style={style}>
             <Show
                 when=move || { active.get() }
             >
-                <FocusArea onclickother={onclickother.clone()} style={SharedString::from("width:100%;height:100%;")}>
-                    { children.read_value()() }
+                <FocusArea clone:children onclickother={onclickother.clone()} style={SharedString::from("width:100%;height:100%;")}>
+                    { children() }
                 </FocusArea>
             </Show>
         </div>

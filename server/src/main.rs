@@ -22,6 +22,7 @@ use middleware::auth::AuthMiddleware;
 use middleware::auth::Guest;
 use middleware::auth::User;
 use middleware::context::ContextMiddleware;
+use middleware::session::get_header;
 use middleware::session::SessionMiddleware;
 use middleware::session::SignatureResult;
 use middleware::time_stat::TimeStatMiddleware;
@@ -135,7 +136,9 @@ async fn dispatch_api(
         .try_get::<ApiLevel>(&request, remote_addr)
         .await?
         .clone();
-
+    let route = request.uri().path().to_string();
+    let client_id =
+        get_header(request.headers(), "X-Client-Id").map(|client_id| client_id.to_string());
     let resp_ret = match api_level {
         ApiLevel::Guest => {
             let guest: Guest = request_data
@@ -177,6 +180,12 @@ async fn dispatch_api(
             return Ok(json_response(resp));
         }
         Err(err_msg) => {
+            log::error!(
+                "接口请求报错，接口：{}, client_id: {:?}, 错误：{}",
+                route,
+                client_id,
+                err_msg.message()
+            );
             let resp = tihu::api::Response::<()>::from(err_msg);
             let resp = serde_json::to_vec(&resp).unwrap_or_else(json_serialize_err);
             return Ok(json_response(resp));

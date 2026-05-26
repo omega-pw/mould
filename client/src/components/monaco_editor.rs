@@ -47,27 +47,45 @@ pub fn MonacoEditor(
             move || div_ref.get(),
             move |div_ref, _, _| {
                 if let Some(div) = div_ref {
-                    let (editor_inst, subscription) =
-                        init_monaco_editor(&div, &value.read(), &language, readonly, on_change);
-                    editor.set(Some(editor_inst.clone()));
-                    let editor_inst_clone = editor_inst.clone();
-                    let on_resize = Closure::wrap(Box::new(move |_event: Event| {
-                        update_editor(&editor_inst_clone);
-                    }) as Box<dyn Fn(Event)>)
-                    .into_js_value();
-                    let window = web_sys::window().unwrap();
-                    window
-                        .add_event_listener_with_callback("resize", on_resize.unchecked_ref())
-                        .unwrap();
-                    latest_destroy.replace(move || {
-                        window
-                            .remove_event_listener_with_callback(
-                                "resize",
-                                on_resize.unchecked_ref(),
-                            )
-                            .unwrap();
-                        destroy_monaco(&editor_inst, &subscription);
-                    });
+                    match init_monaco_editor(
+                        &div,
+                        &value.get_untracked(),
+                        &language,
+                        readonly,
+                        on_change,
+                    ) {
+                        Ok((editor_inst, subscription)) => {
+                            editor.set(Some(editor_inst.clone()));
+                            let editor_inst_clone = editor_inst.clone();
+                            let on_resize = Closure::wrap(Box::new(move |_event: Event| {
+                                update_editor(&editor_inst_clone);
+                            })
+                                as Box<dyn Fn(Event)>)
+                            .into_js_value();
+                            let window = web_sys::window().unwrap();
+                            window
+                                .add_event_listener_with_callback(
+                                    "resize",
+                                    on_resize.unchecked_ref(),
+                                )
+                                .unwrap();
+                            latest_destroy.replace(move || {
+                                window
+                                    .remove_event_listener_with_callback(
+                                        "resize",
+                                        on_resize.unchecked_ref(),
+                                    )
+                                    .unwrap();
+                                destroy_monaco(&editor_inst, &subscription);
+                            });
+                        }
+                        Err(err) => {
+                            web_sys::console::log_2(
+                                &JsValue::from("init monaco editor failed"),
+                                &err,
+                            );
+                        }
+                    }
                 }
             },
             true,
@@ -79,10 +97,12 @@ pub fn MonacoEditor(
         Effect::watch(
             move || value.get(),
             move |value, _, _| {
-                let inner_value = inner_value.read();
+                let inner_value = inner_value.get_untracked();
                 if inner_value.deref() != value {
-                    if let Some(editor) = editor.read().as_ref() {
-                        update_value(editor, value).unwrap();
+                    if let Some(editor) = editor.get_untracked().as_ref() {
+                        if let Err(err) = update_value(editor, value) {
+                            web_sys::console::log_2(&JsValue::from("update value failed"), &err);
+                        }
                     }
                 }
             },
@@ -96,7 +116,7 @@ pub fn MonacoEditor(
         Effect::watch(
             move || (width.get(), height.get()),
             move |_, _, _| {
-                if let Some(editor) = editor.read().as_ref() {
+                if let Some(editor) = editor.get_untracked().as_ref() {
                     update_editor(editor);
                 }
             },
@@ -128,54 +148,43 @@ pub fn init_monaco_editor(
     language: &Option<SharedString>,
     readonly: bool,
     onchange: UnsyncCallback<SharedString>,
-) -> (JsValue, JsValue) {
-    let monaco =
-        js_sys::Reflect::get(&web_sys::window().unwrap(), &JsValue::from_str("monaco")).unwrap();
-    let editor = js_sys::Reflect::get(&monaco, &JsValue::from_str("editor")).unwrap();
+) -> Result<(JsValue, JsValue), JsValue> {
+    let monaco = js_sys::Reflect::get(&web_sys::window().unwrap(), &JsValue::from_str("monaco"))?;
+    let editor = js_sys::Reflect::get(&monaco, &JsValue::from_str("editor"))?;
     let create_method: js_sys::Function =
-        js_sys::Reflect::get(&editor, &JsValue::from_str("create"))
-            .unwrap()
-            .dyn_into()
-            .unwrap();
+        js_sys::Reflect::get(&editor, &JsValue::from_str("create"))?.dyn_into()?;
     let init_config = js_sys::Object::new();
     js_sys::Reflect::set(
         &init_config,
         &JsValue::from_str("value"),
         &JsValue::from_str(value.as_ref()),
-    )
-    .unwrap();
+    )?;
     if let Some(language) = language.as_ref() {
         js_sys::Reflect::set(
             &init_config,
             &JsValue::from_str("language"),
             &JsValue::from_str(language.as_ref()),
-        )
-        .unwrap();
+        )?;
     }
     js_sys::Reflect::set(
         &init_config,
         &JsValue::from_str("selectOnLineNumbers"),
         &JsValue::from_bool(true),
-    )
-    .unwrap();
+    )?;
     js_sys::Reflect::set(
         &init_config,
         &JsValue::from_str("readOnly"),
         &JsValue::from_bool(readonly),
-    )
-    .unwrap();
+    )?;
     js_sys::Reflect::set(
         &init_config,
         &JsValue::from_str("theme"),
         &JsValue::from_str("vs-dark"),
-    )
-    .unwrap();
-    let editor_inst = create_method.call2(&editor, root, &init_config).unwrap();
+    )?;
+    let editor_inst = create_method.call2(&editor, root, &init_config)?;
     let on_did_change_model_content_method: js_sys::Function =
-        js_sys::Reflect::get(&editor_inst, &JsValue::from_str("onDidChangeModelContent"))
-            .unwrap()
-            .dyn_into()
-            .unwrap();
+        js_sys::Reflect::get(&editor_inst, &JsValue::from_str("onDidChangeModelContent"))?
+            .dyn_into()?;
     let editor_inst_clone = editor_inst.clone();
     let on_change = Closure::wrap(Box::new(move |_event: Event| {
         let get_value_method: js_sys::Function =
@@ -189,21 +198,14 @@ pub fn init_monaco_editor(
         }
     }) as Box<dyn Fn(Event)>)
     .into_js_value();
-    let subscription = on_did_change_model_content_method
-        .call1(&editor_inst, &on_change)
-        .unwrap();
-    return (editor_inst, subscription);
+    let subscription = on_did_change_model_content_method.call1(&editor_inst, &on_change)?;
+    return Ok((editor_inst, subscription));
 }
 
 pub fn update_value(editor_inst: &JsValue, value: &str) -> Result<(), JsValue> {
     let set_value_method: js_sys::Function =
-        js_sys::Reflect::get(editor_inst, &JsValue::from_str("setValue"))
-            .unwrap()
-            .dyn_into()
-            .unwrap();
-    set_value_method
-        .call1(editor_inst, &JsValue::from_str(value))
-        .unwrap();
+        js_sys::Reflect::get(editor_inst, &JsValue::from_str("setValue"))?.dyn_into()?;
+    set_value_method.call1(editor_inst, &JsValue::from_str(value))?;
     return Ok(());
 }
 

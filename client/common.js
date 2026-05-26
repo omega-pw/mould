@@ -1,6 +1,10 @@
+import "./src/components/button.css";
 import "./src/components/button_group.css";
+import "./src/components/input.css";
 import "./src/components/checkbox_group.css";
+import "./src/components/selection.css";
 import "./src/components/loading.css";
+import "./src/components/dialog.css";
 import "./src/components/pagination.css";
 import "./src/components/common_popup.css";
 import "./src/components/popup_message.css";
