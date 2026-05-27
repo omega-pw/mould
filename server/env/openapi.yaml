@@ -12,7 +12,7 @@ securityDefinitions:
     in: "header"
 
 x-google-backend:
-  address: https://mould-demo-57239000179.asia-southeast1.run.app
+  address: http://xxx.com
   path_translation: APPEND_PATH_TO_ADDRESS
 
 # 2. 全局默认开启安全校验
