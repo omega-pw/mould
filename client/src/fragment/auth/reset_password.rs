@@ -1,9 +1,12 @@
 use super::super::common::turnstile::TokenResult;
 use super::super::common::turnstile::Turnstile;
+use crate::assets;
 use crate::cache::SYSTEM_INFO;
 use crate::components::button::Button;
+use crate::components::center_middle::CenterMiddle;
+use crate::components::dialog::Dialog;
 use crate::components::input::Input;
-use crate::components::modal_dialog::ModalDialog;
+use crate::components::page::Page;
 use crate::js;
 use crate::sdk;
 use crate::utils;
@@ -108,74 +111,78 @@ pub fn ResetPassword() -> impl IntoView {
         navigate("/login", Default::default());
     };
     view! {
-        <ModalDialog title={SharedString::from("重置密码")} closable=false>
-            <div style="padding-top:2em;padding-bottom:2em;">
-                <div style="padding-right:4em;">
-                    <table style="border-collapse:collapse;table-layout: fixed;">
-                        <tr>
-                            <td class="align-right" style="width:6em;padding-bottom: 1em;">{"邮箱："}</td>
-                            <td style="padding-bottom: 1em;">
-                                <Input value={form.account.clone()} onfocus={clear_err_msg.clone()} onenter={on_submit.clone()}/>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="align-right" style="width:6em;padding-bottom: 1em;">{"密码："}</td>
-                            <td style="padding-bottom: 1em;">
-                                <Input r#type="password" disable_trim={true} value={form.password.clone()} onfocus={clear_err_msg.clone()} onenter={on_submit.clone()}/>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="align-right" style="width:6em;padding-bottom: 1em;">{"确认密码："}</td>
-                            <td style="padding-bottom: 1em;">
-                                <Input r#type="password" disable_trim={true} value={form.confirm_password.clone()} onfocus={clear_err_msg.clone()} onenter={on_submit.clone()}/>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="align-right" style="width:6em;padding-bottom: 1em;">{"验证码："}</td>
-                            <td style="padding-bottom: 1em;">
-                                {
-                                    let turnstile_token_callback = turnstile_token_callback.clone();
-                                    move || {
-                                        if let Some(token_callback) = turnstile_token_callback.get() {
-                                            view! {
-                                                <Turnstile ondone=token_callback/>
-                                            }.into_any()
-                                        } else {
-                                            view! {}.into_any()
+        <Page mask=false style={format!("background-repeat: no-repeat;background-size: cover;background-position: center;background-image:url({})", assets::LOGIN_BG.path())}>
+            <CenterMiddle>
+                <Dialog title={SharedString::from("重置密码")} closable={false} content_style="background-color:#FFF;">
+                    <div style="padding-top:2em;padding-bottom:2em;">
+                        <div style="padding-right:4em;">
+                            <table style="border-collapse:collapse;table-layout: fixed;">
+                                <tr>
+                                    <td class="align-right" style="width:6em;padding-bottom: 1em;">{"邮箱："}</td>
+                                    <td style="padding-bottom: 1em;">
+                                        <Input value={form.account.clone()} onfocus={clear_err_msg.clone()} onenter={on_submit.clone()}/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="align-right" style="width:6em;padding-bottom: 1em;">{"密码："}</td>
+                                    <td style="padding-bottom: 1em;">
+                                        <Input r#type="password" disable_trim={true} value={form.password.clone()} onfocus={clear_err_msg.clone()} onenter={on_submit.clone()}/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="align-right" style="width:6em;padding-bottom: 1em;">{"确认密码："}</td>
+                                    <td style="padding-bottom: 1em;">
+                                        <Input r#type="password" disable_trim={true} value={form.confirm_password.clone()} onfocus={clear_err_msg.clone()} onenter={on_submit.clone()}/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="align-right" style="width:6em;padding-bottom: 1em;">{"验证码："}</td>
+                                    <td style="padding-bottom: 1em;">
+                                        {
+                                            let turnstile_token_callback = turnstile_token_callback.clone();
+                                            move || {
+                                                if let Some(token_callback) = turnstile_token_callback.get() {
+                                                    view! {
+                                                        <Turnstile ondone=token_callback/>
+                                                    }.into_any()
+                                                } else {
+                                                    view! {}.into_any()
+                                                }
+                                            }
                                         }
-                                    }
-                                }
-                                <div>
-                                    <Input value={form.captcha.clone()} onfocus={clear_err_msg} onenter={on_submit.clone()} style="width:9em;"/>
-                                    <Button disabled={
-                                        let account = form.account.clone();
-                                        move || {
-                                            let account = account.read();
-                                            let account: &str = account.as_ref();
-                                            account.is_empty() || !ValidateEmail::validate_email(&account) || turnstile_token_callback.read().is_some()
-                                        }
-                                    } onclick={on_send_captcha}>{"发送验证码"}</Button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td></td>
-                            <td>
-                                <Button disabled={is_resetting} onclick={on_submit} style={SharedString::from("padding-left: 1em;padding-right: 1em;")}>{"提交"}</Button>
-                                <Show
-                                    when={ let err_msg = err_msg.clone(); move || { err_msg.read().is_some() } }
-                                >
-                                    <span class="middle" style="color:red;margin-left: 0.5em;">{err_msg}</span>
-                                </Show>
-                            </td>
-                        </tr>
-                    </table>
-                </div>
-                <div style="text-align:right;padding-right:1em;">
-                    <a href="javascript:void(0);" on:click={on_switch_login}>{"登录"}</a>
-                </div>
-            </div>
-        </ModalDialog>
+                                        <div>
+                                            <Input value={form.captcha.clone()} onfocus={clear_err_msg} onenter={on_submit.clone()} style="width:9em;"/>
+                                            <Button disabled={
+                                                let account = form.account.clone();
+                                                move || {
+                                                    let account = account.read();
+                                                    let account: &str = account.as_ref();
+                                                    account.is_empty() || !ValidateEmail::validate_email(&account) || turnstile_token_callback.read().is_some()
+                                                }
+                                            } onclick={on_send_captcha}>{"发送验证码"}</Button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td></td>
+                                    <td>
+                                        <Button disabled={is_resetting} onclick={on_submit} style={SharedString::from("padding-left: 1em;padding-right: 1em;")}>{"提交"}</Button>
+                                        <Show
+                                            when={ let err_msg = err_msg.clone(); move || { err_msg.read().is_some() } }
+                                        >
+                                            <span class="middle" style="color:red;margin-left: 0.5em;">{err_msg}</span>
+                                        </Show>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div style="text-align:right;padding-right:1em;">
+                            <a href="javascript:void(0);" on:click={on_switch_login}>{"登录"}</a>
+                        </div>
+                    </div>
+                </Dialog>
+            </CenterMiddle>
+        </Page>
     }
 }
 

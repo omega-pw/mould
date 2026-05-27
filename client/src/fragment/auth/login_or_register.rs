@@ -1,5 +1,6 @@
 use super::login::Login;
 use super::register::Register;
+use crate::assets;
 use crate::components::button_group::ButtonGroup;
 use crate::components::center_middle::CenterMiddle;
 use crate::components::dialog::Dialog;
@@ -96,7 +97,7 @@ pub fn LoginOrRegisterPage(
         })
     };
     view! {
-        <Page mask=false>
+        <Page mask=false style={format!("background-repeat: no-repeat;background-size: cover;background-position: center;background-image:url({})", assets::LOGIN_BG.path())}>
             <CenterMiddle>
                 <Dialog title={title.clone()} closable={false} content_style="background-color:#FFF;">
                     <LoginOrRegister tab={tab} ondone={ondone}/>

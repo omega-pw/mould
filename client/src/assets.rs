@@ -1,3 +1,5 @@
+use crate::SharedString;
+use leptos::prelude::*;
 use std::path::Path;
 
 pub struct Asset(&'static str);
@@ -19,6 +21,13 @@ impl Asset {
             .map(|path| format!("/{}", path))
             .unwrap()
     }
+    pub fn image_view(&self, style: Option<SharedString>) -> impl IntoView {
+        let path = self.path();
+        view! {
+            <img src={path} style={style}/>
+        }
+    }
 }
 
 pub const GITHUB_LOGO: Asset = asset!("../static/assets/img/github.svg");
+pub const LOGIN_BG: Asset = asset!("../static/assets/img/login-bg.svg");
