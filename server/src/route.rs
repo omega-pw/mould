@@ -262,11 +262,11 @@ pub async fn dispatch_guest_api(
     (route, req, guest): (SharedString, Bytes, Guest),
 ) -> Result<Bytes, ErrNo> {
     match route.as_str() {
-        //获取turnstile的Site Key
-        sdk::system::get_turnstile_site_key::GET_TURNSTILE_SITE_KEY_API => {
+        //获取当前时间
+        sdk::system::get_current_time::GET_CURRENT_TIME_API => {
             call_guest_api(
-                sdk::system::get_turnstile_site_key::GetTurnstileSiteKeyApi,
-                action::system::get_turnstile_site_key::get_turnstile_site_key,
+                sdk::system::get_current_time::GetCurrentTimeApi,
+                action::system::get_current_time::get_current_time,
                 guest,
                 &req,
             )
@@ -277,16 +277,6 @@ pub async fn dispatch_guest_api(
             call_guest_api(
                 sdk::auth::get_salt::GetSaltApi,
                 action::auth::get_salt::get_salt,
-                guest,
-                &req,
-            )
-            .await
-        }
-        //获取公钥接口
-        sdk::auth::get_rsa_pub_key::GET_RSA_PUB_KEY_API => {
-            call_guest_api(
-                sdk::auth::get_rsa_pub_key::GetRsaPubKeyApi,
-                action::auth::get_rsa_pub_key::get_rsa_pub_key,
                 guest,
                 &req,
             )
@@ -399,9 +389,8 @@ pub async fn dispatch_guest_api(
 pub static WHITE_LIST_NAMESPACE: &[&'static str] = &[
     "/blob/",
     "/file/",
-    sdk::system::get_turnstile_site_key::GET_TURNSTILE_SITE_KEY_API,
+    sdk::system::get_current_time::GET_CURRENT_TIME_API,
     sdk::auth::get_salt::GET_SALT_API,
-    sdk::auth::get_rsa_pub_key::GET_RSA_PUB_KEY_API,
     sdk::auth::get_nonce::GET_NONCE_API,
     sdk::auth::send_email_captcha::SEND_EMAIL_CAPTCHA_API,
     sdk::auth::login::LOGIN_API,

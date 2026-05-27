@@ -1,9 +1,11 @@
+use crate::cache::SYSTEM_INFO;
 use crate::components::button::Button;
 use crate::components::input::Input;
 use crate::js;
 use crate::sdk;
 use crate::utils;
 use crate::utils::request::ApiExt;
+use crate::utils::result::ResultExt;
 use crate::AppContext;
 use crate::SharedString;
 use base64::prelude::BASE64_STANDARD;
@@ -18,9 +20,8 @@ use sdk::auth::change_password::ChangePasswordReq;
 use sdk::auth::get_curr_user::AuthSource;
 use sdk::auth::get_nonce::GetNonceApi;
 use sdk::auth::get_nonce::GetNonceReq;
-use sdk::auth::get_rsa_pub_key::GetRsaPubKeyApi;
-use sdk::auth::get_rsa_pub_key::GetRsaPubKeyReq;
 use sdk::auth::RandomValue;
+use std::sync::LazyLock;
 
 #[derive(Clone)]
 struct ChangeForm {
@@ -37,13 +38,10 @@ pub fn ChangePassword(ondone: UnsyncCallback<()>) -> impl IntoView {
         new_password: RwSignal::new("".into()),
         confirm_new_password: RwSignal::new("".into()),
     };
-    let rsa_pub_key: RwSignal<Option<SharedString>> = RwSignal::new(None);
     let is_saving: RwSignal<bool> = RwSignal::new(false);
     let err_msg: RwSignal<Option<SharedString>> = RwSignal::new(None);
-
-    let rsa_pub_key_clone = rsa_pub_key.clone();
     wasm_bindgen_futures::spawn_local(async move {
-        get_rsa_pub_key(&rsa_pub_key_clone).await.ok();
+        LazyLock::force(&SYSTEM_INFO).get_fresh_data().await.ok();
     });
 
     let err_msg_clone = err_msg.clone();
@@ -62,22 +60,15 @@ pub fn ChangePassword(ondone: UnsyncCallback<()>) -> impl IntoView {
             } => {
                 let user_random_value = user_random_value.clone();
                 let on_save = UnsyncCallback::new(move |_| {
-                    let rsa_pub_key = rsa_pub_key.clone();
                     let is_saving = is_saving_clone.clone();
                     let form = form_clone.clone();
                     let err_msg = err_msg_clone.clone();
                     let user_random_value = user_random_value.clone();
                     let ondone = ondone.clone();
                     wasm_bindgen_futures::spawn_local(async move {
-                        save_change(
-                            &rsa_pub_key,
-                            &user_random_value,
-                            &is_saving,
-                            &form,
-                            &err_msg,
-                            &ondone,
-                        )
-                        .await;
+                        save_change(&user_random_value, &is_saving, &form, &err_msg, &ondone)
+                            .await
+                            .display_error();
                     });
                 });
                 view! {
@@ -122,13 +113,6 @@ pub fn ChangePassword(ondone: UnsyncCallback<()>) -> impl IntoView {
     }
 }
 
-async fn get_rsa_pub_key(rsa_pub_key: &RwSignal<Option<SharedString>>) -> Result<(), SharedString> {
-    let params = GetRsaPubKeyReq {};
-    let pub_key = GetRsaPubKeyApi.call(&params).await?;
-    rsa_pub_key.set(Some(pub_key.into()));
-    return Ok(());
-}
-
 fn chk_form_err(form: &ChangeForm) -> Vec<SharedString> {
     let mut err_msgs: Vec<SharedString> = Vec::new();
     let old_password = form.old_password.get();
@@ -156,45 +140,38 @@ fn chk_form_err(form: &ChangeForm) -> Vec<SharedString> {
 }
 
 async fn save_change(
-    rsa_pub_key: &RwSignal<Option<SharedString>>,
     user_random_value: &str,
     is_saving: &RwSignal<bool>,
     form: &ChangeForm,
     err_msg: &RwSignal<Option<SharedString>>,
     ondone: &UnsyncCallback<()>,
-) {
-    let mut err_msgs = chk_form_err(form);
-    if !err_msgs.is_empty() {
-        err_msgs.reverse();
-        err_msg.set(err_msgs.pop());
-        return;
+) -> Result<(), SharedString> {
+    let err_msgs = chk_form_err(form);
+    if let Some(msg) = err_msgs.first() {
+        err_msg.set(Some(msg.clone()));
+        return Err(msg.clone());
     }
-    if let Some(rsa_pub_key) = rsa_pub_key.get() {
-        if is_saving.get() {
-            return;
-        }
-        is_saving.set(true);
-        let rsa_pub_key = rsa_pub_key.to_string();
-        let form = form.clone();
-        let result = change_password(rsa_pub_key, user_random_value, form).await;
-        is_saving.set(false);
-        match result {
-            Err(err) => {
-                log::error!("{}", err);
-                err_msg.set(Some(err));
-            }
-            Ok(_) => {
-                utils::success(SharedString::from("修改成功"));
-                ondone.run(());
-            }
-        }
-    } else {
-        log::error!("rsa公钥为空");
+    if is_saving.get() {
+        return Ok(());
     }
+    is_saving.set(true);
+    let form = form.clone();
+    let result = change_password(user_random_value, form).await;
+    is_saving.set(false);
+    match result {
+        Err(err) => {
+            log::error!("{}", err);
+            err_msg.set(Some(err));
+        }
+        Ok(_) => {
+            utils::success(SharedString::from("修改成功"));
+            ondone.run(());
+        }
+    }
+    return Ok(());
 }
 
 async fn change_password(
-    rsa_pub_key: String,
     user_random_value: &str,
     form: ChangeForm,
 ) -> Result<(), SharedString> {
@@ -219,8 +196,14 @@ async fn change_password(
     let old_auth_key = BASE64_STANDARD.encode(&old_auth_key);
     let new_auth_key = BASE64_STANDARD.encode(&new_auth_key);
     let params = GetNonceReq {};
-    let nonce = GetNonceApi.call(&params).await?;
-    let rsa_pub_key = RsaPubKey2048::try_from_string(&rsa_pub_key);
+    let (system_info_ret, nonce_ret) = futures::future::join(
+        LazyLock::force(&SYSTEM_INFO).get_fresh_data(),
+        GetNonceApi.call(&params),
+    )
+    .await;
+    let system_info = system_info_ret?;
+    let nonce = nonce_ret?;
+    let rsa_pub_key = RsaPubKey2048::try_from_string(system_info.rsa_pub_key.as_ref());
     let cipher_old_auth_key = rsa_pub_key
         .encrypt(&[old_auth_key.as_bytes(), nonce.as_bytes()].concat())
         .ok_or_else(|| SharedString::from("加密旧授权秘钥失败！"))?;

@@ -36,8 +36,8 @@ use leptos::prelude::*;
 use log;
 use request::ApiExt;
 use sdk::storage::UPLOAD_API;
-use sdk::system::get_system_info::GetSystemInfoApi;
-use sdk::system::get_system_info::GetSystemInfoReq;
+use sdk::system::get_current_time::GetCurrentTimeApi;
+use sdk::system::get_current_time::GetCurrentTimeReq;
 use send_wrapper::SendWrapper;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -81,9 +81,9 @@ pub fn format_time_local(date_time: &DateTime<Utc>) -> String {
 
 pub async fn init_time_diff() -> Result<(), SharedString> {
     let client_time = Utc::now().timestamp_millis();
-    let params = GetSystemInfoReq {};
-    let system_info = GetSystemInfoApi.call(&params).await?;
-    let server_time = system_info.current_time.timestamp_millis();
+    let params = GetCurrentTimeReq {};
+    let resp = GetCurrentTimeApi.call(&params).await?;
+    let server_time = resp.current_time.timestamp_millis();
     let diff = server_time - client_time;
     TIME_DIFF.store(diff, Ordering::Relaxed);
     return Ok(());

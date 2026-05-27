@@ -1,7 +1,6 @@
 use super::super::common::turnstile::TokenResult;
 use super::super::common::turnstile::Turnstile;
-use crate::cache::RSA_PUB_KEY;
-use crate::cache::TURNSTILE_SITE_KEY;
+use crate::cache::SYSTEM_INFO;
 use crate::components::button::Button;
 use crate::components::center_middle::CenterMiddle;
 use crate::components::input::Input;
@@ -51,13 +50,7 @@ pub fn Register(ondone: UnsyncCallback<GetCurrUserResp>) -> impl IntoView {
     let is_registering: RwSignal<bool> = RwSignal::new(false);
     let err_msg: RwSignal<Option<SharedString>> = RwSignal::new(None);
     wasm_bindgen_futures::spawn_local(async move {
-        LazyLock::force(&RSA_PUB_KEY).get_fresh_data().await.ok();
-    });
-    wasm_bindgen_futures::spawn_local(async move {
-        LazyLock::force(&TURNSTILE_SITE_KEY)
-            .get_fresh_data()
-            .await
-            .ok();
+        LazyLock::force(&SYSTEM_INFO).get_fresh_data().await.ok();
     });
 
     let err_msg_clone = err_msg.clone();
@@ -224,12 +217,11 @@ async fn start_register(
         err_msg.set(Some(msg.clone()));
         return Err(msg.clone());
     }
-    let rsa_pub_key = LazyLock::force(&RSA_PUB_KEY).get_fresh_data().await?;
     if is_registering.get() {
         return Ok(());
     }
     is_registering.set(true);
-    let result = register(rsa_pub_key.as_ref(), form).await;
+    let result = register(form).await;
     is_registering.set(false);
     match result {
         Err(err) => {
@@ -243,15 +235,18 @@ async fn start_register(
     return Ok(());
 }
 
-async fn register(
-    server_rsa_pub_key: &str,
-    form: &RegisterForm,
-) -> Result<GetCurrUserResp, SharedString> {
+async fn register(form: &RegisterForm) -> Result<GetCurrUserResp, SharedString> {
     let mut user_random_value = [0u8; 32];
     utils::fill_random_bytes(&mut user_random_value);
     let params = GetNonceReq {};
-    let nonce = GetNonceApi.call(&params).await?;
-    let server_rsa_pub_key = RsaPubKey2048::try_from_string(server_rsa_pub_key);
+    let (system_info_ret, nonce_ret) = futures::future::join(
+        LazyLock::force(&SYSTEM_INFO).get_fresh_data(),
+        GetNonceApi.call(&params),
+    )
+    .await;
+    let system_info = system_info_ret?;
+    let nonce = nonce_ret?;
+    let server_rsa_pub_key = RsaPubKey2048::try_from_string(system_info.rsa_pub_key.as_ref());
     let cipher_account = server_rsa_pub_key
         .encrypt(&[form.account.get().as_bytes(), nonce.as_bytes()].concat())
         .ok_or_else(|| SharedString::from("加密账户失败！"))?;

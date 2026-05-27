@@ -2,7 +2,6 @@ pub mod change_password;
 pub mod get_curr_user;
 pub mod get_nonce;
 pub mod get_openid_providers;
-pub mod get_rsa_pub_key;
 pub mod get_salt;
 pub mod login;
 pub mod login_by_oauth2_code;

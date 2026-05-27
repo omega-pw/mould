@@ -1,7 +1,5 @@
-use chrono::DateTime;
-use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use tihu::datetime_format;
+use tihu::api::CacheMeta;
 use tihu::Api;
 use tihu::SharedString;
 
@@ -13,8 +11,8 @@ pub struct GetSystemInfoReq {}
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GetSystemInfoResp {
     pub version: String,
-    #[serde(with = "datetime_format")]
-    pub current_time: DateTime<Utc>,
+    pub rsa_pub_key: String,
+    pub turnstile_site_key: Option<String>,
 }
 
 pub struct GetSystemInfoApi;
@@ -23,5 +21,14 @@ impl Api for GetSystemInfoApi {
     type Output = GetSystemInfoResp;
     fn namespace() -> SharedString {
         return SharedString::from_static(GET_SYSTEM_INFO_API);
+    }
+    fn retryable() -> bool {
+        return true;
+    }
+    fn get_cache_meta(_: &Self::Input) -> Option<CacheMeta> {
+        return Some(CacheMeta {
+            key: SharedString::from_static(GET_SYSTEM_INFO_API),
+            ttl: Some(5 * 60 * 1000),
+        });
     }
 }

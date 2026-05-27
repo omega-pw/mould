@@ -1,5 +1,5 @@
 use crate::assets;
-use crate::cache::RSA_PUB_KEY;
+use crate::cache::SYSTEM_INFO;
 use crate::components::button::Button;
 use crate::components::center_middle::CenterMiddle;
 use crate::components::input::Input;
@@ -47,7 +47,7 @@ pub fn Login(ondone: UnsyncCallback<GetCurrUserResp>) -> impl IntoView {
     // });
     let openid_providers_clone = openid_providers.clone();
     wasm_bindgen_futures::spawn_local(async move {
-        LazyLock::force(&RSA_PUB_KEY).get_fresh_data().await.ok();
+        LazyLock::force(&SYSTEM_INFO).get_fresh_data().await.ok();
     });
     wasm_bindgen_futures::spawn_local(async move {
         get_openid_providers(&openid_providers_clone).await.ok();
@@ -151,12 +151,11 @@ async fn start_login(
         err_msg.set(Some(msg.clone()));
         return Err(msg.clone());
     }
-    let rsa_pub_key = LazyLock::force(&RSA_PUB_KEY).get_fresh_data().await?;
     if is_logining.get() {
         return Ok(());
     }
     is_logining.set(true);
-    let ret = login(rsa_pub_key.as_ref(), form).await;
+    let ret = login(form).await;
     is_logining.set(false);
     match ret {
         Err(err) => {
@@ -170,7 +169,7 @@ async fn start_login(
     return Ok(());
 }
 
-async fn login(rsa_pub_key: &str, form: &LoginForm) -> Result<LoginResp, SharedString> {
+async fn login(form: &LoginForm) -> Result<LoginResp, SharedString> {
     let account = form.account.get();
     let salt = GetSaltApi
         .call(&GetSaltReq {
@@ -187,8 +186,14 @@ async fn login(rsa_pub_key: &str, form: &LoginForm) -> Result<LoginResp, SharedS
         sdk::auth::calc_derived_key(form.password.get().as_bytes(), &salt);
     let auth_key = BASE64_STANDARD.encode(&auth_key);
     let params = GetNonceReq {};
-    let nonce = GetNonceApi.call(&params).await?;
-    let rsa_pub_key = RsaPubKey2048::try_from_string(rsa_pub_key);
+    let (system_info_ret, nonce_ret) = futures::future::join(
+        LazyLock::force(&SYSTEM_INFO).get_fresh_data(),
+        GetNonceApi.call(&params),
+    )
+    .await;
+    let system_info = system_info_ret?;
+    let nonce = nonce_ret?;
+    let rsa_pub_key = RsaPubKey2048::try_from_string(system_info.rsa_pub_key.as_ref());
     let cipher_account = rsa_pub_key
         .encrypt(&[account.as_bytes(), nonce.as_bytes()].concat())
         .ok_or_else(|| SharedString::from("加密账户失败！"))?;

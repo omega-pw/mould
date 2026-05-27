@@ -1,4 +1,4 @@
-use crate::cache::TURNSTILE_SITE_KEY;
+use crate::cache::SYSTEM_INFO;
 use crate::utils::script_loader::ScriptLoader;
 use crate::SharedString;
 use leptos::html;
@@ -29,15 +29,16 @@ pub fn Turnstile(
     #[prop(into)] ondone: UnsyncCallback<TokenResult>,
 ) -> impl IntoView {
     let site_key: RwSignal<Option<SharedString>> = RwSignal::new(None);
+    let div_ref: NodeRef<html::Div> = NodeRef::new();
     spawn_local({
         let site_key = site_key.clone();
         let ondone = ondone.clone();
         async move {
-            let result = LazyLock::force(&TURNSTILE_SITE_KEY).get_fresh_data().await;
+            let result = LazyLock::force(&SYSTEM_INFO).get_fresh_data().await;
             match result {
-                Ok(key) => {
-                    if let Some(key) = key {
-                        site_key.set(Some(key.into()));
+                Ok(system_info) => {
+                    if let Some(turnstile_site_key) = system_info.turnstile_site_key {
+                        site_key.set(Some(turnstile_site_key.into()));
                     } else {
                         ondone.run(TokenResult::NotRequired);
                     }
@@ -48,7 +49,6 @@ pub fn Turnstile(
             }
         }
     });
-    let div_ref: NodeRef<html::Div> = NodeRef::new();
     Effect::watch(
         move || (div_ref.get(), site_key.get()),
         move |(div_ref, site_key), _, _| {
