@@ -1,3 +1,4 @@
 /api/* https://mould-demo-xxx.asia-southeast1.run.app/api/:splat 200
 /file/* https://mould-demo-xxx.asia-southeast1.run.app/file/:splat 200
 /blob/* https://mould-demo-xxx.asia-southeast1.run.app/blob/:splat 200
+/* /index.html 200
