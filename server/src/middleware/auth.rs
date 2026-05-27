@@ -359,14 +359,17 @@ pub async fn call_guest_api<F, I>(
     handler: impl Fn(Guest, I::Input) -> F,
     guest: Guest,
     req: &[u8],
-) -> Bytes
+) -> Result<Bytes, ErrNo>
 where
     F: Future<Output = Result<I::Output, ErrNo>>,
     I: Api,
     I::Input: DeserializeOwned,
     I::Output: Serialize,
 {
-    result_to_json_resp(try_call_guest_api(api, handler, guest, req).await).into()
+    let resp = try_call_guest_api(api, handler, guest, req).await?;
+    serde_json::to_vec(&tihu::api::Response::success(Some(resp)))
+        .map(From::from)
+        .map_err(ErrNo::SerializeError)
 }
 
 /**
@@ -397,12 +400,15 @@ pub async fn call_user_api<F, I>(
     handler: impl Fn(Id, User, I::Input) -> F,
     user: User,
     req: &[u8],
-) -> Bytes
+) -> Result<Bytes, ErrNo>
 where
     F: Future<Output = Result<I::Output, tihu_native::ErrNo>>,
     I: Api,
     I::Input: DeserializeOwned,
     I::Output: Serialize,
 {
-    result_to_json_resp(try_call_user_api(api, handler, user, req).await).into()
+    let resp = try_call_user_api(api, handler, user, req).await?;
+    serde_json::to_vec(&tihu::api::Response::success(Some(resp)))
+        .map(From::from)
+        .map_err(ErrNo::SerializeError)
 }

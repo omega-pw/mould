@@ -13,7 +13,7 @@ use tihu_native::ErrNo;
 pub async fn dispatch_user_api(
     (route, req, user): (SharedString, Bytes, User),
 ) -> Result<Bytes, ErrNo> {
-    let resp = match route.as_str() {
+    match route.as_str() {
         //修改密码
         sdk::auth::change_password::CHANGE_PASSWORD_API => {
             call_user_api(
@@ -254,15 +254,14 @@ pub async fn dispatch_user_api(
             )
             .await
         }
-        _ => gen_no_such_api().into(),
-    };
-    return Ok(resp);
+        _ => Ok(gen_no_such_api().into()),
+    }
 }
 
 pub async fn dispatch_guest_api(
     (route, req, guest): (SharedString, Bytes, Guest),
 ) -> Result<Bytes, ErrNo> {
-    let resp = match route.as_str() {
+    match route.as_str() {
         //获取盐值接口
         sdk::auth::get_salt::GET_SALT_API => {
             call_guest_api(
@@ -383,9 +382,8 @@ pub async fn dispatch_guest_api(
             )
             .await
         }
-        _ => gen_no_such_api().into(),
-    };
-    return Ok(resp);
+        _ => Ok(gen_no_such_api().into()),
+    }
 }
 
 pub static WHITE_LIST_NAMESPACE: &[&'static str] = &[
