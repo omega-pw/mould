@@ -2,6 +2,7 @@
 
 mod app;
 mod assets;
+mod cache;
 mod components;
 mod fragment;
 mod id_gen;

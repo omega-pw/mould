@@ -1,4 +1,5 @@
 pub mod ajax;
+pub mod cache_mgr;
 pub mod handle;
 pub mod request;
 pub mod result;

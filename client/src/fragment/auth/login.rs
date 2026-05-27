@@ -1,10 +1,12 @@
 use crate::assets;
+use crate::cache::RSA_PUB_KEY;
 use crate::components::button::Button;
 use crate::components::center_middle::CenterMiddle;
 use crate::components::input::Input;
 use crate::js;
 use crate::sdk;
 use crate::utils::request::ApiExt;
+use crate::utils::result::ResultExt;
 use crate::SharedString;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
@@ -17,13 +19,12 @@ use sdk::auth::get_nonce::GetNonceReq;
 use sdk::auth::get_openid_providers::GetOpenidProvidersApi;
 use sdk::auth::get_openid_providers::GetOpenidProvidersReq;
 use sdk::auth::get_openid_providers::OpenidProvider;
-use sdk::auth::get_rsa_pub_key::GetRsaPubKeyApi;
-use sdk::auth::get_rsa_pub_key::GetRsaPubKeyReq;
 use sdk::auth::get_salt::GetSaltApi;
 use sdk::auth::get_salt::GetSaltReq;
 use sdk::auth::login::LoginApi;
 use sdk::auth::login::LoginReq;
 use sdk::auth::login::LoginResp;
+use std::sync::LazyLock;
 
 #[derive(Clone)]
 struct LoginForm {
@@ -37,10 +38,8 @@ pub fn Login(ondone: UnsyncCallback<GetCurrUserResp>) -> impl IntoView {
         account: RwSignal::new("".into()),
         password: RwSignal::new("".into()),
     };
-    let rsa_pub_key: RwSignal<Option<SharedString>> = RwSignal::new(None);
     let is_logining: RwSignal<bool> = RwSignal::new(false);
     let err_msg: RwSignal<Option<SharedString>> = RwSignal::new(None);
-    let rsa_pub_key_clone = rsa_pub_key.clone();
     let openid_providers: RwSignal<Vec<OpenidProvider>> = RwSignal::new(Default::default());
     // let on_wechat = UnsyncCallback::new(move |_| {
     //     let window = web_sys::window().unwrap();
@@ -48,7 +47,7 @@ pub fn Login(ondone: UnsyncCallback<GetCurrUserResp>) -> impl IntoView {
     // });
     let openid_providers_clone = openid_providers.clone();
     wasm_bindgen_futures::spawn_local(async move {
-        get_rsa_pub_key(&rsa_pub_key_clone).await.ok();
+        LazyLock::force(&RSA_PUB_KEY).get_fresh_data().await.ok();
     });
     wasm_bindgen_futures::spawn_local(async move {
         get_openid_providers(&openid_providers_clone).await.ok();
@@ -61,13 +60,14 @@ pub fn Login(ondone: UnsyncCallback<GetCurrUserResp>) -> impl IntoView {
     let form_clone = form.clone();
     let err_msg_clone = err_msg.clone();
     let on_submit = UnsyncCallback::new(move |_| {
-        let rsa_pub_key = rsa_pub_key.clone();
         let is_logining = is_logining_clone.clone();
         let form = form_clone.clone();
         let err_msg = err_msg_clone.clone();
         let ondone = ondone.clone();
         wasm_bindgen_futures::spawn_local(async move {
-            start_login(&rsa_pub_key, &is_logining, &form, &err_msg, &ondone).await;
+            start_login(&is_logining, &form, &err_msg, &ondone)
+                .await
+                .display_error();
         });
     });
     let on_github = move |_| {
@@ -129,13 +129,6 @@ pub fn Login(ondone: UnsyncCallback<GetCurrUserResp>) -> impl IntoView {
     }
 }
 
-async fn get_rsa_pub_key(rsa_pub_key: &RwSignal<Option<SharedString>>) -> Result<(), SharedString> {
-    let params = GetRsaPubKeyReq {};
-    let pub_key = GetRsaPubKeyApi.call(&params).await?;
-    rsa_pub_key.set(Some(pub_key.into()));
-    return Ok(());
-}
-
 fn chk_form_err(form: &LoginForm) -> Vec<SharedString> {
     let mut err_msgs: Vec<SharedString> = Vec::new();
     if form.account.read().is_empty() {
@@ -148,37 +141,33 @@ fn chk_form_err(form: &LoginForm) -> Vec<SharedString> {
 }
 
 async fn start_login(
-    rsa_pub_key: &RwSignal<Option<SharedString>>,
     is_logining: &RwSignal<bool>,
     form: &LoginForm,
     err_msg: &RwSignal<Option<SharedString>>,
     ondone: &UnsyncCallback<GetCurrUserResp>,
-) {
-    let mut err_msgs = chk_form_err(form);
-    if !err_msgs.is_empty() {
-        err_msgs.reverse();
-        err_msg.set(err_msgs.pop());
-        return;
+) -> Result<(), SharedString> {
+    let err_msgs = chk_form_err(form);
+    if let Some(msg) = err_msgs.first() {
+        err_msg.set(Some(msg.clone()));
+        return Err(msg.clone());
     }
-    if let Some(rsa_pub_key) = rsa_pub_key.get() {
-        if is_logining.get() {
-            return;
-        }
-        is_logining.set(true);
-        let ret = login(rsa_pub_key.as_ref(), form).await;
-        is_logining.set(false);
-        match ret {
-            Err(err) => {
-                log::error!("{}", err);
-                err_msg.set(Some(err));
-            }
-            Ok(curr_user) => {
-                ondone.run(curr_user);
-            }
-        }
-    } else {
-        log::error!("rsa公钥为空");
+    let rsa_pub_key = LazyLock::force(&RSA_PUB_KEY).get_fresh_data().await?;
+    if is_logining.get() {
+        return Ok(());
     }
+    is_logining.set(true);
+    let ret = login(rsa_pub_key.as_ref(), form).await;
+    is_logining.set(false);
+    match ret {
+        Err(err) => {
+            log::error!("{}", err);
+            err_msg.set(Some(err));
+        }
+        Ok(curr_user) => {
+            ondone.run(curr_user);
+        }
+    }
+    return Ok(());
 }
 
 async fn login(rsa_pub_key: &str, form: &LoginForm) -> Result<LoginResp, SharedString> {

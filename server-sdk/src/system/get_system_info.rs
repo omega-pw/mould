@@ -15,7 +15,6 @@ pub struct GetSystemInfoResp {
     pub version: String,
     #[serde(with = "datetime_format")]
     pub current_time: DateTime<Utc>,
-    pub turnstile_site_key: Option<String>,
 }
 
 pub struct GetSystemInfoApi;

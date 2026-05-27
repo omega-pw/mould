@@ -1,5 +1,7 @@
 use super::super::common::turnstile::TokenResult;
 use super::super::common::turnstile::Turnstile;
+use crate::cache::RSA_PUB_KEY;
+use crate::cache::TURNSTILE_SITE_KEY;
 use crate::components::button::Button;
 use crate::components::input::Input;
 use crate::components::modal_dialog::ModalDialog;
@@ -7,6 +9,7 @@ use crate::js;
 use crate::sdk;
 use crate::utils;
 use crate::utils::request::ApiExt;
+use crate::utils::result::ResultExt;
 use crate::SharedString;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
@@ -16,8 +19,6 @@ use leptos_router::hooks::use_navigate;
 use log;
 use sdk::auth::get_nonce::GetNonceApi;
 use sdk::auth::get_nonce::GetNonceReq;
-use sdk::auth::get_rsa_pub_key::GetRsaPubKeyApi;
-use sdk::auth::get_rsa_pub_key::GetRsaPubKeyReq;
 use sdk::auth::get_salt::GetSaltApi;
 use sdk::auth::get_salt::GetSaltReq;
 use sdk::auth::reset_password::ResetPasswordApi;
@@ -26,6 +27,7 @@ use sdk::auth::reset_password::ResetPasswordResp;
 use sdk::auth::send_email_captcha::Scene;
 use sdk::auth::send_email_captcha::SendEmailCaptchaApi;
 use sdk::auth::send_email_captcha::SendEmailCaptchaReq;
+use std::sync::LazyLock;
 use validator::ValidateEmail;
 
 #[derive(Clone)]
@@ -47,12 +49,16 @@ pub fn ResetPassword() -> impl IntoView {
         confirm_password: RwSignal::new("".into()),
         captcha: RwSignal::new("".into()),
     };
-    let rsa_pub_key: RwSignal<Option<SharedString>> = RwSignal::new(None);
     let is_resetting: RwSignal<bool> = RwSignal::new(false);
     let err_msg: RwSignal<Option<SharedString>> = RwSignal::new(None);
-    let rsa_pub_key_clone = rsa_pub_key.clone();
     wasm_bindgen_futures::spawn_local(async move {
-        get_rsa_pub_key(&rsa_pub_key_clone).await.ok();
+        LazyLock::force(&RSA_PUB_KEY).get_fresh_data().await.ok();
+    });
+    wasm_bindgen_futures::spawn_local(async move {
+        LazyLock::force(&TURNSTILE_SITE_KEY)
+            .get_fresh_data()
+            .await
+            .ok();
     });
 
     let err_msg_clone = err_msg.clone();
@@ -96,12 +102,13 @@ pub fn ResetPassword() -> impl IntoView {
     let form_clone = form.clone();
     let err_msg_clone = err_msg.clone();
     let on_submit = UnsyncCallback::new(move |_| {
-        let rsa_pub_key = rsa_pub_key.clone();
         let is_resetting = is_resetting_clone.clone();
         let form = form_clone.clone();
         let err_msg = err_msg_clone.clone();
         wasm_bindgen_futures::spawn_local(async move {
-            start_reset(&rsa_pub_key, &is_resetting, &form, &err_msg).await;
+            start_reset(&is_resetting, &form, &err_msg)
+                .await
+                .display_error();
         });
     });
     let on_switch_login = move |_| {
@@ -109,77 +116,74 @@ pub fn ResetPassword() -> impl IntoView {
     };
     view! {
         <ModalDialog title={SharedString::from("重置密码")} closable=false>
-            <table style="border-collapse:collapse;table-layout: fixed;">
-                <tr>
-                    <td class="align-right" style="width:6em;padding-bottom: 1em;">{"邮箱："}</td>
-                    <td style="padding-bottom: 1em;">
-                        <Input value={form.account.clone()} onfocus={clear_err_msg.clone()} onenter={on_submit.clone()}/>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="align-right" style="width:6em;padding-bottom: 1em;">{"密码："}</td>
-                    <td style="padding-bottom: 1em;">
-                        <Input r#type="password" disable_trim={true} value={form.password.clone()} onfocus={clear_err_msg.clone()} onenter={on_submit.clone()}/>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="align-right" style="width:6em;padding-bottom: 1em;">{"确认密码："}</td>
-                    <td style="padding-bottom: 1em;">
-                        <Input r#type="password" disable_trim={true} value={form.confirm_password.clone()} onfocus={clear_err_msg.clone()} onenter={on_submit.clone()}/>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="align-right" style="width:6em;padding-bottom: 1em;">{"验证码："}</td>
-                    <td style="padding-bottom: 1em;">
-                        {
-                            let turnstile_token_callback = turnstile_token_callback.clone();
-                            move || {
-                                if let Some(token_callback) = turnstile_token_callback.get() {
-                                    view! {
-                                        <Turnstile ondone=token_callback/>
-                                    }.into_any()
-                                } else {
-                                    view! {}.into_any()
+            <div style="padding-top:2em;padding-bottom:2em;">
+                <div style="padding-right:4em;">
+                    <table style="border-collapse:collapse;table-layout: fixed;">
+                        <tr>
+                            <td class="align-right" style="width:6em;padding-bottom: 1em;">{"邮箱："}</td>
+                            <td style="padding-bottom: 1em;">
+                                <Input value={form.account.clone()} onfocus={clear_err_msg.clone()} onenter={on_submit.clone()}/>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="align-right" style="width:6em;padding-bottom: 1em;">{"密码："}</td>
+                            <td style="padding-bottom: 1em;">
+                                <Input r#type="password" disable_trim={true} value={form.password.clone()} onfocus={clear_err_msg.clone()} onenter={on_submit.clone()}/>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="align-right" style="width:6em;padding-bottom: 1em;">{"确认密码："}</td>
+                            <td style="padding-bottom: 1em;">
+                                <Input r#type="password" disable_trim={true} value={form.confirm_password.clone()} onfocus={clear_err_msg.clone()} onenter={on_submit.clone()}/>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="align-right" style="width:6em;padding-bottom: 1em;">{"验证码："}</td>
+                            <td style="padding-bottom: 1em;">
+                                {
+                                    let turnstile_token_callback = turnstile_token_callback.clone();
+                                    move || {
+                                        if let Some(token_callback) = turnstile_token_callback.get() {
+                                            view! {
+                                                <Turnstile ondone=token_callback/>
+                                            }.into_any()
+                                        } else {
+                                            view! {}.into_any()
+                                        }
+                                    }
                                 }
-                            }
-                        }
-                        <div>
-                            <Input value={form.captcha.clone()} onfocus={clear_err_msg} onenter={on_submit.clone()} style="width:9em;"/>
-                            <Button disabled={
-                                let account = form.account.clone();
-                                move || {
-                                    let account = account.read();
-                                    let account: &str = account.as_ref();
-                                    account.is_empty() || !ValidateEmail::validate_email(&account) || turnstile_token_callback.read().is_some()
-                                }
-                            } onclick={on_send_captcha}>{"发送验证码"}</Button>
-                        </div>
-                    </td>
-                </tr>
-                <tr>
-                    <td></td>
-                    <td>
-                        <Button disabled={is_resetting} onclick={on_submit} style={SharedString::from("padding-left: 1em;padding-right: 1em;")}>{"提交"}</Button>
-                        <Show
-                            when={ let err_msg = err_msg.clone(); move || { err_msg.read().is_some() } }
-                        >
-                            <span class="middle" style="color:red;margin-left: 0.5em;">{err_msg}</span>
-                        </Show>
-                    </td>
-                </tr>
-            </table>
-            <div style="text-align:right;">
-                <a href="javascript:void(0);" on:click={on_switch_login}>{"登录"}</a>
+                                <div>
+                                    <Input value={form.captcha.clone()} onfocus={clear_err_msg} onenter={on_submit.clone()} style="width:9em;"/>
+                                    <Button disabled={
+                                        let account = form.account.clone();
+                                        move || {
+                                            let account = account.read();
+                                            let account: &str = account.as_ref();
+                                            account.is_empty() || !ValidateEmail::validate_email(&account) || turnstile_token_callback.read().is_some()
+                                        }
+                                    } onclick={on_send_captcha}>{"发送验证码"}</Button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td>
+                                <Button disabled={is_resetting} onclick={on_submit} style={SharedString::from("padding-left: 1em;padding-right: 1em;")}>{"提交"}</Button>
+                                <Show
+                                    when={ let err_msg = err_msg.clone(); move || { err_msg.read().is_some() } }
+                                >
+                                    <span class="middle" style="color:red;margin-left: 0.5em;">{err_msg}</span>
+                                </Show>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div style="text-align:right;padding-right:1em;">
+                    <a href="javascript:void(0);" on:click={on_switch_login}>{"登录"}</a>
+                </div>
             </div>
         </ModalDialog>
     }
-}
-
-async fn get_rsa_pub_key(rsa_pub_key: &RwSignal<Option<SharedString>>) -> Result<(), SharedString> {
-    let params = GetRsaPubKeyReq {};
-    let pub_key = GetRsaPubKeyApi.call(&params).await?;
-    rsa_pub_key.set(Some(pub_key.into()));
-    return Ok(());
 }
 
 fn chk_form_err(form: &ResetPasswordForm) -> Vec<SharedString> {
@@ -220,38 +224,33 @@ async fn start_send_captcha(account: String, token: Option<String>) -> Result<()
 }
 
 async fn start_reset(
-    rsa_pub_key: &RwSignal<Option<SharedString>>,
     is_resetting: &RwSignal<bool>,
     form: &ResetPasswordForm,
     err_msg: &RwSignal<Option<SharedString>>,
-) {
-    let mut err_msgs = chk_form_err(form);
-    if !err_msgs.is_empty() {
-        err_msgs.reverse();
-        err_msg.set(err_msgs.pop());
-        return;
+) -> Result<(), SharedString> {
+    let err_msgs = chk_form_err(form);
+    if let Some(msg) = err_msgs.first() {
+        err_msg.set(Some(msg.clone()));
+        return Err(msg.clone());
     }
-    if let Some(rsa_pub_key) = rsa_pub_key.get() {
-        if is_resetting.get() {
-            return;
-        }
-        is_resetting.set(true);
-        let rsa_pub_key = rsa_pub_key.to_string();
-        let result = reset(&rsa_pub_key, form).await;
-        is_resetting.set(false);
-        match result {
-            Err(err) => {
-                log::error!("{}", err);
-                err_msg.set(Some(err));
-            }
-            Ok(_) => {
-                clear_form(form);
-                utils::success(SharedString::from("重置成功"));
-            }
-        }
-    } else {
-        log::error!("rsa公钥为空");
+    let rsa_pub_key = LazyLock::force(&RSA_PUB_KEY).get_fresh_data().await?;
+    if is_resetting.get() {
+        return Ok(());
     }
+    is_resetting.set(true);
+    let result = reset(rsa_pub_key.as_ref(), form).await;
+    is_resetting.set(false);
+    match result {
+        Err(err) => {
+            log::error!("{}", err);
+            err_msg.set(Some(err));
+        }
+        Ok(_) => {
+            clear_form(form);
+            utils::success(SharedString::from("重置成功"));
+        }
+    }
+    return Ok(());
 }
 
 fn clear_form(form: &ResetPasswordForm) {

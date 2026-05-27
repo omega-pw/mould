@@ -1,6 +1,9 @@
 use super::login::Login;
 use super::register::Register;
-use crate::components::modal_dialog::ModalDialog;
+use crate::components::button_group::ButtonGroup;
+use crate::components::center_middle::CenterMiddle;
+use crate::components::dialog::Dialog;
+use crate::components::page::Page;
 use crate::sdk;
 use crate::SharedString;
 use leptos::prelude::*;
@@ -15,58 +18,37 @@ pub enum Tab {
 
 #[component]
 pub fn LoginOrRegister(
-    #[prop(optional)] init_tab: Option<Tab>,
+    tab: RwSignal<Tab>,
     ondone: UnsyncCallback<GetCurrUserResp>,
-    #[prop(into, default = None)] oncancel: Option<UnsyncCallback<()>>,
 ) -> impl IntoView {
     let navigate = use_navigate();
-    let tab: RwSignal<Tab> = RwSignal::new(init_tab.unwrap_or(Tab::Login));
-    let on_switch_login = {
-        let tab = tab.clone();
-        move |_| {
-            tab.set(Tab::Login);
-        }
-    };
-    let on_switch_register = {
-        let tab = tab.clone();
-        move |_| {
-            tab.set(Tab::Register);
-        }
-    };
     let on_done = UnsyncCallback::new(move |curr_user| {
         ondone.run(curr_user);
         // handle_done(ctx, user);
     });
-    let title = {
-        let tab = tab.clone();
-        Signal::derive(move || match tab.get() {
-            Tab::Login => SharedString::from("登录"),
-            Tab::Register => SharedString::from("注册"),
-        })
-    };
     view! {
-        <ModalDialog title={title} closable=true onclose={oncancel}>
-            <div style="padding-top:2em;padding-bottom:2em;">
-                <div style="padding-right:4em;">
-                    {
-                        let tab = tab.clone();
-                        move || {
-                            match tab.get() {
-                                Tab::Login => {
-                                    view! {
-                                        <Login ondone={on_done} />
-                                    }.into_any()
-                                },
-                                Tab::Register => {
-                                    view! {
-                                        <Register ondone={on_done} />
-                                    }.into_any()
-                                }
+        <div style="padding-top:2em;padding-bottom:2em;">
+            <div style="padding-right:4em;">
+                {
+                    let tab = tab.clone();
+                    move || {
+                        match tab.get() {
+                            Tab::Login => {
+                                view! {
+                                    <Login ondone={on_done} />
+                                }.into_any()
+                            },
+                            Tab::Register => {
+                                view! {
+                                    <Register ondone={on_done} />
+                                }.into_any()
                             }
                         }
                     }
-                </div>
-                <div style="text-align:right;padding-right:1em;">
+                }
+            </div>
+            <div style="text-align:right;padding-right:1em;">
+                <ButtonGroup>
                     {
                         move || {
                             match tab.get() {
@@ -75,14 +57,18 @@ pub fn LoginOrRegister(
                                     let on_reset_password = move |_| {
                                         navigate("/resetPassword", Default::default());
                                     };
+                                    let on_switch_register = move |_| {
+                                        tab.set(Tab::Register);
+                                    };
                                     view! {
-                                        <>
-                                            <a href="javascript:void(0);" on:click={on_reset_password}>{"找回密码"}</a>
-                                            <a href="javascript:void(0);" on:click={on_switch_register}>{"注册"}</a>
-                                        </>
+                                        <a href="javascript:void(0);" on:click={on_reset_password}>{"找回密码"}</a>
+                                        <a href="javascript:void(0);" on:click={on_switch_register}>{"注册"}</a>
                                     }.into_any()
                                 },
                                 Tab::Register => {
+                                    let on_switch_login = move |_| {
+                                        tab.set(Tab::Login);
+                                    };
                                     view! {
                                         <a href="javascript:void(0);" on:click={on_switch_login}>{"登录"}</a>
                                     }.into_any()
@@ -90,9 +76,33 @@ pub fn LoginOrRegister(
                             }
                         }
                     }
-                </div>
+                </ButtonGroup>
             </div>
-        </ModalDialog>
+        </div>
+    }
+}
+
+#[component]
+pub fn LoginOrRegisterPage(
+    #[prop(optional)] init_tab: Option<Tab>,
+    ondone: UnsyncCallback<GetCurrUserResp>,
+) -> impl IntoView {
+    let tab: RwSignal<Tab> = RwSignal::new(init_tab.unwrap_or(Tab::Login));
+    let title = {
+        let tab = tab.clone();
+        Signal::derive(move || match tab.get() {
+            Tab::Login => SharedString::from("登录"),
+            Tab::Register => SharedString::from("注册"),
+        })
+    };
+    view! {
+        <Page mask=false>
+            <CenterMiddle>
+                <Dialog title={title.clone()} closable={false} content_style="background-color:#FFF;">
+                    <LoginOrRegister tab={tab} ondone={ondone}/>
+                </Dialog>
+            </CenterMiddle>
+        </Page>
     }
 }
 

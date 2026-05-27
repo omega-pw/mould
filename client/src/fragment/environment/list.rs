@@ -93,7 +93,7 @@ pub fn EnvironmentList() -> impl IntoView {
         <div class="relative width-fill height-fill" style="overflow:hidden;">
             <Show when={
                 let record_list_active = record_list_active.clone();
-                move || record_list_active.get()
+                move || !record_list_active.get()
             }>
                 <div class="width-fill height-fill border-box" style="padding:0.25em;">
                     <div class="width-fill height-fill" style="display: -webkit-box;display: flex;-webkit-box-direction: normal;-webkit-box-orient: vertical;flex-direction: column;">
@@ -130,12 +130,10 @@ pub fn EnvironmentList() -> impl IntoView {
             </Drawer>
             <Drawer active={edit_active} onclickother={on_leave_edit}>
                 {
+                    let active_edit_id = active_edit_id.clone();
                     move || {
-                        match active_edit_id.get() {
-                            Some(active_edit_id) => view! {
-                                <EnvironmentEdit id={active_edit_id} onsave={on_finish_save} />
-                            }.into_any(),
-                            None => view! {}.into_any()
+                        view! {
+                            <EnvironmentEdit id={active_edit_id.get()} onsave={on_finish_save} />
                         }
                     }
                 }

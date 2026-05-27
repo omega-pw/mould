@@ -1,5 +1,5 @@
 use crate::components::loading::Loading;
-use crate::fragment::auth::login_or_register::LoginOrRegister;
+use crate::fragment::auth::login_or_register::LoginOrRegisterPage;
 use crate::fragment::auth::logout::Logout;
 use crate::fragment::auth::oauth2_authorize::Oauth2AuthorizePage;
 use crate::fragment::auth::oidc_authorize::OidcAuthorizePage;
@@ -70,6 +70,12 @@ pub fn RootApp() -> impl IntoView {
             }
         });
     }
+    let on_exit = UnsyncCallback::new({
+        let curr_user = curr_user.clone();
+        move |_: ()| {
+            curr_user.set(None);
+        }
+    });
     let on_login_done = {
         let app_context = app_context.clone();
         let curr_user = curr_user.clone();
@@ -90,12 +96,12 @@ pub fn RootApp() -> impl IntoView {
             fallback=|| view!{ <Loading center_middle={true} /> }
         >
             <Routes fallback=|| view!{ <Redirect path="/"/> }>
-                <Route path=LOGIN view=move || view! { <LoginOrRegister ondone={on_login_done.clone()}/> }/>
+                <Route path=LOGIN view=move || view! { <LoginOrRegisterPage ondone={on_login_done.clone()}/> }/>
                 <Route path=OAUTH2_AUTHORIZE view=move || view! { <Oauth2AuthorizePage ondone={on_login_done.clone()}/> }/>
                 <Route path=OIDC_AUTHORIZE view=move || view! { <OidcAuthorizePage ondone={on_login_done}/> }/>
                 <Route path=RESET_PASSWORD view=move || view! { <ResetPassword/> }/>
                 <Route path=LOGOUT view=move || view! { <Logout/> }/>
-                <ParentRoute path=INDEX view=move || view! { <DefaultLayout/> }>
+                <ParentRoute path=INDEX view=move || view! { <DefaultLayout curr_user={curr_user} onexit={on_exit.clone()}/> }>
                     <Route path=path!("") view=move || view! { <Index/> }/>
                     <Route path=ENVIRONMENT_SCHEMA_LIST view=move || view! { <EnvironmentSchemaList/> }/>
                     <Route path=ENVIRONMENT_LIST view=move || view! { <EnvironmentList /> }/>

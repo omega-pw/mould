@@ -122,12 +122,10 @@ pub fn EnvironmentSchemaList() -> impl IntoView {
             </Drawer>
             <Drawer active={edit_active} onclickother={on_leave_edit}>
                 {
+                    let active_edit_id = active_edit_id.clone();
                     move || {
-                        match active_edit_id.get() {
-                            Some(active_edit_id) => view! {
-                                <EnvironmentSchemaEdit id={active_edit_id} onsave={on_finish_save} />
-                            }.into_any(),
-                            None => view! {}.into_any()
+                        view! {
+                            <EnvironmentSchemaEdit id={active_edit_id.get()} onsave={on_finish_save} />
                         }
                     }
                 }

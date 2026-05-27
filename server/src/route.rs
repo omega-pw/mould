@@ -262,6 +262,16 @@ pub async fn dispatch_guest_api(
     (route, req, guest): (SharedString, Bytes, Guest),
 ) -> Result<Bytes, ErrNo> {
     match route.as_str() {
+        //获取turnstile的Site Key
+        sdk::system::get_turnstile_site_key::GET_TURNSTILE_SITE_KEY_API => {
+            call_guest_api(
+                sdk::system::get_turnstile_site_key::GetTurnstileSiteKeyApi,
+                action::system::get_turnstile_site_key::get_turnstile_site_key,
+                guest,
+                &req,
+            )
+            .await
+        }
         //获取盐值接口
         sdk::auth::get_salt::GET_SALT_API => {
             call_guest_api(
@@ -389,6 +399,7 @@ pub async fn dispatch_guest_api(
 pub static WHITE_LIST_NAMESPACE: &[&'static str] = &[
     "/blob/",
     "/file/",
+    sdk::system::get_turnstile_site_key::GET_TURNSTILE_SITE_KEY_API,
     sdk::auth::get_salt::GET_SALT_API,
     sdk::auth::get_rsa_pub_key::GET_RSA_PUB_KEY_API,
     sdk::auth::get_nonce::GET_NONCE_API,

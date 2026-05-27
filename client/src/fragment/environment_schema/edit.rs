@@ -41,8 +41,8 @@ struct EditForm {
 
 #[component]
 pub fn EnvironmentSchemaEdit(
-    #[prop(optional)] id: Option<Id>,
-    #[prop(optional)] onsave: Option<UnsyncCallback<PrimaryKey>>,
+    #[prop(into, default = None)] id: Option<Id>,
+    #[prop(into, default = None)] onsave: Option<UnsyncCallback<PrimaryKey>>,
 ) -> impl IntoView {
     let is_saving: RwSignal<bool> = RwSignal::new(false);
     let err_msg: RwSignal<Option<SharedString>> = RwSignal::new(None);

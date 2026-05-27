@@ -1,5 +1,7 @@
 use super::super::common::turnstile::TokenResult;
 use super::super::common::turnstile::Turnstile;
+use crate::cache::RSA_PUB_KEY;
+use crate::cache::TURNSTILE_SITE_KEY;
 use crate::components::button::Button;
 use crate::components::center_middle::CenterMiddle;
 use crate::components::input::Input;
@@ -7,6 +9,7 @@ use crate::js;
 use crate::sdk;
 use crate::utils;
 use crate::utils::request::ApiExt;
+use crate::utils::result::ResultExt;
 use crate::SharedString;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
@@ -18,14 +21,13 @@ use sdk::auth::calc_salt;
 use sdk::auth::get_curr_user::GetCurrUserResp;
 use sdk::auth::get_nonce::GetNonceApi;
 use sdk::auth::get_nonce::GetNonceReq;
-use sdk::auth::get_rsa_pub_key::GetRsaPubKeyApi;
-use sdk::auth::get_rsa_pub_key::GetRsaPubKeyReq;
 use sdk::auth::register::RegisterApi;
 use sdk::auth::register::RegisterReq;
 use sdk::auth::send_email_captcha::Scene;
 use sdk::auth::send_email_captcha::SendEmailCaptchaApi;
 use sdk::auth::send_email_captcha::SendEmailCaptchaReq;
 use sdk::auth::RandomValue;
+use std::sync::LazyLock;
 use validator::ValidateEmail;
 
 #[derive(Clone)]
@@ -46,12 +48,16 @@ pub fn Register(ondone: UnsyncCallback<GetCurrUserResp>) -> impl IntoView {
         confirm_password: RwSignal::new("".into()),
         captcha: RwSignal::new("".into()),
     };
-    let rsa_pub_key: RwSignal<Option<SharedString>> = RwSignal::new(None);
     let is_registering: RwSignal<bool> = RwSignal::new(false);
     let err_msg: RwSignal<Option<SharedString>> = RwSignal::new(None);
-    let rsa_pub_key_clone = rsa_pub_key.clone();
     wasm_bindgen_futures::spawn_local(async move {
-        get_rsa_pub_key(&rsa_pub_key_clone).await.ok();
+        LazyLock::force(&RSA_PUB_KEY).get_fresh_data().await.ok();
+    });
+    wasm_bindgen_futures::spawn_local(async move {
+        LazyLock::force(&TURNSTILE_SITE_KEY)
+            .get_fresh_data()
+            .await
+            .ok();
     });
 
     let err_msg_clone = err_msg.clone();
@@ -95,13 +101,14 @@ pub fn Register(ondone: UnsyncCallback<GetCurrUserResp>) -> impl IntoView {
     let form_clone = form.clone();
     let err_msg_clone = err_msg.clone();
     let on_submit = UnsyncCallback::new(move |_| {
-        let rsa_pub_key = rsa_pub_key.clone();
         let is_registering = is_registering_clone.clone();
         let form = form_clone.clone();
         let err_msg = err_msg_clone.clone();
         let ondone = ondone.clone();
         wasm_bindgen_futures::spawn_local(async move {
-            start_register(&rsa_pub_key, &is_registering, &form, &err_msg, &ondone).await;
+            start_register(&is_registering, &form, &err_msg, &ondone)
+                .await
+                .display_error();
         });
     });
     view! {
@@ -128,7 +135,7 @@ pub fn Register(ondone: UnsyncCallback<GetCurrUserResp>) -> impl IntoView {
                 <tr>
                     <td class="align-right" style="width:6em;padding-bottom: 1em;">{"验证码："}</td>
                     <td style="padding-bottom: 1em;">
-                       {
+                        {
                             let turnstile_token_callback = turnstile_token_callback.clone();
                             move || {
                                 if let Some(token_callback) = turnstile_token_callback.get() {
@@ -169,13 +176,6 @@ pub fn Register(ondone: UnsyncCallback<GetCurrUserResp>) -> impl IntoView {
     }
 }
 
-async fn get_rsa_pub_key(rsa_pub_key: &RwSignal<Option<SharedString>>) -> Result<(), SharedString> {
-    let params = GetRsaPubKeyReq {};
-    let pub_key = GetRsaPubKeyApi.call(&params).await?;
-    rsa_pub_key.set(Some(pub_key.into()));
-    return Ok(());
-}
-
 fn chk_form_err(form: &RegisterForm) -> Vec<SharedString> {
     let mut err_msgs: Vec<SharedString> = Vec::new();
     let account = form.account.get();
@@ -214,38 +214,33 @@ async fn start_send_captcha(account: String, token: Option<String>) -> Result<()
 }
 
 async fn start_register(
-    rsa_pub_key: &RwSignal<Option<SharedString>>,
     is_registering: &RwSignal<bool>,
     form: &RegisterForm,
     err_msg: &RwSignal<Option<SharedString>>,
     ondone: &UnsyncCallback<GetCurrUserResp>,
-) {
-    let mut err_msgs = chk_form_err(form);
-    if !err_msgs.is_empty() {
-        err_msgs.reverse();
-        err_msg.set(err_msgs.pop());
-        return;
+) -> Result<(), SharedString> {
+    let err_msgs = chk_form_err(form);
+    if let Some(msg) = err_msgs.first() {
+        err_msg.set(Some(msg.clone()));
+        return Err(msg.clone());
     }
-    if let Some(rsa_pub_key) = rsa_pub_key.get() {
-        if is_registering.get() {
-            return;
-        }
-        is_registering.set(true);
-        let rsa_pub_key = rsa_pub_key.to_string();
-        let result = register(&rsa_pub_key, form).await;
-        is_registering.set(false);
-        match result {
-            Err(err) => {
-                log::error!("{}", err);
-                err_msg.set(Some(err));
-            }
-            Ok(curr_user) => {
-                ondone.run(curr_user);
-            }
-        }
-    } else {
-        log::error!("rsa公钥为空");
+    let rsa_pub_key = LazyLock::force(&RSA_PUB_KEY).get_fresh_data().await?;
+    if is_registering.get() {
+        return Ok(());
     }
+    is_registering.set(true);
+    let result = register(rsa_pub_key.as_ref(), form).await;
+    is_registering.set(false);
+    match result {
+        Err(err) => {
+            log::error!("{}", err);
+            err_msg.set(Some(err));
+        }
+        Ok(curr_user) => {
+            ondone.run(curr_user);
+        }
+    }
+    return Ok(());
 }
 
 async fn register(
