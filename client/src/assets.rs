@@ -29,5 +29,6 @@ impl Asset {
     }
 }
 
+pub const LOGO: Asset = asset!("../static/logo.svg");
 pub const GITHUB_LOGO: Asset = asset!("../static/assets/img/github.svg");
 pub const LOGIN_BG: Asset = asset!("../static/assets/img/login-bg.svg");

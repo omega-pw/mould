@@ -113,7 +113,11 @@ pub fn ResetPassword() -> impl IntoView {
     view! {
         <Page mask=false style={format!("background-repeat: no-repeat;background-size: cover;background-position: center;background-image:url({})", assets::LOGIN_BG.path())}>
             <CenterMiddle>
-                <Dialog title={SharedString::from("重置密码")} closable={false} content_style="background-color:#FFF;">
+                <div style="display: flex;justify-content: center;align-items: center;">
+                    <img src={assets::LOGO.path()} style="height: 4em;"/>
+                    <span style="font-weight: bold;font-size:200%;margin-left: 0.25em;">{"Mould"}</span>
+                </div>
+                <Dialog title={SharedString::from("重置密码")} closable={false} content_style="background-color:#FFF;" style="margin-top:1em;">
                     <div style="padding-top:2em;padding-bottom:2em;">
                         <div style="padding-right:4em;">
                             <table style="border-collapse:collapse;table-layout: fixed;">

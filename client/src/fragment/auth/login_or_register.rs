@@ -99,7 +99,14 @@ pub fn LoginOrRegisterPage(
     view! {
         <Page mask=false style={format!("background-repeat: no-repeat;background-size: cover;background-position: center;background-image:url({})", assets::LOGIN_BG.path())}>
             <CenterMiddle>
-                <Dialog title={title.clone()} closable={false} content_style="background-color:#FFF;">
+                <div style="text-align: center;">
+                    <div style="display: flex;justify-content: center;align-items: center;">
+                        <img src={assets::LOGO.path()} style="height: 4em;"/>
+                        <span style="font-weight: bold;font-size:200%;margin-left: 0.25em;">{"Mould"}</span>
+                    </div>
+                    <p>{"让你的环境更加一致!"}</p>
+                </div>
+                <Dialog title={title.clone()} closable={false} content_style="background-color:#FFF;" style="margin-top:1em;">
                     <LoginOrRegister tab={tab} ondone={ondone}/>
                 </Dialog>
             </CenterMiddle>

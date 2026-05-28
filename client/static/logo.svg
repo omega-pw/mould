@@ -1,0 +1,57 @@
+<svg version="1.1" height="106" width="106" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="logo" transform="translate(53, 53)">
+  <g id="gear" mask="url(#holes)">
+    <circle r="43" fill="none" stroke="#F74C00" stroke-width="9" />
+    <g id="cogs">
+      <polygon id="cog" stroke="#F74C00" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" />
+      <use xlink:href="#cog" transform="rotate(11.25)" />
+      <use xlink:href="#cog" transform="rotate(22.50)" />
+      <use xlink:href="#cog" transform="rotate(33.75)" />
+      <use xlink:href="#cog" transform="rotate(45.00)" />
+      <use xlink:href="#cog" transform="rotate(56.25)" />
+      <use xlink:href="#cog" transform="rotate(67.50)" />
+      <use xlink:href="#cog" transform="rotate(78.75)" />
+      <use xlink:href="#cog" transform="rotate(90.00)" />
+      <use xlink:href="#cog" transform="rotate(101.25)" />
+      <use xlink:href="#cog" transform="rotate(112.50)" />
+      <use xlink:href="#cog" transform="rotate(123.75)" />
+      <use xlink:href="#cog" transform="rotate(135.00)" />
+      <use xlink:href="#cog" transform="rotate(146.25)" />
+      <use xlink:href="#cog" transform="rotate(157.50)" />
+      <use xlink:href="#cog" transform="rotate(168.75)" />
+      <use xlink:href="#cog" transform="rotate(180.00)" />
+      <use xlink:href="#cog" transform="rotate(191.25)" />
+      <use xlink:href="#cog" transform="rotate(202.50)" />
+      <use xlink:href="#cog" transform="rotate(213.75)" />
+      <use xlink:href="#cog" transform="rotate(225.00)" />
+      <use xlink:href="#cog" transform="rotate(236.25)" />
+      <use xlink:href="#cog" transform="rotate(247.50)" />
+      <use xlink:href="#cog" transform="rotate(258.75)" />
+      <use xlink:href="#cog" transform="rotate(270.00)" />
+      <use xlink:href="#cog" transform="rotate(281.25)" />
+      <use xlink:href="#cog" transform="rotate(292.50)" />
+      <use xlink:href="#cog" transform="rotate(303.75)" />
+      <use xlink:href="#cog" transform="rotate(315.00)" />
+      <use xlink:href="#cog" transform="rotate(326.25)" />
+      <use xlink:href="#cog" transform="rotate(337.50)" />
+      <use xlink:href="#cog" transform="rotate(348.75)" />
+    </g>
+    <g id="mounts">
+      <polygon id="mount" stroke="#F74C00" stroke-width="6" stroke-linejoin="round" points="-7,-42 0,-35 7,-42" />
+      <use xlink:href="#mount" transform="rotate(72)" />
+      <use xlink:href="#mount" transform="rotate(144)" />
+      <use xlink:href="#mount" transform="rotate(216)" />
+      <use xlink:href="#mount" transform="rotate(288)" />
+    </g>
+  </g>
+  <mask id="holes">
+    <rect x="-60" y="-60" width="120" height="120" fill="white"/>
+    <circle id="hole" cy="-40" r="3" />
+    <use xlink:href="#hole" transform="rotate(72)" />
+    <use xlink:href="#hole" transform="rotate(144)" />
+    <use xlink:href="#hole" transform="rotate(216)" />
+    <use xlink:href="#hole" transform="rotate(288)" />
+  </mask>
+</g>
+<path xmlns="http://www.w3.org/2000/svg" fill="#F94C00" d="M52.9914 50.6161C53.6506 48.2425 57.9298 38.3786 59.7849 36.5118C60.954 35.3353 66.1836 35.9359 68.0789 36.1167C68.369 37.9343 69.6195 42.0872 70.1347 43.9918L74.4039 59.7023C75.1965 62.6018 76.2179 65.8319 76.482 68.8036C74.4669 68.5875 67.675 68.9293 66.763 68.0869C65.4087 65.8408 63.274 48.4966 63.1443 44.987C61.0191 45.8825 58.802 57.906 56.924 59.9702C55.776 61.232 50.6646 60.8068 48.8622 60.7616C46.4966 55.352 44.7729 49.6397 42.5765 44.1132C42.0325 47.6197 40.105 67.14 38.8848 68.0507C37.312 69.2246 34.3674 68.5296 32.4993 68.4903C31.7733 68.475 30.9498 68.655 30.2408 68.557C29.6882 68.4806 29.5501 68.356 29.2201 67.9318C29.1067 66.9648 36.2207 39.8214 37.1033 36.7885C38.1379 35.7101 39.8312 35.9043 41.3348 35.8672C42.5569 35.8489 45.418 35.776 46.0438 36.8539C48.6566 41.3548 50.1368 46.1721 52.9914 50.6161Z"/>
+</svg>
