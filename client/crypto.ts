@@ -378,6 +378,7 @@ export async function calcFileSha512(file: File): Promise<Bytes> {
             sha512.update(uint8ArrayToWordArray(chunk!));
         }
     }
+    sha512.update(CryptoJS.enc.Utf8.parse(file.name));
     return Bytes.__fromWordArray(sha512.finalize());
 }
 
