@@ -4374,9 +4374,9 @@ dependencies = [
 
 [[package]]
 name = "object-storage-lib"
-version = "0.1.13"
+version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "783a6912fd7274f74c97c5d72210e08a93d680b382c9361980fe293c1164dccf"
+checksum = "392c654bb2f56d9901b5c6249114be07de6c0de16256f40f63556045269c0c19"
 dependencies = [
  "anyhow",
  "async-trait",

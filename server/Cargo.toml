@@ -65,6 +65,6 @@ url = "2"
 oauth2 = "4"
 openid = { version = "0.13", default-features = false, features = ["rustls"] }
 tera = "1"
-object-storage-lib = "0.1.12"
+object-storage-lib = "0.1.14"
 server-sdk = { path="../server-sdk" }
 mould-extension-sdk = { path="../extension-sdk" }
