@@ -134,16 +134,28 @@ fn handle_embed<B: RustEmbed>(req: Request<Incoming>) -> Response<Body> {
     if path.is_empty() {
         path = index_page;
     }
+    let mut cache_control = "public, must-revalidate, max-age=300";
+    if ["index.html", "index.js", "index.css"]
+        .iter()
+        .any(|item| &path == item)
+    {
+        cache_control = "public, no-cache";
+    }
     let mut read_result = read_by_file::<B>(path, accepts_gzip);
     if read_result.is_none() {
         read_result = read_by_file::<B>(index_page, accepts_gzip);
+        // 单页应用回退按主页的逻辑处理
+        cache_control = "public, no-cache";
     }
     if let Some(read_result) = read_result {
-        let hash = HexStr(&read_result.content.metadata.sha256_hash()).to_string();
+        let etag = format!(
+            "\"{}\"",
+            HexStr(&read_result.content.metadata.sha256_hash())
+        );
         if req
             .headers()
             .get(header::IF_NONE_MATCH)
-            .map(|etag| etag.to_str().ok() == Some(&hash))
+            .map(|req_etag| req_etag.to_str().ok() == Some(&etag))
             .unwrap_or(false)
         {
             let mut response = Response::new(Body::empty());
@@ -158,11 +170,8 @@ fn handle_embed<B: RustEmbed>(req: Request<Incoming>) -> Response<Body> {
         return builder
             .header(header::CONTENT_TYPE, read_result.content_type.as_ref())
             .header(header::CONTENT_LENGTH, body.len())
-            .header(
-                header::CACHE_CONTROL,
-                "public, must-revalidate, max-age=300",
-            )
-            .header(header::ETAG, hash)
+            .header(header::CACHE_CONTROL, cache_control)
+            .header(header::ETAG, etag)
             .body(Body::from(body))
             .unwrap();
     } else {
