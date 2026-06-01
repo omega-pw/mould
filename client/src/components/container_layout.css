@@ -1,0 +1,28 @@
+.container-layout {
+    display: flex;
+    justify-content: space-between;
+}
+
+.container-layout.is-horizontal {
+    flex-direction: row;
+    width: 100%;
+}
+
+.container-layout.is-vertical {
+    flex-direction: column;
+    height: 100%;
+}
+
+.container-layout>.main {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: auto;
+}
+
+.container-layout>.header,
+.container-layout>.footer,
+.container-layout>.aside {
+    flex-grow: 0;
+    flex-shrink: 0;
+    flex-basis: auto;
+}

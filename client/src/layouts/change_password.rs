@@ -18,6 +18,7 @@ use sdk::auth::calc_salt;
 use sdk::auth::change_password::ChangePasswordApi;
 use sdk::auth::change_password::ChangePasswordReq;
 use sdk::auth::get_curr_user::AuthSource;
+use sdk::auth::get_curr_user::User;
 use sdk::auth::get_nonce::GetNonceApi;
 use sdk::auth::get_nonce::GetNonceReq;
 use sdk::auth::RandomValue;
@@ -31,7 +32,7 @@ struct ChangeForm {
 }
 
 #[component]
-pub fn ChangePassword(ondone: UnsyncCallback<()>) -> impl IntoView {
+pub fn ChangePassword(curr_user: User, ondone: UnsyncCallback<()>) -> impl IntoView {
     let app_context = use_context::<AppContext>().expect("no app context found");
     let form = ChangeForm {
         old_password: RwSignal::new("".into()),
@@ -52,64 +53,60 @@ pub fn ChangePassword(ondone: UnsyncCallback<()>) -> impl IntoView {
     let is_saving_clone = is_saving.clone();
     let form_clone = form.clone();
     let err_msg_clone = err_msg.clone();
-    if let Some(curr_user) = app_context.curr_user.as_ref() {
-        match &curr_user.auth_source {
-            AuthSource::External { .. } => view! {}.into_any(),
-            AuthSource::System {
-                user_random_value, ..
-            } => {
+    match &curr_user.auth_source {
+        AuthSource::External { .. } => view! {}.into_any(),
+        AuthSource::System {
+            user_random_value, ..
+        } => {
+            let user_random_value = user_random_value.clone();
+            let on_save = UnsyncCallback::new(move |_| {
+                let is_saving = is_saving_clone.clone();
+                let form = form_clone.clone();
+                let err_msg = err_msg_clone.clone();
                 let user_random_value = user_random_value.clone();
-                let on_save = UnsyncCallback::new(move |_| {
-                    let is_saving = is_saving_clone.clone();
-                    let form = form_clone.clone();
-                    let err_msg = err_msg_clone.clone();
-                    let user_random_value = user_random_value.clone();
-                    let ondone = ondone.clone();
-                    wasm_bindgen_futures::spawn_local(async move {
-                        save_change(&user_random_value, &is_saving, &form, &err_msg, &ondone)
-                            .await
-                            .display_error();
-                    });
+                let ondone = ondone.clone();
+                wasm_bindgen_futures::spawn_local(async move {
+                    save_change(&user_random_value, &is_saving, &form, &err_msg, &ondone)
+                        .await
+                        .display_error();
                 });
-                view! {
-                    <div class="width-fill height-fill border-box" style="padding:0.25em;">
-                        <table style="border-collapse:collapse;table-layout: fixed;">
-                            <tr>
-                                <td class="align-right" style="width:8em;">{"旧密码："}</td>
-                                <td>
-                                    <Input r#type="password" disable_trim={true} value={form.old_password.clone()} onfocus={clear_err_msg.clone()}/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="align-right" style="width:8em;">{"新密码："}</td>
-                                <td>
-                                    <Input r#type="password" disable_trim={true} value={form.new_password.clone()} onfocus={clear_err_msg.clone()}/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="align-right" style="width:8em;">{"确认新密码："}</td>
-                                <td>
-                                    <Input r#type="password" disable_trim={true} value={form.confirm_new_password.clone()} onfocus={clear_err_msg}/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td></td>
-                                <td>
-                                    <Button disabled={is_saving} onclick={on_save}>{"保存"}</Button>
-                                    <Show
-                                        when={ let err_msg = err_msg.clone(); move || { err_msg.read().is_some() } }
-                                    >
-                                        <span class="middle" style="color:red;margin-left: 0.5em;">{err_msg}</span>
-                                    </Show>
-                                </td>
-                            </tr>
-                        </table>
-                    </div>
-                }.into_any()
-            }
+            });
+            view! {
+                <div class="width-fill height-fill border-box" style="padding:0.25em;">
+                    <table style="border-collapse:collapse;table-layout: fixed;">
+                        <tr>
+                            <td class="align-right" style="width:8em;">{"旧密码："}</td>
+                            <td>
+                                <Input r#type="password" disable_trim={true} value={form.old_password.clone()} onfocus={clear_err_msg.clone()}/>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="align-right" style="width:8em;">{"新密码："}</td>
+                            <td>
+                                <Input r#type="password" disable_trim={true} value={form.new_password.clone()} onfocus={clear_err_msg.clone()}/>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="align-right" style="width:8em;">{"确认新密码："}</td>
+                            <td>
+                                <Input r#type="password" disable_trim={true} value={form.confirm_new_password.clone()} onfocus={clear_err_msg}/>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td>
+                                <Button disabled={is_saving} onclick={on_save}>{"保存"}</Button>
+                                <Show
+                                    when={ let err_msg = err_msg.clone(); move || { err_msg.read().is_some() } }
+                                >
+                                    <span class="middle" style="color:red;margin-left: 0.5em;">{err_msg}</span>
+                                </Show>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            }.into_any()
         }
-    } else {
-        view! {}.into_any()
     }
 }
 
@@ -171,10 +168,7 @@ async fn save_change(
     return Ok(());
 }
 
-async fn change_password(
-    user_random_value: &str,
-    form: ChangeForm,
-) -> Result<(), SharedString> {
+async fn change_password(user_random_value: &str, form: ChangeForm) -> Result<(), SharedString> {
     let user_random_value =
         BASE64_STANDARD
             .decode(user_random_value)

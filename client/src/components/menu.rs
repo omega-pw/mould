@@ -52,7 +52,7 @@ impl Node for MenuNode {
         self.children.clone()
     }
     fn children_style(&self) -> Option<SharedString> {
-        let base_style = "margin: 0;padding: 0;list-style-type: none;";
+        let base_style = "margin: 0;padding: 0 0 0 1em;list-style-type: none;";
         let addon_style = if &Some(self.key.clone()) == self.state.expanded_key.read().deref() {
             "height: auto;"
         } else {

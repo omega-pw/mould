@@ -9,6 +9,8 @@ import "./src/components/pagination.css";
 import "./src/components/common_popup.css";
 import "./src/components/popup_message.css";
 import "./src/components/datetime_picker.css";
+import "./src/components/frame_layout.css";
+import "./src/components/container_layout.css";
 import "./src/css/theme.css";
 import "./src/css/theme-default.less";
 import { Bytes, AesKey256, RsaPubKey2048, RsaPriKey2048, genRsaKeyPair, isValidRsaKeyPair, sha256, sha512, calcFileSha512 } from "./crypto";

@@ -104,7 +104,7 @@ pub fn LoginOrRegisterPage(
                         <img src={assets::LOGO.path()} style="height: 4em;"/>
                         <span style="font-weight: bold;font-size:200%;margin-left: 0.25em;">{"Mould"}</span>
                     </div>
-                    <p>{"让你的环境更加一致!"}</p>
+                    <p>{"减小环境之间的差异!"}</p>
                 </div>
                 <Dialog title={title.clone()} closable={false} content_style="background-color:#FFF;" style="margin-top:1em;">
                     <LoginOrRegister tab={tab} ondone={ondone}/>

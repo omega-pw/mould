@@ -11,6 +11,7 @@ pub fn Selection<O: SelectOption>(
     #[prop(optional)] readonly: bool,
     #[prop(optional)] clearable: bool,
     #[prop(into, default = None)] placeholder: Option<SharedString>,
+    #[prop(into, optional)] style: SharedString,
     #[prop(into, default = None)] onchange: Option<UnsyncCallback<Option<O>>>,
 ) -> impl IntoView
 where
@@ -49,7 +50,7 @@ where
         }
     };
     view! {
-        <select class="e-select" on:change={on_change}>
+        <select class="e-select" on:change={on_change} style={style}>
             <Show
                 when={
                     let not_match = not_match.clone();

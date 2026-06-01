@@ -1,0 +1,12 @@
+.frame-layout {
+    height: 100%;
+}
+
+.frame-layout>.frame {
+    display: none;
+    height: 100%;
+}
+
+.frame-layout>.frame:last-child {
+    display: block;
+}

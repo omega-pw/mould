@@ -1,5 +1,4 @@
 pub mod auth;
-pub mod change_password;
 pub mod common;
 pub mod environment;
 pub mod environment_schema;
