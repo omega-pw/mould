@@ -7,5 +7,4 @@ mod extension;
 pub mod index;
 pub mod job;
 pub mod job_record;
-pub mod sys_menu;
 pub mod user;

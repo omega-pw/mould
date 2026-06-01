@@ -1,11 +1,10 @@
+use super::sys_menu::SysMenu;
 use crate::components::button::Button;
 use crate::components::center_middle::CenterMiddle;
 use crate::components::image::Image;
 use crate::components::modal_dialog::ModalDialog;
 use crate::fragment::change_password::ChangePassword;
-use crate::fragment::sys_menu::SysMenu;
 use crate::sdk;
-use crate::AppContext;
 use crate::SharedString;
 use leptos::prelude::*;
 use leptos_router::hooks::use_navigate;
@@ -18,7 +17,6 @@ pub fn DefaultLayout(
     curr_user: RwSignal<Option<User>>,
     onexit: UnsyncCallback<()>,
 ) -> impl IntoView {
-    let app_context = use_context::<AppContext>().expect("no app context found");
     let navigate = use_navigate();
     let change_password_active: RwSignal<bool> = RwSignal::new(false);
     let on_logout = {
@@ -69,7 +67,7 @@ pub fn DefaultLayout(
                             if curr_user.org_id.is_some() {
                                 view! {
                                     <div style="position: absolute;width: 16em;height: 100%;left: 0;box-sizing: border-box;border-right: 1px solid #CCC;">
-                                        <SysMenu/>
+                                        <SysMenu permissions={Vec::new()}/>
                                     </div>
                                     <div style="position: absolute;left: 16em;height: 100%;right: 0;">
                                         <Outlet/>
