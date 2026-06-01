@@ -1,3 +1,5 @@
+use super::icon_button::Icon;
+use super::icon_button::IconButton;
 use crate::SharedString;
 use leptos::prelude::*;
 
@@ -21,18 +23,7 @@ pub fn Dialog(
                 <Show
                     when=move || { closable }
                 >
-                    {
-                        let on_close = move |_| {
-                            if let Some(onclose) = onclose.as_ref() {
-                                onclose.run(());
-                            }
-                        };
-                        view! {
-                            <span class="btn-close" on:click={on_close} style="position: absolute;top: 0;right: 0;width: 2em;height: 2em;text-align: center;cursor: pointer;">
-                                <i class="fas fa-times"></i>
-                            </span>
-                        }
-                    }
+                    <IconButton icon=Icon::Close onclick={onclose} color="#fff" style="position: absolute;top: 0;right: 0;width: 2em;height: 2em;text-align: center;"/>
                 </Show>
             </div>
             <div style={actual_content_style}>
