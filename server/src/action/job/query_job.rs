@@ -1,25 +1,26 @@
-use crate::get_context;
-use crate::middleware::auth::User;
 use crate::model::job::JobOpt;
+use crate::prehandle::auth::User;
 use crate::sdk;
 use crate::service::base::EnvironmentSchemaBaseService;
 use crate::service::base::JobBaseService;
 use crate::service::job::JobService;
+use crate::Context;
 use sdk::job::query_job::Job;
 use sdk::job::query_job::QueryJobReq;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::sync::Arc;
 use tihu::pagination::PaginationList;
-use tihu::Id;
 use tihu::Pagination;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
 pub async fn query_job(
-    org_id: Id,
-    _user: User,
+    context: Arc<Context>,
+    user: User,
     query_job_req: QueryJobReq,
 ) -> Result<PaginationList<Job>, ErrNo> {
+    let org_id = user.org_id;
     let QueryJobReq {
         name,
         page_no,
@@ -30,7 +31,6 @@ pub async fn query_job(
         name: name.map(|v| v.into()),
         ..JobOpt::empty()
     };
-    let context = get_context()?;
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
     let job_base_service = JobBaseService::new(&transaction);

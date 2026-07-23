@@ -1,23 +1,23 @@
-use crate::get_context;
-use crate::middleware::auth::User;
 use crate::model::user::UserProperty;
+use crate::prehandle::auth::User;
 use crate::sdk;
 use crate::service::base::UserBaseService;
+use crate::Context;
 use chrono::Utc;
 use sdk::user::invite_user::InviteUserReq;
-use tihu::Id;
+use std::sync::Arc;
 use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
 pub async fn invite_user(
-    org_id: Id,
-    _user: User,
+    context: Arc<Context>,
+    user: User,
     invite_user_req: InviteUserReq,
 ) -> Result<(), ErrNo> {
+    let org_id = user.org_id;
     let InviteUserReq { user_id } = invite_user_req;
-    let context = get_context()?;
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
     let user_base_service = UserBaseService::new(&transaction);

@@ -1,15 +1,15 @@
 use super::cache_session_info;
 use super::check_nonce;
 use super::decrypt_base64_data_by_rsa_pri_key;
-use crate::get_context;
-use crate::middleware::auth::AuthMethod;
-use crate::middleware::auth::Guest;
-use crate::middleware::auth::SessionInfo;
 use crate::model::system_user::SystemUserOpt;
 use crate::native_common;
+use crate::prehandle::auth::Guest;
+use crate::prehandle::session::AuthMethod;
+use crate::prehandle::session::SessionInfo;
 use crate::sdk;
 use crate::service::base::SystemUserBaseService;
 use crate::service::base::UserBaseService;
+use crate::Context;
 use native_common::utils::decrypt_by_base64;
 use native_common::utils::encrypt_by_base64;
 use native_common::utils::sha512;
@@ -17,17 +17,21 @@ use sdk::auth::get_curr_user::AuthSource;
 use sdk::auth::get_curr_user::User as SdkUser;
 use sdk::auth::login::LoginReq;
 use sdk::auth::login::LoginResp;
+use std::sync::Arc;
 use tihu::SharedString;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 use validator::ValidateEmail;
 
-pub async fn login(guest: Guest, login_req: LoginReq) -> Result<LoginResp, ErrNo> {
-    let nonce_ok = check_nonce(&login_req.nonce).await?;
+pub async fn login(
+    context: Arc<Context>,
+    guest: Guest,
+    login_req: LoginReq,
+) -> Result<LoginResp, ErrNo> {
+    let nonce_ok = check_nonce(context.clone(), &login_req.nonce).await?;
     if !nonce_ok {
         return Err(ErrNo::TokenInvalid);
     }
-    let context = get_context()?;
     let rsa_pri_key = &context.get_rsa_pri_key().await?;
     let email = String::from_utf8_lossy(
         &decrypt_base64_data_by_rsa_pri_key(
@@ -89,7 +93,7 @@ pub async fn login(guest: Guest, login_req: LoginReq) -> Result<LoginResp, ErrNo
             user_id: user_id,
             org_id: user.org_id,
         };
-        cache_session_info(guest.session_id, &session_info).await?;
+        cache_session_info(context, guest.session_id, &session_info).await?;
         return Ok(Some(SdkUser {
             id: user_id,
             org_id: user.org_id,

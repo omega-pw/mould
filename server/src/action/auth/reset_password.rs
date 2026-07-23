@@ -1,12 +1,12 @@
 use super::check_nonce;
 use super::decrypt_base64_data_by_rsa_pri_key;
-use crate::get_context;
-use crate::middleware::auth::Guest;
 use crate::model::system_user::SystemUserOpt;
 use crate::model::system_user::SystemUserProperty;
 use crate::native_common;
+use crate::prehandle::auth::Guest;
 use crate::sdk;
 use crate::service::base::SystemUserBaseService;
+use crate::Context;
 use chrono::Utc;
 use native_common::cache::AsyncCache;
 use native_common::utils::decrypt_by_base64;
@@ -15,6 +15,7 @@ use native_common::utils::sha512;
 use sdk::auth::reset_password::ResetPasswordApi;
 use sdk::auth::reset_password::ResetPasswordReq;
 use sdk::auth::reset_password::ResetPasswordResp;
+use std::sync::Arc;
 use tihu::Api;
 use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
@@ -23,13 +24,14 @@ use tihu_native::ErrNo;
 use validator::ValidateEmail;
 
 pub async fn reset_password(
+    context: Arc<Context>,
     guest: Guest,
     reset_password_req: ResetPasswordReq,
 ) -> Result<ResetPasswordResp, ErrNo> {
     if let Err(err) = ResetPasswordApi::validate_input(&reset_password_req) {
         return Err(ErrNo::CommonError(err));
     }
-    let nonce_ok = check_nonce(&reset_password_req.nonce).await?;
+    let nonce_ok = check_nonce(context.clone(), &reset_password_req.nonce).await?;
     if !nonce_ok {
         return Err(ErrNo::NotAllowed);
     }
@@ -42,7 +44,6 @@ pub async fn reset_password(
     for item in &mut captcha {
         item.make_ascii_lowercase();
     }
-    let context = get_context()?;
     let cache_mgr = context.get_cache_mgr().await?;
     let mut captcha2 = cache_mgr
         .get(

@@ -1,11 +1,10 @@
 use crate::context::Context;
 use crate::context::RPC_TIMEOUT;
-use crate::get_context;
-use crate::middleware::auth::AuthMethod;
-use crate::middleware::auth::Guest;
-use crate::middleware::auth::SessionInfo;
-use crate::middleware::auth::SESSION_PREFIX;
 use crate::native_common;
+use crate::prehandle::auth::Guest;
+use crate::prehandle::session::AuthMethod;
+use crate::prehandle::session::SessionInfo;
+use crate::prehandle::session::SESSION_PREFIX;
 use crate::sdk;
 use crate::service::base::SystemUserBaseService;
 use crate::service::base::UserBaseService;
@@ -202,11 +201,11 @@ pub async fn get_user_info(
 }
 
 pub async fn get_curr_user(
+    context: Arc<Context>,
     guest: Guest,
     _get_curr_user_req: GetCurrUserReq,
 ) -> Result<GetCurrUserResp, ErrNo> {
     let session_id = guest.session_id;
-    let context = get_context()?;
     let session_info = get_session_data(&context, &session_id.to_string()).await?;
     if let Some(session_info) = session_info {
         let user_info = get_user_info(&context, &session_info).await?;

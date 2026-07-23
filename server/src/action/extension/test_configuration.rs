@@ -1,14 +1,14 @@
-use crate::get_context;
-use crate::middleware::auth::User;
+use crate::prehandle::auth::User;
 use crate::sdk;
+use crate::Context;
 use sdk::extension::test_configuration::TestConfigurationReq;
 use sdk::extension::test_configuration::TestConfigurationResp;
-use tihu::Id;
+use std::sync::Arc;
 use tihu::SharedString;
 use tihu_native::ErrNo;
 
 pub async fn test_configuration(
-    _org_id: Id,
+    context: Arc<Context>,
     _user: User,
     test_configuration_req: TestConfigurationReq,
 ) -> Result<TestConfigurationResp, ErrNo> {
@@ -16,7 +16,6 @@ pub async fn test_configuration(
         extension_id,
         extension_configuration,
     } = test_configuration_req;
-    let context = get_context()?;
     let extension = context
         .get_extension(&extension_id)
         .ok_or_else(|| -> ErrNo {

@@ -2,8 +2,6 @@ use super::super::job_record::merge_step_and_resource_record;
 use super::merge_step_and_resource;
 use super::start_run;
 use super::Step;
-use crate::get_context;
-use crate::middleware::auth::User;
 use crate::model::environment::EnvironmentOpt;
 use crate::model::environment_resource::EnvironmentResourceOpt;
 use crate::model::environment_schema_resource::EnvironmentSchemaResourceOpt;
@@ -15,6 +13,7 @@ use crate::model::job_step_record::enums::Status as StepStatus;
 use crate::model::job_step_record::JobStepRecord;
 use crate::model::job_step_resource_record::enums::Status as StepResourceStatus;
 use crate::model::job_step_resource_record::JobStepResourceRecord;
+use crate::prehandle::auth::User;
 use crate::sdk;
 use crate::service::base::EnvironmentBaseService;
 use crate::service::base::EnvironmentResourceBaseService;
@@ -24,10 +23,11 @@ use crate::service::base::JobRecordBaseService;
 use crate::service::base::JobStepBaseService;
 use crate::service::base::JobStepRecordBaseService;
 use crate::service::base::JobStepResourceRecordBaseService;
+use crate::Context;
 use chrono::Utc;
 use sdk::job::start_job::StartJobReq;
 use sdk::job::start_job::StartJobResp;
-use tihu::Id;
+use std::sync::Arc;
 use tihu::PrimaryKey;
 use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
@@ -35,15 +35,15 @@ use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
 pub async fn start_job(
-    org_id: Id,
-    _user: User,
+    context: Arc<Context>,
+    user: User,
     start_job_req: StartJobReq,
 ) -> Result<StartJobResp, ErrNo> {
+    let org_id = user.org_id;
     let StartJobReq {
         job_id,
         environment_id,
     } = start_job_req;
-    let context = get_context()?;
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
     let job_base_service = JobBaseService::new(&transaction);

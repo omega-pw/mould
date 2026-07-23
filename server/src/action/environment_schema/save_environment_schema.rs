@@ -1,5 +1,3 @@
-use crate::get_context;
-use crate::middleware::auth::User;
 use crate::model::environment_schema::EnvironmentSchema;
 use crate::model::environment_schema::EnvironmentSchemaOpt;
 use crate::model::environment_schema::EnvironmentSchemaProperty;
@@ -7,12 +5,14 @@ use crate::model::environment_schema_resource::EnvironmentSchemaResource;
 use crate::model::environment_schema_resource::EnvironmentSchemaResourceOpt;
 use crate::model::environment_schema_resource::EnvironmentSchemaResourceProperty;
 use crate::native_common::utils::list;
+use crate::prehandle::auth::User;
 use crate::sdk;
 use crate::service::base::EnvironmentSchemaBaseService;
 use crate::service::base::EnvironmentSchemaResourceBaseService;
+use crate::Context;
 use chrono::Utc;
 use sdk::environment_schema::save_environment_schema::SaveEnvironmentSchemaReq;
-use tihu::Id;
+use std::sync::Arc;
 use tihu::PrimaryKey;
 use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
@@ -20,16 +20,16 @@ use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
 pub async fn save_environment_schema(
-    org_id: Id,
-    _user: User,
+    context: Arc<Context>,
+    user: User,
     save_environment_schema_req: SaveEnvironmentSchemaReq,
 ) -> Result<PrimaryKey, ErrNo> {
+    let org_id = user.org_id;
     let SaveEnvironmentSchemaReq {
         id,
         name,
         resource_list,
     } = save_environment_schema_req;
-    let context = get_context()?;
     let curr_time = Utc::now();
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;

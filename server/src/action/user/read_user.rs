@@ -1,4 +1,3 @@
-use crate::get_context;
 use crate::model::external_user::enums::ProviderType;
 use crate::model::user::enums::UserSource;
 use crate::model::user::UserOpt;
@@ -6,11 +5,12 @@ use crate::sdk;
 use crate::service::base::ExternalUserBaseService;
 use crate::service::base::SystemUserBaseService;
 use crate::service::base::UserBaseService;
+use crate::Context;
 use sdk::user::read_user::ExternalUser;
 use sdk::user::read_user::ReadUserReq;
 use sdk::user::read_user::ReadUserResp;
 use sdk::user::read_user::SystemUser;
-use tihu::Id;
+use std::sync::Arc;
 use tihu::SharedString;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
@@ -23,12 +23,12 @@ fn to_sdk_provider_type(val: ProviderType) -> sdk::user::enums::ProviderType {
 }
 
 pub async fn read_user(
-    org_id: Id,
-    _user: crate::middleware::auth::User,
+    context: Arc<Context>,
+    user: crate::prehandle::auth::User,
     read_user_req: ReadUserReq,
 ) -> Result<ReadUserResp, ErrNo> {
+    let org_id = user.org_id;
     let ReadUserReq { id } = read_user_req;
-    let context = get_context()?;
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
     let user_base_service = UserBaseService::new(&transaction);

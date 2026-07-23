@@ -1,26 +1,26 @@
 use super::check_nonce;
 use super::decrypt_base64_data_by_rsa_pri_key;
-use crate::get_context;
-use crate::middleware::auth::User;
 use crate::model::system_user::SystemUser;
 use crate::model::system_user::SystemUserProperty;
 use crate::native_common;
+use crate::prehandle::auth::User;
 use crate::sdk;
 use crate::service::base::SystemUserBaseService;
+use crate::Context;
 use chrono::Utc;
 use native_common::utils::decrypt_by_base64;
 use native_common::utils::encrypt_by_base64;
 use native_common::utils::sha512;
 use sdk::auth::change_password::ChangePasswordReq;
 use sdk::auth::change_password::ChangePasswordResp;
-use tihu::Id;
+use std::sync::Arc;
 use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
 pub async fn change_password(
-    _org_id: Id,
+    context: Arc<Context>,
     user: User,
     change_password_req: ChangePasswordReq,
 ) -> Result<ChangePasswordResp, ErrNo> {
@@ -29,11 +29,10 @@ pub async fn change_password(
         old_auth_key,
         new_auth_key,
     } = change_password_req;
-    let nonce_ok = check_nonce(&nonce).await?;
+    let nonce_ok = check_nonce(context.clone(), &nonce).await?;
     if !nonce_ok {
         return Err(ErrNo::NotAllowed);
     }
-    let context = get_context()?;
     let rsa_pri_key = &context.get_rsa_pri_key().await?;
     let old_auth_key = String::from_utf8_lossy(
         &decrypt_base64_data_by_rsa_pri_key(

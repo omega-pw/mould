@@ -1,5 +1,3 @@
-use crate::get_context;
-use crate::middleware::auth::User;
 use crate::model::environment_schema_resource::EnvironmentSchemaResourceOpt;
 use crate::model::job::JobOpt;
 use crate::model::job::JobProperty;
@@ -9,23 +7,26 @@ use crate::model::job_step::JobStepOpt;
 use crate::model::job_step::JobStepProperty;
 use crate::native_common::utils::list;
 use crate::native_common::utils::list::Either;
+use crate::prehandle::auth::User;
 use crate::sdk;
 use crate::service::base::EnvironmentSchemaResourceBaseService;
 use crate::service::base::JobBaseService;
 use crate::service::base::JobStepBaseService;
+use crate::Context;
 use chrono::Utc;
 use sdk::job::update_job::UpdateJobReq;
-use tihu::Id;
+use std::sync::Arc;
 use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
 pub async fn update_job(
-    org_id: Id,
-    _user: User,
+    context: Arc<Context>,
+    user: User,
     update_job_req: UpdateJobReq,
 ) -> Result<(), ErrNo> {
+    let org_id = user.org_id;
     let UpdateJobReq {
         id,
         name,
@@ -33,7 +34,6 @@ pub async fn update_job(
         job_step_list,
     } = update_job_req;
     let job_id = id;
-    let context = get_context()?;
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
     let job_base_service = JobBaseService::new(&transaction);

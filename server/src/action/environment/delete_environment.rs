@@ -1,32 +1,32 @@
-use crate::get_context;
-use crate::middleware::auth::User;
 use crate::model::environment::EnvironmentOpt;
 use crate::model::environment_resource::EnvironmentResourceOpt;
 use crate::model::job_record::enums::Status;
 use crate::model::job_record::JobRecordOpt;
 use crate::model::job_step_record::JobStepRecordOpt;
 use crate::model::job_step_resource_record::JobStepResourceRecordOpt;
+use crate::prehandle::auth::User;
 use crate::sdk;
 use crate::service::base::EnvironmentBaseService;
 use crate::service::base::EnvironmentResourceBaseService;
 use crate::service::base::JobRecordBaseService;
 use crate::service::base::JobStepRecordBaseService;
 use crate::service::base::JobStepResourceRecordBaseService;
+use crate::Context;
 use sdk::environment::delete_environment::DeleteEnvironmentReq;
-use tihu::Id;
+use std::sync::Arc;
 use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
 pub async fn delete_environment(
-    org_id: Id,
-    _user: User,
+    context: Arc<Context>,
+    user: User,
     delete_environment_req: DeleteEnvironmentReq,
 ) -> Result<(), ErrNo> {
+    let org_id = user.org_id;
     let DeleteEnvironmentReq { id } = delete_environment_req;
     let environment_id = id;
-    let context = get_context()?;
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
     let environment_base_service = EnvironmentBaseService::new(&transaction);

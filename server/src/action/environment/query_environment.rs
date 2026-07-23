@@ -1,25 +1,26 @@
-use crate::get_context;
-use crate::middleware::auth::User;
 use crate::model::environment::EnvironmentOpt;
+use crate::prehandle::auth::User;
 use crate::sdk;
 use crate::service::base::EnvironmentBaseService;
 use crate::service::base::EnvironmentSchemaBaseService;
 use crate::service::environment::EnvironmentService;
+use crate::Context;
 use sdk::environment::query_environment::Environment;
 use sdk::environment::query_environment::QueryEnvironmentReq;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::sync::Arc;
 use tihu::pagination::PaginationList;
-use tihu::Id;
 use tihu::Pagination;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
 pub async fn query_environment(
-    org_id: Id,
-    _user: User,
+    context: Arc<Context>,
+    user: User,
     query_environment_req: QueryEnvironmentReq,
 ) -> Result<PaginationList<Environment>, ErrNo> {
+    let org_id = user.org_id;
     let QueryEnvironmentReq {
         environment_schema_id,
         name,
@@ -32,7 +33,6 @@ pub async fn query_environment(
         name: name,
         ..EnvironmentOpt::empty()
     };
-    let context = get_context()?;
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
     let environment_base_service = EnvironmentBaseService::new(&transaction);

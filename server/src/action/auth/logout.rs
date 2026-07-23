@@ -1,9 +1,8 @@
-use crate::get_context;
-use crate::middleware::auth::AuthMethod;
-use crate::middleware::auth::Guest;
-use crate::middleware::auth::SessionInfo;
-use crate::middleware::auth::SESSION_PREFIX;
 use crate::native_common;
+use crate::prehandle::auth::Guest;
+use crate::prehandle::session::AuthMethod;
+use crate::prehandle::session::SessionInfo;
+use crate::prehandle::session::SESSION_PREFIX;
 use crate::sdk;
 use crate::Context;
 use form_urlencoded::Serializer;
@@ -31,11 +30,11 @@ async fn get_session_data(
 }
 
 pub async fn get_logout_url(
+    context: Arc<Context>,
     guest: Guest,
     get_logout_url_req: LogoutReq,
 ) -> Result<LogoutResp, ErrNo> {
     let LogoutReq { redirect_uri } = get_logout_url_req;
-    let context = get_context()?;
     let session_id = guest.session_id.to_string();
     let cache_mgr = context.get_cache_mgr().await?;
     let session_info = get_session_data(&context, &session_id.to_string()).await?;

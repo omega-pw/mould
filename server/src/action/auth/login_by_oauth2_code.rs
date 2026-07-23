@@ -1,10 +1,5 @@
 use super::cache_session_info;
 use crate::context::RPC_TIMEOUT;
-use crate::get_context;
-use crate::middleware::auth::AuthMethod;
-use crate::middleware::auth::Guest;
-use crate::middleware::auth::Oauth2Token;
-use crate::middleware::auth::SessionInfo;
 use crate::model::external_user::enums::ProviderType;
 use crate::model::external_user::ExternalUser;
 use crate::model::external_user::ExternalUserOpt;
@@ -14,10 +9,15 @@ use crate::model::user::enums::UserSource;
 use crate::model::user::User;
 use crate::model::user::UserOpt;
 use crate::model::user::UserProperty;
+use crate::prehandle::auth::Guest;
+use crate::prehandle::session::AuthMethod;
+use crate::prehandle::session::Oauth2Token;
+use crate::prehandle::session::SessionInfo;
 use crate::sdk;
 use crate::service::base::ExternalUserBaseService;
 use crate::service::base::OrganizationBaseService;
 use crate::service::base::UserBaseService;
+use crate::Context;
 use chrono::Utc;
 use form_urlencoded::Serializer;
 use oauth2::AuthorizationCode;
@@ -28,6 +28,7 @@ use sdk::auth::get_curr_user::User as SdkUser;
 use sdk::auth::login_by_oauth2_code::LoginByOauth2CodeReq;
 use sdk::auth::login_by_oauth2_code::LoginByOauth2CodeResp;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use std::time::Duration;
 use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
@@ -65,6 +66,7 @@ struct WechatTokenResp {
 }
 
 pub async fn login_by_oauth2_code(
+    context: Arc<Context>,
     guest: Guest,
     login_by_oauth2_code_req: LoginByOauth2CodeReq,
 ) -> Result<LoginByOauth2CodeResp, ErrNo> {
@@ -73,7 +75,6 @@ pub async fn login_by_oauth2_code(
         code,
         pkce_verifier,
     } = login_by_oauth2_code_req;
-    let context = get_context()?;
     let (oauth2_client, oauth2_server) = context.get_oauth2_client(&provider)?;
     let (session_info, curr_user) = if "wechat" == provider {
         let token_url = &oauth2_server.token_url;
@@ -421,7 +422,7 @@ pub async fn login_by_oauth2_code(
             provider
         ))));
     };
-    cache_session_info(guest.session_id, &session_info).await?;
+    cache_session_info(context, guest.session_id, &session_info).await?;
     return Ok(Some(curr_user));
 }
 

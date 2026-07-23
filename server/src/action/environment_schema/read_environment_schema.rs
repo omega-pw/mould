@@ -1,25 +1,25 @@
-use crate::get_context;
-use crate::middleware::auth::User;
 use crate::model::environment_schema::EnvironmentSchemaOpt;
 use crate::model::environment_schema_resource::EnvironmentSchemaResourceOpt;
+use crate::prehandle::auth::User;
 use crate::sdk;
 use crate::service::base::EnvironmentSchemaBaseService;
 use crate::service::base::EnvironmentSchemaResourceBaseService;
+use crate::Context;
 use sdk::environment_schema::read_environment_schema::EnvironmentSchema;
 use sdk::environment_schema::read_environment_schema::ReadEnvironmentSchemaReq;
 use sdk::environment_schema::read_environment_schema::SchemaResource;
-use tihu::Id;
+use std::sync::Arc;
 use tihu::SharedString;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
 pub async fn read_environment_schema(
-    org_id: Id,
-    _user: User,
+    context: Arc<Context>,
+    user: User,
     read_environment_schema_req: ReadEnvironmentSchemaReq,
 ) -> Result<EnvironmentSchema, ErrNo> {
+    let org_id = user.org_id;
     let ReadEnvironmentSchemaReq { id } = read_environment_schema_req;
-    let context = get_context()?;
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
     let environment_schema_base_service = EnvironmentSchemaBaseService::new(&transaction);

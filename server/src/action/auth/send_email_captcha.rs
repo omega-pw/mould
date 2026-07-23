@@ -1,7 +1,5 @@
 use crate::context::RPC_TIMEOUT;
-use crate::get_context;
 use crate::log;
-use crate::middleware::auth::Guest;
 use crate::model::captcha::enums::ReceiverType;
 use crate::model::captcha::enums::Scene;
 use crate::model::captcha::Captcha;
@@ -9,9 +7,11 @@ use crate::model::captcha::CaptchaOpt;
 use crate::model::captcha::CaptchaProperty;
 use crate::model::system_user::SystemUserOpt;
 use crate::native_common;
+use crate::prehandle::auth::Guest;
 use crate::sdk;
 use crate::service::base::CaptchaBaseService;
 use crate::service::base::SystemUserBaseService;
+use crate::Context;
 use chrono::Utc;
 use native_common::cache::AsyncCache;
 use native_common::cache::EliminateType;
@@ -22,6 +22,7 @@ use native_common::utils::DEFAULT_SEED;
 use sdk::auth::send_email_captcha::Scene as SdkScene;
 use sdk::auth::send_email_captcha::SendEmailCaptchaReq;
 use sdk::auth::send_email_captcha::SendEmailCaptchaResp;
+use std::sync::Arc;
 use std::time::Duration;
 use tera::Tera;
 use tihu::SharedString;
@@ -52,10 +53,10 @@ pub async fn check_email_existed(
 }
 
 pub async fn send_email_captcha(
+    context: Arc<Context>,
     guest: Guest,
     send_email_captcha_req: SendEmailCaptchaReq,
 ) -> Result<SendEmailCaptchaResp, ErrNo> {
-    let context = get_context()?;
     if let Some(turnstile) = context.config.turnstile.as_ref() {
         let token = send_email_captcha_req
             .token

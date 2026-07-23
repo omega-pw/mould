@@ -39,6 +39,7 @@ format_xml = "=0.1.4"
 jsonpath_lib = "0.3"
 v8 = "0.106.0"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "fs"] }
+tokio-util = { version = "0.7", features = ["io"] }
 tokio-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-uuid-1"] }
 tokio-postgres-rustls = "0.13"
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
@@ -50,10 +51,11 @@ sync_wrapper = { version = "1", features = ["futures"] }
 pin-project = "1"
 http-body-util = "0.1"
 multer = "3"
+async-compression = { version = "0.4", features = ["tokio", "gzip", "deflate", "brotli", "zstd"] }
 hyper-util = { version = "0.1", features = ["tokio", "server", "http1", "http2"] }
 hyper = { version = "1", features = ["http1", "http2", "server"] }
 tihu = "0.1.12"
-tihu-native = "0.1.16"
+tihu-native = "0.1.18"
 lettre = {version = "0.11", default-features = false, features = ["builder", "smtp-transport", "tokio1-rustls-tls"]}
 aws-types = "1"
 aws-smithy-http = "0.60"

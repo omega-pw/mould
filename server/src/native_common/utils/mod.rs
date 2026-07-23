@@ -1,4 +1,5 @@
 mod encrypt;
+pub mod http;
 pub mod list;
 mod mail;
 pub mod set;

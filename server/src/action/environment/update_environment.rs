@@ -1,5 +1,3 @@
-use crate::get_context;
-use crate::middleware::auth::User;
 use crate::model::environment::EnvironmentOpt;
 use crate::model::environment::EnvironmentProperty;
 use crate::model::environment_resource::EnvironmentResource;
@@ -8,30 +6,32 @@ use crate::model::environment_resource::EnvironmentResourceProperty;
 use crate::model::environment_schema_resource::EnvironmentSchemaResourceOpt;
 use crate::native_common::utils::list;
 use crate::native_common::utils::list::group_sub_list;
+use crate::prehandle::auth::User;
 use crate::sdk;
 use crate::service::base::EnvironmentBaseService;
 use crate::service::base::EnvironmentResourceBaseService;
 use crate::service::base::EnvironmentSchemaResourceBaseService;
+use crate::Context;
 use chrono::Utc;
 use sdk::environment::update_environment::UpdateEnvironmentReq;
-use tihu::Id;
+use std::sync::Arc;
 use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
 pub async fn update_environment(
-    org_id: Id,
-    _user: User,
+    context: Arc<Context>,
+    user: User,
     update_environment_req: UpdateEnvironmentReq,
 ) -> Result<(), ErrNo> {
+    let org_id = user.org_id;
     let UpdateEnvironmentReq {
         id,
         name,
         schema_resource_list,
     } = update_environment_req;
     let environment_id = id;
-    let context = get_context()?;
     for schema_resource in &schema_resource_list {
         let extension = context
             .get_extension(&schema_resource.extension_id)

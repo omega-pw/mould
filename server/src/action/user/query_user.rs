@@ -1,12 +1,12 @@
-use crate::get_context;
 use crate::model::user::enums::UserSource;
 use crate::model::user::User;
 use crate::model::user::UserOpt;
 use crate::sdk;
 use crate::service::base::UserBaseService;
+use crate::Context;
 use sdk::user::query_user::QueryUserReq;
+use std::sync::Arc;
 use tihu::pagination::PaginationList;
-use tihu::Id;
 use tihu::Pagination;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
@@ -26,10 +26,11 @@ fn to_sdk_user_source(val: UserSource) -> sdk::user::enums::UserSource {
 }
 
 pub async fn query_user(
-    org_id: Id,
-    _user: crate::middleware::auth::User,
+    context: Arc<Context>,
+    user: crate::prehandle::auth::User,
     query_user_req: QueryUserReq,
 ) -> Result<PaginationList<sdk::user::query_user::User>, ErrNo> {
+    let org_id = user.org_id;
     let QueryUserReq {
         id,
         user_source,
@@ -44,7 +45,6 @@ pub async fn query_user(
         name: name.map(|v| v.into()),
         ..UserOpt::empty()
     };
-    let context = get_context()?;
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
     let user_base_service = UserBaseService::new(&transaction);

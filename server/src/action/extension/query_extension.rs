@@ -1,17 +1,16 @@
-use crate::get_context;
-use crate::middleware::auth::User;
+use crate::prehandle::auth::User;
 use crate::sdk;
+use crate::Context;
 use sdk::extension::query_extension::QueryExtensionReq;
 use sdk::extension::query_extension::QueryExtensionResp;
-use tihu::Id;
+use std::sync::Arc;
 use tihu_native::ErrNo;
 
 pub async fn query_extension(
-    _org_id: Id,
+    context: Arc<Context>,
     _user: User,
     _query_extension_req: QueryExtensionReq,
 ) -> Result<QueryExtensionResp, ErrNo> {
-    let context = get_context()?;
     let extensions = context.get_extensions();
     return Ok(extensions);
 }

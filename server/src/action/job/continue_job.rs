@@ -1,38 +1,38 @@
 use super::super::job_record::merge_step_and_resource_record;
 use super::start_run;
 use super::StepRecord;
-use crate::get_context;
-use crate::middleware::auth::User;
 use crate::model::job_record::enums::Status as RecordStatus;
 use crate::model::job_record::JobRecordProperty;
 use crate::model::job_step_record::enums::Status;
 use crate::model::job_step_record::JobStepRecordOpt;
 use crate::model::job_step_record::JobStepRecordProperty;
 use crate::model::job_step_resource_record::JobStepResourceRecordOpt;
+use crate::prehandle::auth::User;
 use crate::sdk;
 use crate::service::base::JobRecordBaseService;
 use crate::service::base::JobStepRecordBaseService;
 use crate::service::base::JobStepResourceRecordBaseService;
+use crate::Context;
 use chrono::Utc;
 use sdk::job::continue_job::ContinueJobReq;
 use sdk::job::continue_job::ContinueJobResp;
-use tihu::Id;
+use std::sync::Arc;
 use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
 pub async fn continue_job(
-    org_id: Id,
-    _user: User,
+    context: Arc<Context>,
+    user: User,
     continue_job_req: ContinueJobReq,
 ) -> Result<ContinueJobResp, ErrNo> {
+    let org_id = user.org_id;
     let ContinueJobReq {
         record_id,
         step_record_id,
         success,
     } = continue_job_req;
-    let context = get_context()?;
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
     let job_step_record_base_service = JobStepRecordBaseService::new(&transaction);

@@ -1,9 +1,9 @@
-use crate::get_context;
-use crate::middleware::auth::Guest;
 use crate::model::system_user::SystemUserOpt;
 use crate::native_common;
+use crate::prehandle::auth::Guest;
 use crate::sdk;
 use crate::service::base::SystemUserBaseService;
+use crate::Context;
 use native_common::utils::decrypt_by_base64;
 use native_common::utils::encrypt_by_base64;
 use native_common::utils::sha512;
@@ -11,12 +11,16 @@ use sdk::auth::calc_salt;
 use sdk::auth::get_salt::GetSaltReq;
 use sdk::auth::get_salt::GetSaltResp;
 use sdk::auth::RandomValue;
+use std::sync::Arc;
 use tihu::SharedString;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
-pub async fn get_salt(_guest: Guest, get_salt_req: GetSaltReq) -> Result<GetSaltResp, ErrNo> {
-    let context = get_context()?;
+pub async fn get_salt(
+    context: Arc<Context>,
+    _guest: Guest,
+    get_salt_req: GetSaltReq,
+) -> Result<GetSaltResp, ErrNo> {
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
     let system_user_base_service = SystemUserBaseService::new(&transaction);
@@ -50,7 +54,6 @@ pub async fn get_salt(_guest: Guest, get_salt_req: GetSaltReq) -> Result<GetSalt
             )));
         }
     } else {
-        let context = get_context()?;
         let server_random_value = context.get_server_random_value().await?;
         let salt = calc_salt(
             RandomValue::Server(get_salt_req.account.as_bytes(), server_random_value),

@@ -1,18 +1,18 @@
-use crate::get_context;
-use crate::middleware::auth::User;
 use crate::model::job_record::enums::Status;
 use crate::model::job_record::JobRecord;
 use crate::model::job_record::JobRecordOpt;
+use crate::prehandle::auth::User;
 use crate::sdk;
 use crate::service::base::EnvironmentBaseService;
 use crate::service::base::JobBaseService;
 use crate::service::base::JobRecordBaseService;
 use crate::service::job_record::JobRecordService;
+use crate::Context;
 use sdk::job_record::query_job_record::QueryJobRecordReq;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::sync::Arc;
 use tihu::pagination::PaginationList;
-use tihu::Id;
 use tihu::Pagination;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
@@ -33,10 +33,11 @@ fn to_sdk_status(val: Status) -> sdk::job_record::enums::RecordStatus {
 }
 
 pub async fn query_job_record(
-    org_id: Id,
-    _user: User,
+    context: Arc<Context>,
+    user: User,
     query_job_record_req: QueryJobRecordReq,
 ) -> Result<PaginationList<sdk::job_record::query_job_record::JobRecord>, ErrNo> {
+    let org_id = user.org_id;
     let QueryJobRecordReq {
         job_id,
         environment_id,
@@ -51,7 +52,6 @@ pub async fn query_job_record(
         status: status.map(from_sdk_status),
         ..JobRecordOpt::empty()
     };
-    let context = get_context()?;
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
     let job_record_base_service = JobRecordBaseService::new(&transaction);

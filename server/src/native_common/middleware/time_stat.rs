@@ -1,71 +1,89 @@
 use crate::log;
 use async_trait::async_trait;
-use std::fmt::Display;
+use hyper::body::Incoming;
+use hyper::{Request, Response};
 use std::marker::PhantomData;
+use std::net::SocketAddr;
+use std::sync::Arc;
 use std::time::Instant;
 use tihu::Handler;
 use tihu::Middleware;
+use tihu::SharedString;
+use tihu_native::http::Body;
+use tihu_native::http::RequestData;
+use tihu_native::ErrNo;
+
+pub type In<Ctx> = (Ctx, Request<Incoming>, SocketAddr, RequestData);
+pub type Out = Result<Response<Body>, ErrNo>;
 
 pub struct TimeStatHandler<H, In> {
     inner: H,
+    exclude_list: Arc<Vec<SharedString>>,
     phantom: PhantomData<In>,
 }
 
 #[async_trait]
-impl<H, NS, D> Handler<(NS, D)> for TimeStatHandler<H, (NS, D)>
+impl<H, Ctx> Handler<In<Ctx>> for TimeStatHandler<H, In<Ctx>>
 where
-    H: Handler<(NS, D)>,
-    H::Out: Send + Sync + 'static,
-    NS: Display + Clone + Send + Sync + 'static,
-    D: Send + Sync + 'static,
+    H: Handler<In<Ctx>, Out = Out>,
+    Ctx: Send + Sync + 'static,
 {
     type Out = H::Out;
-    async fn handle(&self, input: (NS, D)) -> Self::Out {
-        let route = input.0.clone();
-        let now = Instant::now();
-        let output = self.inner.handle(input).await;
-        let cost = now.elapsed().as_millis();
-        if cost > 1000 {
-            //大于1秒就警告
-            log::warn!("time cost: {} {}ms", route, cost);
+    async fn handle(&self, (context, request, remote_addr, request_data): In<Ctx>) -> Self::Out {
+        let route = request.uri().path();
+        if self
+            .exclude_list
+            .iter()
+            .any(|namespace| route.starts_with(namespace.as_ref()))
+        {
+            return self
+                .inner
+                .handle((context, request, remote_addr, request_data))
+                .await;
         } else {
-            log::info!("time cost: {} {}ms", route, cost);
+            let route = route.to_string();
+            let now = Instant::now();
+            let output = self
+                .inner
+                .handle((context, request, remote_addr, request_data))
+                .await;
+            let cost = now.elapsed().as_millis();
+            if cost > 1000 {
+                //大于1秒就警告
+                log::warn!("time cost: {} {}ms", route, cost);
+            } else {
+                log::info!("time cost: {} {}ms", route, cost);
+            }
+            return output;
         }
-        return output;
     }
 }
 
-impl<H, In> TimeStatHandler<H, In>
+#[derive(Clone)]
+pub struct TimeStatMiddleware {
+    exclude_list: Arc<Vec<SharedString>>,
+}
+
+impl<H, Ctx> Middleware<In<Ctx>, H> for TimeStatMiddleware
 where
-    H: Handler<In>,
-    H::Out: Send + Sync + 'static,
+    H: Handler<In<Ctx>, Out = Out>,
+    Ctx: Send + Sync + 'static,
 {
-    pub fn new(handler: H) -> Self {
+    type Output = TimeStatHandler<H, In<Ctx>>;
+
+    fn transform(self, handler: H) -> Self::Output {
         TimeStatHandler {
             inner: handler,
+            exclude_list: self.exclude_list,
             phantom: PhantomData,
         }
     }
 }
 
-pub struct TimeStatMiddleware {}
-
-impl<H, NS, D> Middleware<(NS, D), H> for TimeStatMiddleware
-where
-    H: Handler<(NS, D)>,
-    H::Out: Send + Sync + 'static,
-    NS: Display + Clone + Send + Sync + 'static,
-    D: Send + Sync + 'static,
-{
-    type Output = TimeStatHandler<H, (NS, D)>;
-
-    fn transform(self, handler: H) -> Self::Output {
-        TimeStatHandler::new(handler)
-    }
-}
-
 impl TimeStatMiddleware {
-    pub fn new() -> TimeStatMiddleware {
-        TimeStatMiddleware {}
+    pub fn new(exclude_list: Option<Vec<SharedString>>) -> TimeStatMiddleware {
+        TimeStatMiddleware {
+            exclude_list: Arc::new(exclude_list.unwrap_or_default()),
+        }
     }
 }

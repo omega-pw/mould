@@ -1,10 +1,6 @@
 use super::cache_session_info;
 use super::check_nonce;
 use super::decrypt_base64_data_by_rsa_pri_key;
-use crate::get_context;
-use crate::middleware::auth::AuthMethod;
-use crate::middleware::auth::Guest;
-use crate::middleware::auth::SessionInfo;
 use crate::model::organization::Organization;
 use crate::model::system_user::SystemUser;
 use crate::model::system_user::SystemUserOpt;
@@ -12,10 +8,14 @@ use crate::model::user::enums::UserSource;
 use crate::model::user::User;
 use crate::model::user::UserOpt;
 use crate::native_common;
+use crate::prehandle::auth::Guest;
+use crate::prehandle::session::AuthMethod;
+use crate::prehandle::session::SessionInfo;
 use crate::sdk;
 use crate::service::base::OrganizationBaseService;
 use crate::service::base::SystemUserBaseService;
 use crate::service::base::UserBaseService;
+use crate::Context;
 use chrono::Utc;
 use native_common::cache::AsyncCache;
 use native_common::utils::decrypt_by_base64;
@@ -26,6 +26,7 @@ use sdk::auth::get_curr_user::User as SdkUser;
 use sdk::auth::register::RegisterApi;
 use sdk::auth::register::RegisterReq;
 use sdk::auth::register::RegisterResp;
+use std::sync::Arc;
 use tihu::Api;
 use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
@@ -33,11 +34,15 @@ use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 use validator::ValidateEmail;
 
-pub async fn register(guest: Guest, register_req: RegisterReq) -> Result<RegisterResp, ErrNo> {
+pub async fn register(
+    context: Arc<Context>,
+    guest: Guest,
+    register_req: RegisterReq,
+) -> Result<RegisterResp, ErrNo> {
     if let Err(err) = RegisterApi::validate_input(&register_req) {
         return Err(ErrNo::CommonError(err));
     }
-    let nonce_ok = check_nonce(&register_req.nonce).await?;
+    let nonce_ok = check_nonce(context.clone(), &register_req.nonce).await?;
     if !nonce_ok {
         return Err(ErrNo::NotAllowed);
     }
@@ -50,7 +55,6 @@ pub async fn register(guest: Guest, register_req: RegisterReq) -> Result<Registe
     for item in &mut captcha {
         item.make_ascii_lowercase();
     }
-    let context = get_context()?;
     let cache_mgr = context.get_cache_mgr().await?;
     let mut captcha2 = cache_mgr
         .get(&(String::from("register-captcha-") + &guest.session_id.to_string()).into_bytes())
@@ -159,7 +163,7 @@ pub async fn register(guest: Guest, register_req: RegisterReq) -> Result<Registe
         user_id: user_id,
         org_id: org_id,
     };
-    cache_session_info(guest.session_id, &session_info).await?;
+    cache_session_info(context, guest.session_id, &session_info).await?;
     return Ok(Some(SdkUser {
         id: user_id,
         org_id: org_id,

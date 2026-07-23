@@ -1,12 +1,13 @@
 use crate::log;
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use tihu::Handler;
 use tihu::Middleware;
 
 pub struct CountStatHandler<E> {
     inner: E,
-    count: AtomicU64,
+    count: Arc<AtomicU64>,
 }
 
 #[async_trait]
@@ -31,8 +32,9 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct CountStatMiddleware {
-    count: AtomicU64,
+    count: Arc<AtomicU64>,
 }
 
 impl<In, E> Middleware<In, E> for CountStatMiddleware
@@ -54,7 +56,7 @@ where
 impl CountStatMiddleware {
     pub fn new() -> CountStatMiddleware {
         CountStatMiddleware {
-            count: AtomicU64::new(0),
+            count: Arc::new(AtomicU64::new(0)),
         }
     }
 }

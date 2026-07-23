@@ -10,23 +10,23 @@ pub mod logout;
 pub mod register;
 pub mod reset_password;
 pub mod send_email_captcha;
-use crate::get_context;
-use crate::middleware::auth::SessionInfo;
-use crate::middleware::auth::SESSION_PREFIX;
-use crate::middleware::session::SessionId;
 use crate::native_common;
+use crate::prehandle::session::SessionId;
+use crate::prehandle::session::SessionInfo;
+use crate::prehandle::session::SESSION_PREFIX;
+use crate::Context;
 use native_common::cache::AsyncCache;
 use native_common::cache::EliminateType;
 use native_common::utils::decrypt_by_base64;
 use native_common::utils::decrypt_by_rsa_pri_key;
 use rsa::RsaPrivateKey;
+use std::sync::Arc;
 use tihu::SharedString;
 use tihu_native::ErrNo;
 
 const NONCE_PREFIX: &'static str = "nonce-";
 
-async fn check_nonce(nonce: &str) -> Result<bool, ErrNo> {
-    let context = get_context()?;
+async fn check_nonce(context: Arc<Context>, nonce: &str) -> Result<bool, ErrNo> {
     let cache_mgr = context.get_cache_mgr().await?;
     return cache_mgr
         .remove(&(String::from(NONCE_PREFIX) + &nonce).into_bytes())
@@ -61,10 +61,10 @@ fn decrypt_base64_data_by_rsa_pri_key(
 }
 
 async fn cache_session_info(
+    context: Arc<Context>,
     session_id: SessionId,
     session_info: &SessionInfo,
 ) -> Result<(), ErrNo> {
-    let context = get_context()?;
     let session_info = serde_json::to_vec(&session_info).map_err(ErrNo::SerializeError)?;
     let session_id = session_id.to_string();
     let cache_mgr = context.get_cache_mgr().await?;

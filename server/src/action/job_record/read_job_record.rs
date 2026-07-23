@@ -2,19 +2,19 @@ use super::merge_step_and_resource_record;
 use super::to_sdk_record_status;
 use super::to_sdk_step_record_status;
 use super::to_sdk_step_resource_record_status;
-use crate::get_context;
-use crate::middleware::auth::User;
 use crate::model::environment::EnvironmentOpt;
 use crate::model::job::JobOpt;
 use crate::model::job_record::JobRecordOpt;
 use crate::model::job_step_record::JobStepRecordOpt;
 use crate::model::job_step_resource_record::JobStepResourceRecordOpt;
+use crate::prehandle::auth::User;
 use crate::sdk;
 use crate::service::base::EnvironmentBaseService;
 use crate::service::base::JobBaseService;
 use crate::service::base::JobRecordBaseService;
 use crate::service::base::JobStepRecordBaseService;
 use crate::service::base::JobStepResourceRecordBaseService;
+use crate::Context;
 use sdk::job_record::enums::StepType;
 use sdk::job_record::read_job_record::JobRecord;
 use sdk::job_record::read_job_record::JobStepRecord;
@@ -22,7 +22,7 @@ use sdk::job_record::read_job_record::JobStepResourceRecord;
 use sdk::job_record::read_job_record::ReadJobRecordReq;
 use sdk::job_record::read_job_record::ReadJobRecordResp;
 use sdk::job_record::read_job_record::StepRecord;
-use tihu::Id;
+use std::sync::Arc;
 use tihu::SharedString;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
@@ -71,13 +71,13 @@ fn to_sdk_step_resource_record(
 }
 
 pub async fn read_job_record(
-    org_id: Id,
-    _user: User,
+    context: Arc<Context>,
+    user: User,
     read_job_record_req: ReadJobRecordReq,
 ) -> Result<ReadJobRecordResp, ErrNo> {
+    let org_id = user.org_id;
     let ReadJobRecordReq { id } = read_job_record_req;
     let record_id = id;
-    let context = get_context()?;
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
     let job_record_base_service = JobRecordBaseService::new(&transaction);

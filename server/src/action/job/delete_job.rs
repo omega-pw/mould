@@ -1,32 +1,32 @@
-use crate::get_context;
-use crate::middleware::auth::User;
 use crate::model::job::JobOpt;
 use crate::model::job_record::enums::Status;
 use crate::model::job_record::JobRecordOpt;
 use crate::model::job_step::JobStepOpt;
 use crate::model::job_step_record::JobStepRecordOpt;
 use crate::model::job_step_resource_record::JobStepResourceRecordOpt;
+use crate::prehandle::auth::User;
 use crate::sdk;
 use crate::service::base::JobBaseService;
 use crate::service::base::JobRecordBaseService;
 use crate::service::base::JobStepBaseService;
 use crate::service::base::JobStepRecordBaseService;
 use crate::service::base::JobStepResourceRecordBaseService;
+use crate::Context;
 use sdk::job::delete_job::DeleteJobReq;
-use tihu::Id;
+use std::sync::Arc;
 use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
 pub async fn delete_job(
-    org_id: Id,
-    _user: User,
+    context: Arc<Context>,
+    user: User,
     delete_job_req: DeleteJobReq,
 ) -> Result<(), ErrNo> {
+    let org_id = user.org_id;
     let DeleteJobReq { id } = delete_job_req;
     let job_id = id;
-    let context = get_context()?;
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
     let job_base_service = JobBaseService::new(&transaction);

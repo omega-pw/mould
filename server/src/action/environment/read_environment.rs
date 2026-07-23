@@ -1,30 +1,30 @@
-use crate::get_context;
-use crate::middleware::auth::User;
 use crate::model::environment::EnvironmentOpt;
 use crate::model::environment_resource::EnvironmentResourceOpt;
 use crate::model::environment_schema_resource::EnvironmentSchemaResourceOpt;
 use crate::native_common::utils::list::group_sub_list;
+use crate::prehandle::auth::User;
 use crate::sdk;
 use crate::service::base::EnvironmentBaseService;
 use crate::service::base::EnvironmentResourceBaseService;
 use crate::service::base::EnvironmentSchemaResourceBaseService;
+use crate::Context;
 use sdk::environment::read_environment::Environment;
 use sdk::environment::read_environment::EnvironmentResource;
 use sdk::environment::read_environment::EnvironmentSchemaResource;
 use sdk::environment::read_environment::ReadEnvironmentReq;
-use tihu::Id;
+use std::sync::Arc;
 use tihu::SharedString;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
 pub async fn read_environment(
-    org_id: Id,
-    _user: User,
+    context: Arc<Context>,
+    user: User,
     read_environment_req: ReadEnvironmentReq,
 ) -> Result<Environment, ErrNo> {
+    let org_id = user.org_id;
     let ReadEnvironmentReq { id } = read_environment_req;
     let environment_id = id;
-    let context = get_context()?;
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
     let environment_base_service = EnvironmentBaseService::new(&transaction);

@@ -3,7 +3,7 @@ use crate::context::Context;
 use crate::native_common;
 use crate::sdk;
 use crate::Asset;
-use action::system::get_system_info::get_system_info;
+use action::system::get_current_time::get_current_time;
 use form_urlencoded::Serializer;
 use headers::{ContentType, HeaderMapExt};
 use hyper::body::Incoming;
@@ -15,30 +15,30 @@ use hyper_util::rt::tokio::TokioIo;
 use hyper_util::rt::TokioExecutor;
 use hyper_util::server::conn::auto;
 use mime_guess::Mime;
+use native_common::errno::json_serialize_err;
 use native_common::errno::result_to_json_resp;
+use native_common::utils::http::response_html;
+use native_common::utils::http::response_json;
+use native_common::utils::http::response_not_found;
+use native_common::utils::http::response_text;
 use native_common::utils::HexStr;
 use oauth2::{CsrfToken, PkceCodeChallenge};
 use rust_embed::EmbeddedFile;
 use rust_embed::RustEmbed;
-use sdk::system::get_system_info::GET_SYSTEM_INFO_API;
+use sdk::system::get_current_time::GET_CURRENT_TIME_API;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tihu::Handler;
 use tihu_native::http::Body;
 use tihu_native::http::HttpHandler;
 use tihu_native::http::RequestData;
+use tihu_native::ErrNo;
 use tokio::net::TcpListener;
-
-fn json_response<T: Into<Body>>(body: T) -> Response<Body> {
-    let mut response = Response::new(body.into());
-    response.headers_mut().typed_insert(ContentType::json());
-    return response;
-}
 
 fn response_redirect(url: &str) -> Response<Body> {
     match HeaderValue::from_str(url) {
         Err(err) => {
-            let mut response = text_response(err.to_string());
+            let mut response = response_text(err.to_string());
             *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
             return response;
         }
@@ -52,40 +52,6 @@ fn response_redirect(url: &str) -> Response<Body> {
             return response;
         }
     }
-}
-
-fn response_bad_request() -> Response<Body> {
-    let status_code = StatusCode::BAD_REQUEST;
-    let status_text = status_code.canonical_reason().unwrap_or("Bad Request");
-    let mut response = Response::new(Body::from(status_text));
-    *response.status_mut() = status_code;
-    response.headers_mut().typed_insert(ContentType::html());
-    return response;
-}
-
-fn response_html(content: String) -> Response<Body> {
-    let mut response = Response::new(Body::from(content));
-    response.headers_mut().typed_insert(ContentType::html());
-    return response;
-}
-
-fn text_response<T: Into<Body>>(body: T) -> Response<Body> {
-    let mut response = Response::new(body.into());
-    response
-        .headers_mut()
-        .typed_insert(ContentType::text_utf8());
-    return response;
-}
-
-fn response_not_found() -> Response<Body> {
-    let status_code = StatusCode::NOT_FOUND;
-    let status_text = status_code.canonical_reason().unwrap_or("Not Found");
-    let mut response = Response::new(Body::from(status_text));
-    *response.status_mut() = status_code;
-    response
-        .headers_mut()
-        .typed_insert(ContentType::text_utf8());
-    return response;
 }
 
 struct ReadResult {
@@ -219,10 +185,10 @@ async fn try_dispatch(
     context: Arc<Context>,
     req: Request<Incoming>,
     remote_addr: SocketAddr,
-    handler: Arc<
+    api_handler: Arc<
         impl Handler<
-            (Request<Incoming>, SocketAddr, RequestData),
-            Out = Result<Response<Body>, anyhow::Error>,
+            (Arc<Context>, Request<Incoming>, SocketAddr, RequestData),
+            Out = Result<Response<Body>, ErrNo>,
         >,
     >,
 ) -> Result<Response<Body>, anyhow::Error> {
@@ -230,7 +196,7 @@ async fn try_dispatch(
     let oss_handler = context.get_oss_handler();
     if Method::GET == req.method() {
         if "/version.txt" == route {
-            return Ok(text_response(crate::VERSION_INFO));
+            return Ok(response_text(crate::VERSION_INFO));
         } else if route.starts_with("/oauth2/login/") {
             let (_, provider) = route.split_at("/oauth2/login/".len());
             match context.get_oauth2_client(provider) {
@@ -279,7 +245,7 @@ async fn try_dispatch(
                 }
                 Err(err_no) => {
                     log::error!("没有获取到对应的oauth2 provider: {}", err_no.to_string());
-                    let mut response = text_response("Bad Request");
+                    let mut response = response_text("Bad Request");
                     *response.status_mut() = StatusCode::BAD_REQUEST;
                     return Ok(response);
                 }
@@ -296,7 +262,7 @@ async fn try_dispatch(
                 }
                 Err(err_no) => {
                     log::error!("没有获取到对应的oidc provider: {}", err_no.to_string());
-                    let mut response = text_response("Bad Request");
+                    let mut response = response_text("Bad Request");
                     *response.status_mut() = StatusCode::BAD_REQUEST;
                     return Ok(response);
                 }
@@ -312,12 +278,30 @@ async fn try_dispatch(
         }
     } else if Method::POST == req.method() {
         let route = route.to_string();
-        if GET_SYSTEM_INFO_API == route {
-            return Ok(json_response(result_to_json_resp(
-                get_system_info(context).await,
-            )));
+        if GET_CURRENT_TIME_API == route {
+            return Ok(response_json(result_to_json_resp(get_current_time().await)));
         }
-        return handler.handle((req, remote_addr, RequestData::new())).await;
+        if match_route(oss_handler.as_ref(), &route) {
+            let mut request_data = RequestData::new();
+            let resp = oss_handler
+                .handle(req, remote_addr, &mut request_data, None)
+                .await?;
+            return Ok(resp.map(From::from));
+        } else {
+            match api_handler
+                .handle((context, req, remote_addr, RequestData::new()))
+                .await
+            {
+                Ok(resp) => {
+                    return Ok(resp);
+                }
+                Err(err_msg) => {
+                    let resp = tihu::api::Response::<()>::from(err_msg);
+                    let resp = serde_json::to_vec(&resp).unwrap_or_else(json_serialize_err);
+                    return Ok(response_json(resp));
+                }
+            }
+        }
     } else {
         return Ok(response_not_found());
     }
@@ -327,20 +311,20 @@ async fn dispatch(
     context: Arc<Context>,
     req: Request<Incoming>,
     remote_addr: SocketAddr,
-    handler: Arc<
+    api_handler: Arc<
         impl Handler<
-            (Request<Incoming>, SocketAddr, RequestData),
-            Out = Result<Response<Body>, anyhow::Error>,
+            (Arc<Context>, Request<Incoming>, SocketAddr, RequestData),
+            Out = Result<Response<Body>, ErrNo>,
         >,
     >,
 ) -> Result<Response<Body>, hyper::Error> {
-    match try_dispatch(context, req, remote_addr, handler).await {
+    match try_dispatch(context, req, remote_addr, api_handler).await {
         Ok(response) => {
             return Ok(response);
         }
         Err(err) => {
             log::error!("处理请求失败: {}", err.to_string());
-            let mut response = text_response("Internal Server Error");
+            let mut response = response_text("Internal Server Error");
             *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
             return Ok(response);
         }
@@ -349,10 +333,10 @@ async fn dispatch(
 
 pub async fn start_service(
     context: Arc<Context>,
-    handler: Arc<
+    api_handler: Arc<
         impl Handler<
-            (Request<Incoming>, SocketAddr, RequestData),
-            Out = Result<Response<Body>, anyhow::Error>,
+            (Arc<Context>, Request<Incoming>, SocketAddr, RequestData),
+            Out = Result<Response<Body>, ErrNo>,
         >,
     >,
 ) -> Result<(), anyhow::Error> {
@@ -365,15 +349,15 @@ pub async fn start_service(
         let (stream, remote_addr) = listener.accept().await?;
         let io = TokioIo::new(stream);
         let context = context.clone();
-        let handler = handler.clone();
+        let api_handler = api_handler.clone();
         tokio::task::spawn(async move {
             if let Err(err) = auto::Builder::new(TokioExecutor::new())
                 .serve_connection(
                     io,
                     service_fn(move |req| {
                         let context = context.clone();
-                        let handler = handler.clone();
-                        dispatch(context, req, remote_addr, handler)
+                        let api_handler = api_handler.clone();
+                        dispatch(context, req, remote_addr, api_handler)
                     }),
                 )
                 .await

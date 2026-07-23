@@ -1,9 +1,4 @@
 use super::cache_session_info;
-use crate::get_context;
-use crate::middleware::auth::AuthMethod;
-use crate::middleware::auth::Guest;
-use crate::middleware::auth::OpenidToken;
-use crate::middleware::auth::SessionInfo;
 use crate::model::external_user::enums::ProviderType;
 use crate::model::external_user::ExternalUser;
 use crate::model::external_user::ExternalUserOpt;
@@ -13,10 +8,15 @@ use crate::model::user::enums::UserSource;
 use crate::model::user::User;
 use crate::model::user::UserOpt;
 use crate::model::user::UserProperty;
+use crate::prehandle::auth::Guest;
+use crate::prehandle::session::AuthMethod;
+use crate::prehandle::session::OpenidToken;
+use crate::prehandle::session::SessionInfo;
 use crate::sdk;
 use crate::service::base::ExternalUserBaseService;
 use crate::service::base::OrganizationBaseService;
 use crate::service::base::UserBaseService;
+use crate::Context;
 use chrono::Utc;
 use openid::Token;
 use sdk::auth::get_curr_user::AuthSource;
@@ -24,6 +24,7 @@ use sdk::auth::get_curr_user::User as SdkUser;
 use sdk::auth::login_by_openid_code::LoginByOpenidCodeReq;
 use sdk::auth::login_by_openid_code::LoginByOpenidCodeResp;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
 use tihu_native::errno::open_transaction_error;
@@ -40,11 +41,11 @@ struct WechatTokenResp {
 }
 
 pub async fn login_by_openid_code(
+    context: Arc<Context>,
     guest: Guest,
     login_by_openid_code_req: LoginByOpenidCodeReq,
 ) -> Result<LoginByOpenidCodeResp, ErrNo> {
     let LoginByOpenidCodeReq { provider, code } = login_by_openid_code_req;
-    let context = get_context()?;
     let (openid_client, _) = context.get_openid_client(&provider)?;
     let mut token: Token = openid_client
         .request_token(&code)
@@ -217,6 +218,6 @@ pub async fn login_by_openid_code(
         .commit()
         .await
         .map_err(commit_transaction_error)?;
-    cache_session_info(guest.session_id, &session_info).await?;
+    cache_session_info(context, guest.session_id, &session_info).await?;
     return Ok(Some(curr_user));
 }

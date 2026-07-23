@@ -1,23 +1,27 @@
-use crate::get_context;
-use crate::middleware::auth::User;
 use crate::model::job::JobOpt;
 use crate::model::job_step::enums::StepType;
 use crate::model::job_step::JobStepOpt;
+use crate::prehandle::auth::User;
 use crate::sdk;
 use crate::service::base::JobBaseService;
 use crate::service::base::JobStepBaseService;
+use crate::Context;
 use sdk::job::read_job::Job;
 use sdk::job::read_job::JobStep;
 use sdk::job::read_job::ReadJobReq;
-use tihu::Id;
+use std::sync::Arc;
 use tihu::SharedString;
 use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
-pub async fn read_job(org_id: Id, _user: User, read_job_req: ReadJobReq) -> Result<Job, ErrNo> {
+pub async fn read_job(
+    context: Arc<Context>,
+    user: User,
+    read_job_req: ReadJobReq,
+) -> Result<Job, ErrNo> {
+    let org_id = user.org_id;
     let ReadJobReq { id } = read_job_req;
     let job_id = id;
-    let context = get_context()?;
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
     let job_base_service = JobBaseService::new(&transaction);

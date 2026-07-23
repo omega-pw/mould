@@ -1,16 +1,16 @@
-use crate::get_context;
-use crate::middleware::auth::User;
 use crate::model::environment_schema_resource::EnvironmentSchemaResourceOpt;
 use crate::model::job::Job;
 use crate::model::job_step::enums::StepType;
 use crate::model::job_step::JobStep;
+use crate::prehandle::auth::User;
 use crate::sdk;
 use crate::service::base::EnvironmentSchemaResourceBaseService;
 use crate::service::base::JobBaseService;
 use crate::service::base::JobStepBaseService;
+use crate::Context;
 use chrono::Utc;
 use sdk::job::insert_job::InsertJobReq;
-use tihu::Id;
+use std::sync::Arc;
 use tihu::PrimaryKey;
 use tihu::SharedString;
 use tihu_native::errno::commit_transaction_error;
@@ -18,17 +18,17 @@ use tihu_native::errno::open_transaction_error;
 use tihu_native::ErrNo;
 
 pub async fn insert_job(
-    org_id: Id,
-    _user: User,
+    context: Arc<Context>,
+    user: User,
     insert_job_req: InsertJobReq,
 ) -> Result<PrimaryKey, ErrNo> {
+    let org_id = user.org_id;
     let InsertJobReq {
         environment_schema_id,
         name,
         remark,
         job_step_list,
     } = insert_job_req;
-    let context = get_context()?;
     let mut client = context.get_db_client().await?;
     let transaction = client.transaction().await.map_err(open_transaction_error)?;
     let job_base_service = JobBaseService::new(&transaction);
